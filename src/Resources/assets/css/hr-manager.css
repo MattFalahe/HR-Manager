@@ -1,0 +1,1542 @@
+/* ============================================
+   HR Manager - Complete CSS
+   Version: 1.0 - SCOPED
+
+   IMPORTANT: All views MUST wrap content in:
+   - .hr-manager-wrapper
+
+   This prevents SeAT CSS from overriding our styles.
+   ============================================ */
+
+/* ============================================
+   CSS Variables & Color Palette
+   (Mirrors Mining Manager's --mm-* system)
+   ============================================ */
+:root {
+    /* Primary Colors */
+    --hr-primary-start: #667eea;
+    --hr-primary-end: #764ba2;
+    --hr-dark-bg: #1a1d24;
+    --hr-dark-card: #23262d;
+    --hr-border: #2c3138;
+
+    /* Text Colors */
+    --hr-text-light: #d1d1d1;
+    --hr-text-muted: #9ca3af;
+    --hr-text-white: #ffffff;
+
+    /* HR Status Colors */
+    --hr-status-applied: #17a2b8;
+    --hr-status-review: #ffc107;
+    --hr-status-interview: #6f42c1;
+    --hr-status-accepted: #28a745;
+    --hr-status-rejected: #dc3545;
+    --hr-status-withdrawn: #6c757d;
+
+    /* Standard Status Colors */
+    --hr-success: #28a745;
+    --hr-warning: #ffc107;
+    --hr-danger: #dc3545;
+    --hr-info: #17a2b8;
+
+    /* Spacing */
+    --hr-spacing-xs: 5px;
+    --hr-spacing-sm: 10px;
+    --hr-spacing-md: 15px;
+    --hr-spacing-lg: 20px;
+    --hr-spacing-xl: 30px;
+
+    /* Border Radius */
+    --hr-radius-sm: 3px;
+    --hr-radius-md: 5px;
+    --hr-radius-lg: 10px;
+    --hr-radius-xl: 15px;
+
+    /* Transitions */
+    --hr-transition-fast: 0.15s;
+    --hr-transition-normal: 0.3s;
+    --hr-transition-slow: 0.5s;
+}
+
+/* ============================================
+   Base Styles
+   ============================================ */
+.hr-manager-wrapper {
+    font-family: 'Source Sans Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    color: var(--hr-text-light);
+}
+
+.hr-manager-wrapper a {
+    transition: all var(--hr-transition-fast) ease;
+}
+
+.hr-manager-wrapper a:hover {
+    text-decoration: none;
+}
+
+/* ============================================
+   Cards & Containers
+   ============================================ */
+.hr-manager-wrapper .card-dark {
+    background-color: var(--hr-dark-bg);
+    border: 1px solid var(--hr-border);
+    transition: all var(--hr-transition-normal) ease;
+}
+
+.hr-manager-wrapper .card-dark:hover {
+    border-color: rgba(102, 126, 234, 0.3);
+}
+
+.hr-manager-wrapper .card-dark .card-header {
+    background-color: var(--hr-dark-card);
+    border-bottom: 1px solid var(--hr-border);
+    color: var(--hr-text-white);
+    padding: var(--hr-spacing-md) var(--hr-spacing-lg);
+}
+
+.hr-manager-wrapper .card-dark .card-header h3,
+.hr-manager-wrapper .card-dark .card-header h4,
+.hr-manager-wrapper .card-dark .card-header h5 {
+    margin: 0;
+    font-weight: 600;
+}
+
+.hr-manager-wrapper .card-dark .card-header .card-title {
+    display: flex;
+    align-items: center;
+    gap: var(--hr-spacing-sm);
+}
+
+.hr-manager-wrapper .card-dark .card-body {
+    color: var(--hr-text-light);
+    padding: var(--hr-spacing-lg);
+}
+
+.hr-manager-wrapper .card-dark .card-footer {
+    background-color: var(--hr-dark-card);
+    border-top: 1px solid var(--hr-border);
+    padding: var(--hr-spacing-md) var(--hr-spacing-lg);
+}
+
+/* Card with gradient header */
+.hr-manager-wrapper .card-gradient-header .card-header {
+    background: linear-gradient(135deg, var(--hr-primary-start) 0%, var(--hr-primary-end) 100%);
+    border: none;
+}
+
+/* Card hover effect */
+.hr-manager-wrapper .card-hover {
+    transition: transform var(--hr-transition-normal) ease, box-shadow var(--hr-transition-normal) ease;
+}
+
+.hr-manager-wrapper .card-hover:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================
+   Buttons
+   ============================================ */
+.hr-manager-wrapper .btn-hr-primary {
+    background: linear-gradient(135deg, var(--hr-primary-start) 0%, var(--hr-primary-end) 100%);
+    border: none;
+    color: var(--hr-text-white);
+    transition: all var(--hr-transition-normal) ease;
+}
+
+.hr-manager-wrapper .btn-hr-primary:hover {
+    background: linear-gradient(135deg, #5568d3 0%, #6a3d8f 100%);
+    color: var(--hr-text-white);
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+.hr-manager-wrapper .btn-hr-primary:active {
+    transform: translateY(0);
+}
+
+.hr-manager-wrapper .btn-hr-secondary {
+    background-color: var(--hr-dark-card);
+    border: 1px solid var(--hr-border);
+    color: var(--hr-text-light);
+}
+
+.hr-manager-wrapper .btn-hr-secondary:hover {
+    background-color: #2c3138;
+    border-color: rgba(102, 126, 234, 0.5);
+    color: var(--hr-text-white);
+}
+
+/* Button with icon */
+.hr-manager-wrapper .btn-icon {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--hr-spacing-xs);
+}
+
+/* Button loading state */
+.hr-manager-wrapper .btn-loading {
+    position: relative;
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+.hr-manager-wrapper .btn-loading::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    top: 50%;
+    left: 50%;
+    margin-left: -8px;
+    margin-top: -8px;
+    border: 2px solid transparent;
+    border-radius: 50%;
+    border-top-color: currentColor;
+    animation: spin 0.6s linear infinite;
+}
+
+/* ============================================
+   Badges & Labels
+   ============================================ */
+.hr-manager-wrapper .badge-hr {
+    padding: 4px 8px;
+    border-radius: var(--hr-radius-sm);
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Application status badges */
+.hr-manager-wrapper .badge-applied {
+    background-color: var(--hr-status-applied);
+    color: var(--hr-text-white);
+}
+
+.hr-manager-wrapper .badge-under-review {
+    background-color: var(--hr-status-review);
+    color: var(--hr-dark-bg);
+}
+
+.hr-manager-wrapper .badge-interview {
+    background-color: var(--hr-status-interview);
+    color: var(--hr-text-white);
+}
+
+.hr-manager-wrapper .badge-accepted {
+    background-color: var(--hr-status-accepted);
+    color: var(--hr-text-white);
+}
+
+.hr-manager-wrapper .badge-rejected {
+    background-color: var(--hr-status-rejected);
+    color: var(--hr-text-white);
+}
+
+.hr-manager-wrapper .badge-withdrawn {
+    background-color: var(--hr-status-withdrawn);
+    color: var(--hr-text-white);
+}
+
+/* Note type badges */
+.hr-manager-wrapper .badge-private {
+    background-color: var(--hr-danger);
+    color: var(--hr-text-white);
+}
+
+.hr-manager-wrapper .badge-public {
+    background-color: var(--hr-success);
+    color: var(--hr-text-white);
+}
+
+/* ============================================
+   Info Boxes (Stats)
+   ============================================ */
+.hr-manager-wrapper .info-box {
+    min-height: 90px;
+    border-radius: var(--hr-radius-lg);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+
+.hr-manager-wrapper .info-box.bg-gradient-primary {
+    background: linear-gradient(135deg, var(--hr-primary-start) 0%, var(--hr-primary-end) 100%) !important;
+}
+
+.hr-manager-wrapper .info-box.bg-gradient-success {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%) !important;
+}
+
+.hr-manager-wrapper .info-box.bg-gradient-warning {
+    background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%) !important;
+}
+
+.hr-manager-wrapper .info-box.bg-gradient-danger {
+    background: linear-gradient(135deg, #dc3545 0%, #e83e8c 100%) !important;
+}
+
+.hr-manager-wrapper .info-box.bg-gradient-info {
+    background: linear-gradient(135deg, #17a2b8 0%, #6610f2 100%) !important;
+}
+
+.hr-manager-wrapper .info-box-icon {
+    font-size: 1.8rem;
+}
+
+.hr-manager-wrapper .info-box-number {
+    font-size: 1.4rem;
+    font-weight: 700;
+}
+
+/* ============================================
+   Tables (DataTables dark theme)
+   ============================================ */
+.hr-manager-wrapper .table {
+    color: var(--hr-text-light);
+}
+
+.hr-manager-wrapper .table thead th {
+    background-color: var(--hr-dark-card);
+    color: var(--hr-text-white);
+    border-bottom: 2px solid var(--hr-border);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.5px;
+}
+
+.hr-manager-wrapper .table tbody tr {
+    border-bottom: 1px solid var(--hr-border);
+    transition: background-color var(--hr-transition-fast) ease;
+}
+
+.hr-manager-wrapper .table tbody tr:hover {
+    background-color: rgba(102, 126, 234, 0.1);
+}
+
+.hr-manager-wrapper .table td {
+    vertical-align: middle;
+    padding: var(--hr-spacing-sm) var(--hr-spacing-md);
+    border-top: 1px solid var(--hr-border);
+}
+
+/* DataTables controls dark theme */
+.hr-manager-wrapper .dataTables_wrapper .dataTables_filter input,
+.hr-manager-wrapper .dataTables_wrapper .dataTables_length select {
+    background: #454d55;
+    color: #fff;
+    border: 1px solid #6c757d;
+    border-radius: var(--hr-radius-md);
+    padding: 4px 8px;
+}
+
+.hr-manager-wrapper .dataTables_wrapper .dataTables_info,
+.hr-manager-wrapper .dataTables_wrapper .dataTables_paginate {
+    color: var(--hr-text-muted);
+}
+
+.hr-manager-wrapper .dataTables_wrapper .paginate_button {
+    color: var(--hr-text-light) !important;
+    border: 1px solid var(--hr-border) !important;
+    background-color: var(--hr-dark-card) !important;
+}
+
+.hr-manager-wrapper .dataTables_wrapper .paginate_button.current,
+.hr-manager-wrapper .dataTables_wrapper .paginate_button:hover {
+    background: linear-gradient(135deg, var(--hr-primary-start) 0%, var(--hr-primary-end) 100%) !important;
+    color: var(--hr-text-white) !important;
+    border-color: var(--hr-primary-start) !important;
+}
+
+/* ============================================
+   Forms
+   ============================================ */
+.hr-manager-wrapper .form-control {
+    background-color: #454d55;
+    border: 1px solid #6c757d;
+    color: var(--hr-text-white);
+    transition: border-color var(--hr-transition-fast) ease;
+}
+
+.hr-manager-wrapper .form-control:focus {
+    background-color: #454d55;
+    border-color: var(--hr-primary-start);
+    color: var(--hr-text-white);
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+}
+
+.hr-manager-wrapper .form-control::placeholder {
+    color: var(--hr-text-muted);
+}
+
+.hr-manager-wrapper label {
+    color: var(--hr-text-light);
+    font-weight: 600;
+}
+
+.hr-manager-wrapper .custom-select {
+    background-color: #454d55;
+    border: 1px solid #6c757d;
+    color: var(--hr-text-white);
+}
+
+/* ============================================
+   Modals
+   ============================================ */
+.hr-manager-wrapper .modal-content {
+    background-color: var(--hr-dark-bg);
+    border: 1px solid var(--hr-border);
+    color: var(--hr-text-light);
+}
+
+.hr-manager-wrapper .modal-header {
+    background-color: var(--hr-dark-card);
+    border-bottom: 1px solid var(--hr-border);
+}
+
+.hr-manager-wrapper .modal-header .modal-title {
+    color: var(--hr-text-white);
+}
+
+.hr-manager-wrapper .modal-footer {
+    background-color: var(--hr-dark-card);
+    border-top: 1px solid var(--hr-border);
+}
+
+.hr-manager-wrapper .close {
+    color: var(--hr-text-muted);
+}
+
+/* ============================================
+   Tabs
+   ============================================ */
+.hr-manager-wrapper .nav-tabs {
+    border-bottom: 1px solid var(--hr-border);
+}
+
+.hr-manager-wrapper .nav-tabs .nav-link {
+    color: var(--hr-text-muted);
+    border: none;
+    border-bottom: 2px solid transparent;
+    transition: all var(--hr-transition-fast) ease;
+}
+
+.hr-manager-wrapper .nav-tabs .nav-link:hover {
+    color: var(--hr-text-white);
+    border-bottom-color: rgba(102, 126, 234, 0.5);
+}
+
+.hr-manager-wrapper .nav-tabs .nav-link.active {
+    background: transparent;
+    color: var(--hr-text-white);
+    border-bottom-color: var(--hr-primary-start);
+}
+
+/* ============================================
+   Alerts
+   ============================================ */
+.hr-manager-wrapper .alert {
+    border-radius: var(--hr-radius-md);
+    border: 1px solid;
+}
+
+/* ============================================
+   Notes Section
+   ============================================ */
+.hr-manager-wrapper .note-item {
+    background-color: var(--hr-dark-card);
+    border: 1px solid var(--hr-border);
+    border-radius: var(--hr-radius-md);
+    padding: var(--hr-spacing-md);
+    margin-bottom: var(--hr-spacing-sm);
+    transition: border-color var(--hr-transition-fast) ease;
+}
+
+.hr-manager-wrapper .note-item:hover {
+    border-color: rgba(102, 126, 234, 0.3);
+}
+
+.hr-manager-wrapper .note-item.note-private {
+    border-left: 3px solid var(--hr-danger);
+}
+
+.hr-manager-wrapper .note-item.note-public {
+    border-left: 3px solid var(--hr-success);
+}
+
+.hr-manager-wrapper .note-meta {
+    color: var(--hr-text-muted);
+    font-size: 0.85rem;
+    margin-bottom: var(--hr-spacing-xs);
+}
+
+.hr-manager-wrapper .note-content {
+    color: var(--hr-text-light);
+}
+
+/* ============================================
+   Application Timeline
+   ============================================ */
+.hr-manager-wrapper .status-timeline {
+    position: relative;
+    padding-left: 30px;
+}
+
+.hr-manager-wrapper .status-timeline::before {
+    content: '';
+    position: absolute;
+    left: 10px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background-color: var(--hr-border);
+}
+
+.hr-manager-wrapper .timeline-item {
+    position: relative;
+    margin-bottom: var(--hr-spacing-md);
+    padding: var(--hr-spacing-sm) var(--hr-spacing-md);
+    background-color: var(--hr-dark-card);
+    border-radius: var(--hr-radius-md);
+    border: 1px solid var(--hr-border);
+}
+
+.hr-manager-wrapper .timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -24px;
+    top: 15px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: var(--hr-primary-start);
+    border: 2px solid var(--hr-dark-bg);
+}
+
+.hr-manager-wrapper .timeline-item .timeline-date {
+    color: var(--hr-text-muted);
+    font-size: 0.8rem;
+}
+
+.hr-manager-wrapper .timeline-item .timeline-content {
+    color: var(--hr-text-light);
+}
+
+/* ============================================
+   Character Info Panel
+   ============================================ */
+.hr-manager-wrapper .character-header {
+    display: flex;
+    align-items: center;
+    gap: var(--hr-spacing-md);
+    padding: var(--hr-spacing-lg);
+}
+
+.hr-manager-wrapper .character-avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    border: 2px solid var(--hr-primary-start);
+}
+
+.hr-manager-wrapper .character-name {
+    color: var(--hr-text-white);
+    font-size: 1.4rem;
+    font-weight: 700;
+}
+
+.hr-manager-wrapper .character-corp {
+    color: var(--hr-text-muted);
+    font-size: 0.95rem;
+}
+
+/* Stats grid for member profile */
+.hr-manager-wrapper .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: var(--hr-spacing-md);
+}
+
+.hr-manager-wrapper .stat-item {
+    background-color: var(--hr-dark-card);
+    border: 1px solid var(--hr-border);
+    border-radius: var(--hr-radius-md);
+    padding: var(--hr-spacing-md);
+    text-align: center;
+}
+
+.hr-manager-wrapper .stat-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--hr-text-white);
+}
+
+.hr-manager-wrapper .stat-label {
+    font-size: 0.8rem;
+    color: var(--hr-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* ============================================
+   Employment History
+   ============================================ */
+.hr-manager-wrapper .employment-item {
+    display: flex;
+    align-items: center;
+    gap: var(--hr-spacing-md);
+    padding: var(--hr-spacing-sm) 0;
+    border-bottom: 1px solid var(--hr-border);
+}
+
+.hr-manager-wrapper .employment-item:last-child {
+    border-bottom: none;
+}
+
+.hr-manager-wrapper .employment-corp-logo {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--hr-radius-sm);
+}
+
+.hr-manager-wrapper .employment-details {
+    flex: 1;
+}
+
+.hr-manager-wrapper .employment-corp-name {
+    color: var(--hr-text-white);
+    font-weight: 600;
+}
+
+.hr-manager-wrapper .employment-dates {
+    color: var(--hr-text-muted);
+    font-size: 0.85rem;
+}
+
+/* ============================================
+   Help Page Styles
+   ============================================ */
+.hr-manager-wrapper .help-wrapper {
+    display: flex;
+    gap: 20px;
+}
+
+.hr-manager-wrapper .help-sidebar {
+    flex: 0 0 280px;
+    position: sticky;
+    top: 20px;
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+}
+
+.hr-manager-wrapper .help-content {
+    flex: 1;
+    min-width: 0;
+    color: #d1d5db !important;
+}
+
+.hr-manager-wrapper .help-nav .nav-link {
+    color: #e2e8f0 !important;
+    border-radius: 5px;
+    margin-bottom: 5px;
+    padding: 10px 15px;
+    transition: all 0.3s;
+    font-size: 0.95rem;
+}
+
+.hr-manager-wrapper .help-nav .nav-link:hover {
+    background: rgba(102, 126, 234, 0.2);
+}
+
+.hr-manager-wrapper .help-nav .nav-link.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.hr-manager-wrapper .help-nav .nav-link i {
+    width: 24px;
+    text-align: center;
+    margin-right: 10px;
+}
+
+/* Show one section at a time. The active class is toggled by the
+   sidebar-nav JS. Without this rule every section renders simultaneously
+   on initial paint. */
+.hr-manager-wrapper .help-section {
+    display: none;
+    animation: fadeIn 0.3s;
+}
+
+.hr-manager-wrapper .help-section.active {
+    display: block;
+}
+
+/* Help-card is the actual visible container inside a section. A section
+   can hold multiple cards. */
+.hr-manager-wrapper .help-card {
+    background: var(--hr-dark-card);
+    border-radius: var(--hr-radius-lg);
+    padding: 25px;
+    margin-bottom: 20px;
+    border: 1px solid rgba(102, 126, 234, 0.2);
+}
+
+.hr-manager-wrapper .help-card h3 {
+    color: var(--hr-primary-start) !important;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Avoid the medium-grey on tinted-bg contrast bug — see
+   feedback_help_docs_visual_design.md. Tinted-box overrides further
+   down lift this to near-white inside info/warning/success boxes. */
+.hr-manager-wrapper .help-card h4 {
+    color: #9ca3af !important;
+    margin-top: 20px;
+    margin-bottom: 10px;
+    font-size: 1.1rem;
+}
+
+.hr-manager-wrapper .help-card h5 {
+    color: #e2e8f0 !important;
+    margin-top: 15px;
+    margin-bottom: 8px;
+}
+
+.hr-manager-wrapper .help-card p {
+    color: #d1d5db !important;
+    line-height: 1.6;
+}
+
+.hr-manager-wrapper .help-card ul,
+.hr-manager-wrapper .help-card ol {
+    color: #d1d5db !important;
+    line-height: 1.8;
+    margin-left: 20px;
+}
+
+.hr-manager-wrapper .help-card strong {
+    color: #e2e8f0 !important;
+}
+
+.hr-manager-wrapper .help-card li {
+    color: #d1d5db !important;
+}
+
+.hr-manager-wrapper .help-card code {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: #fbbf24 !important;
+    font-size: 0.9em;
+}
+
+.hr-manager-wrapper .help-card pre {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 15px;
+    border-radius: 5px;
+    overflow-x: auto;
+    color: #d1d5db !important;
+}
+
+.hr-manager-wrapper .help-card table {
+    color: #d1d5db !important;
+}
+
+/* Step-by-step (gradient circle counters) */
+.hr-manager-wrapper .step-by-step {
+    counter-reset: step-counter;
+    list-style: none;
+    padding-left: 0;
+}
+
+.hr-manager-wrapper .step-by-step li {
+    counter-increment: step-counter;
+    margin-bottom: 20px;
+    padding-left: 50px;
+    position: relative;
+    color: #d1d5db !important;
+}
+
+.hr-manager-wrapper .step-by-step li::before {
+    content: counter(step-counter);
+    position: absolute;
+    left: 0;
+    top: 0;
+    background: linear-gradient(135deg, var(--hr-primary-start) 0%, var(--hr-primary-end) 100%);
+    color: white;
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+/* Tinted callouts */
+.hr-manager-wrapper .info-box,
+.hr-manager-wrapper .warning-box,
+.hr-manager-wrapper .success-box {
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 5px;
+    color: #d1d5db !important;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.hr-manager-wrapper .info-box {
+    background: rgba(23, 162, 184, 0.15);
+    border-left: 4px solid var(--hr-info);
+}
+
+/* Variant classes for the multi-content info-box cards in the help
+   section (e.g. the Discord / Connector setup cards). Each variant
+   tints the box with a distinct accent so operators can scan the
+   options without reading every word.
+
+   IMPORTANT: base .info-box uses display:flex which works for the
+   simple 1-icon + 1-paragraph cards everywhere else but explodes a
+   card's multi-paragraph + multi-list content into a row of flex
+   columns. Override to block-level layout here so paragraphs, ordered
+   lists, and unordered lists stack the way the markup expects. */
+.hr-manager-wrapper .info-box.info-box-success,
+.hr-manager-wrapper .info-box.info-box-warning,
+.hr-manager-wrapper .info-box.info-box-purple {
+    display: block;
+}
+.hr-manager-wrapper .info-box.info-box-success > h4,
+.hr-manager-wrapper .info-box.info-box-warning > h4,
+.hr-manager-wrapper .info-box.info-box-purple > h4 {
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+}
+.hr-manager-wrapper .info-box.info-box-success > p,
+.hr-manager-wrapper .info-box.info-box-warning > p,
+.hr-manager-wrapper .info-box.info-box-purple > p {
+    margin-bottom: 0.5rem;
+}
+.hr-manager-wrapper .info-box.info-box-success > ol,
+.hr-manager-wrapper .info-box.info-box-success > ul,
+.hr-manager-wrapper .info-box.info-box-warning > ol,
+.hr-manager-wrapper .info-box.info-box-warning > ul,
+.hr-manager-wrapper .info-box.info-box-purple > ol,
+.hr-manager-wrapper .info-box.info-box-purple > ul {
+    margin-bottom: 0.75rem;
+    padding-left: 1.5rem;
+}
+
+.hr-manager-wrapper .info-box.info-box-success {
+    background: rgba(40, 167, 69, 0.12);
+    border-left: 4px solid var(--hr-success);
+}
+.hr-manager-wrapper .info-box.info-box-success > h4 { color: var(--hr-success); }
+.hr-manager-wrapper .info-box.info-box-success > h4 > i { color: var(--hr-success); }
+
+.hr-manager-wrapper .info-box.info-box-warning {
+    background: rgba(255, 193, 7, 0.10);
+    border-left: 4px solid var(--hr-warning);
+}
+.hr-manager-wrapper .info-box.info-box-warning > h4 { color: var(--hr-warning); }
+.hr-manager-wrapper .info-box.info-box-warning > h4 > i { color: var(--hr-warning); }
+
+.hr-manager-wrapper .info-box.info-box-purple {
+    background: rgba(118, 75, 162, 0.14);
+    border-left: 4px solid #9b7ed5;
+}
+.hr-manager-wrapper .info-box.info-box-purple > h4 { color: #c4b3e8; }
+.hr-manager-wrapper .info-box.info-box-purple > h4 > i { color: #c4b3e8; }
+
+.hr-manager-wrapper .warning-box {
+    background: rgba(255, 193, 7, 0.15);
+    border-left: 4px solid var(--hr-warning);
+}
+
+.hr-manager-wrapper .success-box {
+    background: rgba(40, 167, 69, 0.15);
+    border-left: 4px solid var(--hr-success);
+}
+
+.hr-manager-wrapper .info-box > i,
+.hr-manager-wrapper .warning-box > i,
+.hr-manager-wrapper .success-box > i {
+    margin-top: 3px;
+    flex-shrink: 0;
+}
+
+.hr-manager-wrapper .info-box > i { color: var(--hr-info); }
+.hr-manager-wrapper .warning-box > i { color: var(--hr-warning); }
+.hr-manager-wrapper .success-box > i { color: var(--hr-success); }
+
+/* Lift text inside tinted boxes to high contrast — without this the
+   default .help-card h4 medium-grey is barely readable on tint
+   backgrounds. Chained-class selector beats Bootstrap's .text-muted.
+   See feedback_help_docs_visual_design.md. */
+.hr-manager-wrapper .info-box h3,
+.hr-manager-wrapper .info-box h4,
+.hr-manager-wrapper .info-box h5,
+.hr-manager-wrapper .warning-box h3,
+.hr-manager-wrapper .warning-box h4,
+.hr-manager-wrapper .warning-box h5,
+.hr-manager-wrapper .success-box h3,
+.hr-manager-wrapper .success-box h4,
+.hr-manager-wrapper .success-box h5 {
+    color: #f9fafb !important;
+}
+
+.hr-manager-wrapper .info-box p,
+.hr-manager-wrapper .info-box ul,
+.hr-manager-wrapper .info-box ol,
+.hr-manager-wrapper .info-box li,
+.hr-manager-wrapper .info-box small,
+.hr-manager-wrapper .warning-box p,
+.hr-manager-wrapper .warning-box ul,
+.hr-manager-wrapper .warning-box ol,
+.hr-manager-wrapper .warning-box li,
+.hr-manager-wrapper .warning-box small,
+.hr-manager-wrapper .success-box p,
+.hr-manager-wrapper .success-box ul,
+.hr-manager-wrapper .success-box ol,
+.hr-manager-wrapper .success-box li,
+.hr-manager-wrapper .success-box small {
+    color: #f3f4f6 !important;
+}
+
+.hr-manager-wrapper .info-box strong,
+.hr-manager-wrapper .warning-box strong,
+.hr-manager-wrapper .success-box strong {
+    color: #ffffff !important;
+}
+
+.hr-manager-wrapper .info-box .text-muted,
+.hr-manager-wrapper .warning-box .text-muted,
+.hr-manager-wrapper .success-box .text-muted {
+    color: #d1d5db !important;
+    opacity: 0.95;
+}
+
+/* Feature items (small icon-card grid) */
+.hr-manager-wrapper .feature-item {
+    background: rgba(102, 126, 234, 0.1);
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(102, 126, 234, 0.3);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.hr-manager-wrapper .feature-item .feature-icon {
+    flex: 0 0 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Direct-child only — leaves nested badge / inline icons alone so they
+   inherit their own colour. See feedback_help_docs_visual_design.md. */
+.hr-manager-wrapper .feature-item > .feature-icon > i {
+    font-size: 1.5rem;
+    color: var(--hr-primary-start);
+}
+
+.hr-manager-wrapper .feature-item strong {
+    color: #e2e8f0 !important;
+}
+
+.hr-manager-wrapper .feature-item small {
+    color: #9ca3af !important;
+}
+
+/* Search box */
+.hr-manager-wrapper .search-box {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.hr-manager-wrapper .search-box input {
+    width: 100%;
+    padding: 12px 45px 12px 15px;
+    background: #2d3748;
+    border: 1px solid rgba(102, 126, 234, 0.3);
+    border-radius: 8px;
+    color: #e2e8f0 !important;
+}
+
+.hr-manager-wrapper .search-box > i {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9ca3af;
+}
+
+/* Quick links (gradient pill buttons) */
+.hr-manager-wrapper .quick-links {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    margin: 20px 0;
+}
+
+.hr-manager-wrapper .quick-link {
+    background: linear-gradient(135deg, var(--hr-primary-start) 0%, var(--hr-primary-end) 100%);
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+    color: white !important;
+    text-decoration: none;
+    transition: transform 0.2s;
+    display: block;
+}
+
+.hr-manager-wrapper .quick-link:hover {
+    transform: translateY(-2px);
+    color: white !important;
+    text-decoration: none;
+}
+
+.hr-manager-wrapper .quick-link i {
+    display: block;
+    margin-bottom: 8px;
+}
+
+/* FAQ accordion */
+.hr-manager-wrapper .faq-item {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    margin-bottom: 10px;
+    overflow: hidden;
+}
+
+.hr-manager-wrapper .faq-question {
+    padding: 15px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background 0.2s;
+    color: #e2e8f0 !important;
+}
+
+.hr-manager-wrapper .faq-question:hover {
+    background: rgba(102, 126, 234, 0.1);
+}
+
+.hr-manager-wrapper .faq-question i {
+    transition: transform 0.3s;
+}
+
+.hr-manager-wrapper .faq-item.open .faq-question i {
+    transform: rotate(180deg);
+}
+
+.hr-manager-wrapper .faq-answer {
+    padding: 0 15px;
+    max-height: 0;
+    overflow: hidden;
+    transition: all 0.3s;
+    color: #d1d5db !important;
+}
+
+.hr-manager-wrapper .faq-item.open .faq-answer {
+    padding: 15px;
+    max-height: 600px;
+}
+
+/* badge-hr family — used inside the status-ladder list */
+.hr-manager-wrapper .badge-hr {
+    color: #fff !important;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+.hr-manager-wrapper .badge-applied      { background: var(--hr-status-applied); }
+.hr-manager-wrapper .badge-under-review { background: var(--hr-status-review); color: #1a1d24 !important; }
+.hr-manager-wrapper .badge-interview    { background: var(--hr-status-interview); }
+.hr-manager-wrapper .badge-accepted     { background: var(--hr-status-accepted); }
+.hr-manager-wrapper .badge-rejected     { background: var(--hr-status-rejected); }
+.hr-manager-wrapper .badge-withdrawn    { background: var(--hr-status-withdrawn); }
+
+/* ============================================================
+   Cleared watchlist history banner — muted audit context on
+   the application detail. Same width / shape as the active
+   watchlist banner but lower visual weight (no gradient, no
+   shadow) so it reads as "historical".
+   ============================================================ */
+.hr-manager-wrapper .cleared-watchlist-banner {
+    background: rgba(108, 117, 125, 0.10);
+    border: 1px solid rgba(108, 117, 125, 0.35);
+    border-radius: var(--hr-radius-lg);
+    padding: 16px 20px;
+}
+
+/* ============================================================
+   Intel banner — application detail surfaces intel notes about
+   the applicant. Muted purple-on-dark so it doesn't compete with
+   the watchlist banner (which is red/green) but still reads as
+   "you should look at this".
+   ============================================================ */
+.hr-manager-wrapper .intel-banner {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.18) 0%, rgba(118, 75, 162, 0.12) 100%);
+    border: 1px solid rgba(102, 126, 234, 0.35);
+    border-radius: var(--hr-radius-lg);
+    padding: 16px 20px;
+}
+
+.hr-manager-wrapper .intel-note {
+    padding: 12px 16px;
+    background: var(--hr-dark-card);
+    border: 1px solid var(--hr-border);
+    border-radius: var(--hr-radius-md);
+}
+
+/* ============================================================
+   Unregistered character warning banner — top of member profile
+   when the character has no SeAT refresh token. Directs the admin
+   to either chase them to register or consider kicking them from
+   the corp since we have no insight into them.
+   ============================================================ */
+.hr-manager-wrapper .unregistered-warning-banner {
+    background: linear-gradient(135deg, rgba(220, 53, 69, 0.85) 0%, rgba(155, 28, 47, 0.92) 100%);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: var(--hr-radius-lg);
+    padding: 16px 20px;
+    color: #fff;
+    box-shadow: 0 4px 20px rgba(220, 53, 69, 0.3);
+}
+
+.hr-manager-wrapper .unregistered-warning-banner p {
+    color: #f3f4f6 !important;
+    margin: 0;
+}
+
+.hr-manager-wrapper .unregistered-warning-banner small {
+    color: #f3f4f6 !important;
+}
+
+/* ============================================================
+   Watchlist match banner — full-width above the application
+   detail page. Two color variants: blacklist (red gradient) and
+   whitelist (green gradient). High visual weight so the recruiter
+   sees the match BEFORE reading any answers.
+   ============================================================ */
+.hr-manager-wrapper .watchlist-match-banner {
+    border-radius: var(--hr-radius-lg);
+    padding: 20px 24px;
+    color: #fff;
+    margin-bottom: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.hr-manager-wrapper .watchlist-banner-blacklist {
+    background: linear-gradient(135deg, rgba(220, 53, 69, 0.92) 0%, rgba(155, 28, 47, 0.95) 100%);
+    box-shadow: 0 4px 24px rgba(220, 53, 69, 0.35);
+}
+
+.hr-manager-wrapper .watchlist-banner-whitelist {
+    background: linear-gradient(135deg, rgba(40, 167, 69, 0.92) 0%, rgba(25, 110, 45, 0.95) 100%);
+    box-shadow: 0 4px 24px rgba(40, 167, 69, 0.35);
+}
+
+.hr-manager-wrapper .watchlist-match-banner p {
+    color: #f3f4f6 !important;
+    margin: 0;
+}
+
+.hr-manager-wrapper .watchlist-match-banner small {
+    color: #f3f4f6 !important;
+}
+
+.hr-manager-wrapper .watchlist-match-banner .badge {
+    color: #1a1d24 !important;
+    background: rgba(255, 255, 255, 0.92) !important;
+    border-color: rgba(255, 255, 255, 0.5) !important;
+}
+
+/* ============================================================
+   Page intro banner — "What this page does / When to use" callout
+   at the top of every major tab so users instantly know the
+   page's scope without needing to read the rest of it. Each tab
+   gets its own copy via lang keys. Visibility chip on the right
+   says who else can see this page.
+
+   Layout:
+     +----------------------------------------+---------------+
+     | What this page does                    |   visibility  |
+     | one short paragraph                    |     chip      |
+     +----------------------------------------+---------------+
+     | When to use                                            |
+     | - bullet a                                             |
+     | - bullet b                                             |
+     +----------------------------------------+---------------+
+   ============================================================ */
+.hr-manager-wrapper .page-intro-banner {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.10) 0%, rgba(102, 126, 234, 0.05) 100%);
+    border: 1px solid rgba(102, 126, 234, 0.3);
+    border-radius: var(--hr-radius-lg);
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    position: relative;
+}
+
+.hr-manager-wrapper .page-intro-banner::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 3px;
+    background: linear-gradient(180deg, var(--hr-primary-start) 0%, var(--hr-primary-end) 100%);
+    border-radius: var(--hr-radius-lg) 0 0 var(--hr-radius-lg);
+}
+
+.hr-manager-wrapper .page-intro-banner .page-intro-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    justify-content: space-between;
+}
+
+.hr-manager-wrapper .page-intro-banner .page-intro-body {
+    flex: 1;
+}
+
+.hr-manager-wrapper .page-intro-banner h4 {
+    color: #e2e8f0 !important;
+    font-size: 0.85rem !important;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0 0 4px 0 !important;
+    font-weight: 600;
+}
+
+.hr-manager-wrapper .page-intro-banner h4 i {
+    color: var(--hr-primary-start);
+    margin-right: 6px;
+}
+
+.hr-manager-wrapper .page-intro-banner p {
+    color: #d1d5db !important;
+    margin: 0 0 10px 0;
+    line-height: 1.5;
+}
+
+.hr-manager-wrapper .page-intro-banner ul {
+    color: #d1d5db !important;
+    margin: 0;
+    padding-left: 20px;
+    line-height: 1.7;
+}
+
+.hr-manager-wrapper .page-intro-banner ul li {
+    color: #d1d5db !important;
+}
+
+.hr-manager-wrapper .page-intro-banner .page-intro-visibility {
+    flex-shrink: 0;
+    background: rgba(40, 167, 69, 0.18);
+    color: #d1d5db;
+    border: 1px solid rgba(40, 167, 69, 0.5);
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+.hr-manager-wrapper .page-intro-banner .page-intro-visibility i {
+    color: var(--hr-success);
+    margin-right: 4px;
+}
+
+.hr-manager-wrapper .page-intro-banner .page-intro-when {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(102, 126, 234, 0.15);
+}
+
+@media (max-width: 768px) {
+    .hr-manager-wrapper .page-intro-banner .page-intro-header {
+        flex-direction: column;
+    }
+    .hr-manager-wrapper .page-intro-banner .page-intro-visibility {
+        align-self: flex-start;
+    }
+}
+
+/* ============================================================
+   Two Faces hero — promotes the plugin's branding on the Help
+   Overview tab. Gradient frame, larger heading, side-by-side
+   recruiter / director face cards, and a three-beat motto strip
+   at the bottom (Recruit · Assess · Retain). Used ONCE per page
+   on the Help Overview's lead help-card.
+   ============================================================ */
+.hr-manager-wrapper .two-faces-hero {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.18) 0%, rgba(118, 75, 162, 0.18) 100%);
+    border: 1px solid rgba(102, 126, 234, 0.5);
+    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.15);
+    padding: 28px;
+    position: relative;
+    overflow: hidden;
+}
+
+.hr-manager-wrapper .two-faces-hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--hr-primary-start) 0%, var(--hr-primary-end) 100%);
+}
+
+.hr-manager-wrapper .two-faces-tagline {
+    display: inline-block;
+    background: rgba(255, 255, 255, 0.08);
+    color: #e2e8f0;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    margin-bottom: 12px;
+}
+
+.hr-manager-wrapper .two-faces-tagline i {
+    margin-right: 4px;
+    color: var(--hr-primary-start);
+}
+
+.hr-manager-wrapper .two-faces-title {
+    font-size: 2rem !important;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--hr-primary-start) 0%, var(--hr-primary-end) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 12px !important;
+    border-bottom: none !important;
+}
+
+.hr-manager-wrapper .two-faces-intro {
+    color: #d1d5db !important;
+    font-size: 1.05rem;
+    line-height: 1.6;
+    margin-bottom: 20px;
+}
+
+.hr-manager-wrapper .two-faces-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 20px 0;
+}
+
+@media (max-width: 768px) {
+    .hr-manager-wrapper .two-faces-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.hr-manager-wrapper .face-card {
+    background: var(--hr-dark-card);
+    border: 1px solid var(--hr-border);
+    border-radius: var(--hr-radius-md);
+    padding: 18px;
+    position: relative;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.hr-manager-wrapper .face-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(102, 126, 234, 0.5);
+}
+
+.hr-manager-wrapper .face-card .face-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 12px;
+    font-size: 1.4rem;
+    color: #fff;
+}
+
+.hr-manager-wrapper .face-recruiter .face-icon {
+    background: linear-gradient(135deg, #667eea 0%, #5b21b6 100%);
+}
+
+.hr-manager-wrapper .face-director .face-icon {
+    background: linear-gradient(135deg, #764ba2 0%, #ec4899 100%);
+}
+
+.hr-manager-wrapper .face-card h4 {
+    color: #e2e8f0 !important;
+    margin-top: 0 !important;
+    margin-bottom: 8px !important;
+    font-size: 1.1rem;
+}
+
+.hr-manager-wrapper .face-card p {
+    color: #d1d5db !important;
+    font-size: 0.92rem;
+    line-height: 1.55;
+    margin: 0;
+}
+
+.hr-manager-wrapper .two-faces-motto {
+    text-align: center;
+    padding-top: 18px;
+    margin-top: 12px;
+    border-top: 1px solid rgba(102, 126, 234, 0.3);
+    color: #e2e8f0;
+    font-weight: 600;
+    font-size: 1.1rem;
+    letter-spacing: 1px;
+}
+
+.hr-manager-wrapper .two-faces-motto i.fa-circle {
+    font-size: 0.4rem;
+    color: var(--hr-primary-start);
+    vertical-align: middle;
+    margin: 0 12px;
+}
+
+/* ============================================================
+   Page frame — soft dark backdrop wrapping a busy page so all
+   the inner cards read as one cohesive unit. Used by Corp Health
+   where the dashboard has ~10 cards stacked across the page.
+   ============================================================ */
+.hr-manager-wrapper .hr-page-frame {
+    background: rgba(0, 0, 0, 0.28);
+    border: 1px solid var(--hr-border);
+    border-radius: var(--hr-radius-lg);
+    padding: 20px;
+}
+
+@media (max-width: 768px) {
+    .hr-manager-wrapper .hr-page-frame {
+        padding: 12px;
+    }
+}
+
+/* ============================================================
+   Purge role-strip warning banner
+   ============================================================
+   Three severity tiers with the same shape; only the colors change.
+   purge-blink animation is layered on top of the critical tier ONLY
+   so a fresh purge schedule doesn't constantly flash for a week.
+   Animation pulses background + border opacity (NOT visibility) so
+   the text remains readable while attention-grabbing. */
+
+.hr-manager-wrapper .purge-warning-banner {
+    padding: 18px 22px;
+    border-radius: var(--hr-radius-lg);
+    color: #fff;
+    border: 2px solid transparent;
+}
+
+.hr-manager-wrapper .purge-banner-critical {
+    background: linear-gradient(135deg, rgba(220, 53, 69, 0.9) 0%, rgba(184, 28, 47, 0.95) 100%);
+    border-color: #fff;
+    box-shadow: 0 0 20px rgba(220, 53, 69, 0.5);
+}
+
+.hr-manager-wrapper .purge-banner-warning {
+    background: linear-gradient(135deg, rgba(255, 193, 7, 0.85) 0%, rgba(217, 164, 6, 0.9) 100%);
+    border-color: rgba(255, 255, 255, 0.4);
+    color: #1a1d24;
+}
+
+.hr-manager-wrapper .purge-banner-warning .badge {
+    color: #1a1d24 !important;
+    background: rgba(0, 0, 0, 0.12) !important;
+    border-color: rgba(0, 0, 0, 0.2) !important;
+}
+
+.hr-manager-wrapper .purge-banner-info {
+    background: rgba(23, 162, 184, 0.18);
+    border: 1px solid rgba(23, 162, 184, 0.5);
+    color: var(--hr-text-light);
+}
+
+.hr-manager-wrapper .purge-banner-info .badge {
+    color: var(--hr-text-light) !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+    border-color: var(--hr-border) !important;
+}
+
+@keyframes purge-pulse {
+    0%, 100% {
+        box-shadow: 0 0 20px rgba(220, 53, 69, 0.5);
+        border-color: #fff;
+    }
+    50% {
+        box-shadow: 0 0 40px rgba(220, 53, 69, 0.9), 0 0 60px rgba(220, 53, 69, 0.4);
+        border-color: rgba(255, 220, 220, 0.6);
+    }
+}
+
+.hr-manager-wrapper .purge-blink {
+    animation: purge-pulse 1.4s ease-in-out infinite;
+}
+
+/* Respect reduced-motion preference: don't pulse for users who've
+   asked the OS for less motion. They still get the critical color
+   tier. */
+@media (prefers-reduced-motion: reduce) {
+    .hr-manager-wrapper .purge-blink {
+        animation: none;
+    }
+}
+
+/* ============================================
+   Animations
+   ============================================ */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.hr-manager-wrapper .fade-in {
+    animation: fadeIn var(--hr-transition-normal) ease forwards;
+}
+
+/* ============================================
+   Responsive
+   ============================================ */
+@media (max-width: 768px) {
+    .hr-manager-wrapper .help-wrapper {
+        flex-direction: column;
+    }
+
+    .hr-manager-wrapper .help-sidebar {
+        flex: none;
+        position: static;
+        max-height: none;
+    }
+
+    .hr-manager-wrapper .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .hr-manager-wrapper .character-header {
+        flex-direction: column;
+        text-align: center;
+    }
+}
