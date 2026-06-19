@@ -25,10 +25,11 @@ class Note extends Model
 
     // ---- Relationships ----
 
-    public function noteable()
-    {
-        return $this->morphTo();
-    }
+    // NOTE: there is intentionally no `noteable()` morphTo relation. Notes are
+    // resolved by literal type string ('application' / 'member' / 'player') via
+    // the scopes below + the controllers, never through a polymorphic relation,
+    // so HR does not register (and must not register) a global morph map. See
+    // HrManagerServiceProvider::boot() for the full rationale.
 
     public function author()
     {

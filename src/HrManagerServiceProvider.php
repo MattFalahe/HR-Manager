@@ -3,7 +3,6 @@
 namespace HrManager;
 
 use Seat\Services\AbstractSeatPlugin;
-use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Log;
 
 class HrManagerServiceProvider extends AbstractSeatPlugin
@@ -54,11 +53,23 @@ class HrManagerServiceProvider extends AbstractSeatPlugin
             ]);
         }
 
-        Relation::enforceMorphMap([
-            'application' => \HrManager\Models\Application::class,
-            'member'      => \Seat\Eveapi\Models\Character\CharacterInfo::class,
-            'player'      => \Seat\Web\Models\User::class,
-        ]);
+        // HR deliberately does NOT register a global morph map.
+        //
+        // hr_manager_notes stores its noteable_type as the literal strings
+        // 'application' / 'member' / 'player', and every read is a plain string
+        // match (the Note::noteable morphTo is never resolved anywhere), so no
+        // morph map is needed for HR to function.
+        //
+        // A previous Relation::enforceMorphMap() here turned on app-wide
+        // requireMorphMap enforcement, which made EVERY other plugin's
+        // polymorphic relation throw ClassMorphViolationException for any model
+        // not in HR's 3-entry map. seat-connector's Set->entity morph
+        // (User/Role/Squad/Corporation/Alliance/Title) tripped this, breaking
+        // the SeAT Squads page DataTables (members-table / roles-table) with
+        // "Invalid JSON response". Even a non-enforced map would have globally
+        // re-aliased core models (User -> 'player') and risked mismatching
+        // seat-connector's stored entity_type. Do not re-add a global morph
+        // map from this plugin.
 
         $this->add_publications();
         $this->registerPluginBridgeCapabilities();
