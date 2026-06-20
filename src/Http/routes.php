@@ -243,6 +243,9 @@ Route::group([
         Route::post('/corp-health/purge/{id}/note', [
             'as' => 'hr-manager.corp-health.purge-note', 'uses' => 'CorpHealthController@purgeNote',
         ]);
+        Route::post('/corp-health/purge/{id}/remove-squads', [
+            'as' => 'hr-manager.corp-health.purge-remove-squads', 'uses' => 'CorpHealthController@purgeRemoveSquads',
+        ]);
     });
 
     // --- ADMIN TIER ---

@@ -230,6 +230,16 @@ class PurgeBoardService
             ? app(AccessDepthService::class)->perCharacterIngameAccess($charIds, $s->corporation_id)
             : [];
 
+        // Squad cleanup data (account-level), split for the board:
+        //  removable = manual/hidden & not excluded (the button clears these);
+        //  excluded  = manual/hidden but on the never-touch list (kept);
+        //  auto      = SeAT-managed, never touched (informational).
+        $allSquads       = app(SeatSquadService::class)->squadsForUser((int) $s->user_id);
+        $squadsRemovable = array_values(array_filter($allSquads, fn ($q) => $q['type_removable'] && !$q['excluded']));
+        $squadsExcluded  = array_values(array_filter($allSquads, fn ($q) => $q['type_removable'] && $q['excluded']));
+        $squadsAuto      = array_values(array_filter($allSquads, fn ($q) => !$q['type_removable']));
+        $purgeSvc        = app(PurgeService::class);
+
         return [
             'status_id'      => (int) $s->id,
             'user_id'        => (int) $s->user_id,
@@ -256,6 +266,14 @@ class PurgeBoardService
             'left_corp'      => $s->purge_left_corp_at !== null,
             'left_corp_at'   => $s->purge_left_corp_at,
             'left_corp_to'   => $s->purge_left_corp_to,
+            'squads_removable'  => $squadsRemovable,
+            'squads_excluded'   => $squadsExcluded,
+            'squads_auto'       => $squadsAuto,
+            'squads_removed_at' => $s->purge_squads_removed_at ?? null,
+            'auto_squad'        => [
+                'enabled' => $purgeSvc->autoSquadRemovalEnabled(),
+                'hours'   => $purgeSvc->autoSquadRemovalHours(),
+            ],
         ];
     }
 

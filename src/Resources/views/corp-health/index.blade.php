@@ -1629,6 +1629,58 @@
                             </div>
                         </div>
 
+                        {{-- Squad cleanup (SeAT squads; with Connector these map to Discord roles). --}}
+                        @php
+                            $sqRemovable = $e['squads_removable'] ?? [];
+                            $sqExcluded  = $e['squads_excluded'] ?? [];
+                            $sqAuto      = $e['squads_auto'] ?? [];
+                            $sqDone      = $e['squads_removed_at'] ?? null;
+                            $sqCfg       = $e['auto_squad'] ?? ['enabled' => false, 'hours' => 24];
+                        @endphp
+                        @if(!empty($sqRemovable) || !empty($sqExcluded) || !empty($sqAuto) || $sqDone)
+                            <small style="color: var(--hr-text-muted); text-transform: uppercase; letter-spacing: 0.4px; font-size: 0.7rem; display: block; margin-top: 12px;">
+                                <i class="fas fa-user-friends"></i> {{ trans('hr-manager::corp-health.purge_squads_label') }}
+                            </small>
+
+                            @if($sqDone)
+                                <div class="mt-1 mb-2"><small style="color: #28a745;"><i class="fas fa-check-circle"></i> {{ trans('hr-manager::corp-health.purge_squads_done', ['when' => $sqDone->diffForHumans()]) }}</small></div>
+                            @elseif(!empty($sqRemovable))
+                                <div class="mt-1" style="display: flex; flex-wrap: wrap; gap: 6px;">
+                                    @foreach($sqRemovable as $q)
+                                        <span class="badge" style="background: rgba(255,255,255,0.05); color: var(--hr-text-light); border: 1px solid rgba(255,255,255,0.12); font-weight: normal;"><i class="fas fa-user-friends"></i> {{ $q['name'] }}</span>
+                                    @endforeach
+                                </div>
+                                <form method="POST" action="{{ route('hr-manager.corp-health.purge-remove-squads', $e['status_id']) }}"
+                                      onsubmit="return confirm('{{ trans('hr-manager::corp-health.purge_squads_confirm', ['count' => count($sqRemovable)]) }}');" class="mt-2">
+                                    @csrf
+                                    <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-user-minus"></i> {{ trans('hr-manager::corp-health.purge_squads_btn', ['count' => count($sqRemovable)]) }}</button>
+                                </form>
+                                @if($sqCfg['enabled'])
+                                    <small class="d-block mt-1" style="color: #f59e0b;"><i class="fas fa-exclamation-triangle"></i> {{ trans('hr-manager::corp-health.purge_squads_auto_warn', ['hours' => $sqCfg['hours']]) }}</small>
+                                @endif
+                            @else
+                                <div class="mt-1 mb-1"><small style="color: var(--hr-text-muted);">{{ trans('hr-manager::corp-health.purge_squads_none_removable') }}</small></div>
+                            @endif
+
+                            @if(!empty($sqExcluded))
+                                <div class="mt-1" style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
+                                    <small style="color: var(--hr-text-muted);">{{ trans('hr-manager::corp-health.purge_squads_kept') }}</small>
+                                    @foreach($sqExcluded as $q)
+                                        <span class="badge" style="background: rgba(255,255,255,0.03); color: var(--hr-text-muted); border: 1px dashed rgba(255,255,255,0.15); font-weight: normal;"><i class="fas fa-lock"></i> {{ $q['name'] }}</span>
+                                    @endforeach
+                                </div>
+                            @endif
+
+                            @if(!empty($sqAuto))
+                                <div class="mt-1" style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
+                                    <small style="color: var(--hr-text-muted);">{{ trans('hr-manager::corp-health.purge_squads_auto_managed') }}</small>
+                                    @foreach($sqAuto as $q)
+                                        <span class="badge" style="background: rgba(102,126,234,0.10); color: var(--hr-text-muted); border: 1px solid rgba(102,126,234,0.30); font-weight: normal;"><i class="fas fa-robot"></i> {{ $q['name'] }}</span>
+                                    @endforeach
+                                </div>
+                            @endif
+                        @endif
+
                         {{-- Notes --}}
                         <form method="POST" action="{{ route('hr-manager.corp-health.purge-note', $e['status_id']) }}">
                             @csrf

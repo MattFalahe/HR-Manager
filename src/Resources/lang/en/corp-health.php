@@ -116,6 +116,17 @@ return [
     'purge_save_note'     => 'Save note',
     'purge_step_saved'    => 'Purge step updated.',
     'purge_note_saved'    => 'Purge note saved.',
+    // Squad cleanup on the purge board
+    'purge_squads_label'        => 'Squad cleanup',
+    'purge_squads_btn'          => 'Remove from squads now (:count)',
+    'purge_squads_confirm'      => 'Remove this player from :count manual / hidden squad(s)? If SeAT Connector is installed, the matching Discord roles drop too. Auto and excluded squads are left alone.',
+    'purge_squads_auto_warn'    => 'If no action is taken, HR will auto-remove these :hours hours before the kick date (safety).',
+    'purge_squads_none_removable' => 'No manual or hidden squads to remove.',
+    'purge_squads_kept'         => 'Kept (excluded):',
+    'purge_squads_auto_managed' => 'Auto (managed by SeAT):',
+    'purge_squads_done'         => 'Squads cleared :when.',
+    'purge_squads_removed'      => 'Removed the player from :count squad(s).',
+    'purge_squads_none'         => 'No squads were removed (no manual or hidden squads, or all are excluded / auto).',
 
     // Recruitment stats card
     'rstat_heading'         => 'Recruitment stats',

@@ -195,6 +195,35 @@ class CorpHealthController extends Controller
     }
 
     /**
+     * Manually clear a purge-scheduled player's removable SeAT squads from the
+     * board (manual/hidden, minus the operator's excluded list; auto squads are
+     * never touched). Director-gated. Stamps the same purge_squads_removed_at
+     * marker the auto cleanup uses, so the auto pass will not re-fire.
+     */
+    public function purgeRemoveSquads(Request $request, $id, \HrManager\Services\PurgeService $purge)
+    {
+        $status = \HrManager\Models\PlayerStatus::find((int) $id);
+        if (!$status) {
+            abort(404);
+        }
+        $this->assertCanAccessCorp((int) $status->corporation_id);
+        if (!auth()->user()->can('hr-manager.director')) {
+            abort(403);
+        }
+
+        $removed = $purge->removeSquadsForPurge($status, 'purge_manual');
+        app(CorpStatusService::class)->bustCache((int) $status->corporation_id);
+
+        $message = empty($removed)
+            ? trans('hr-manager::corp-health.purge_squads_none')
+            : trans('hr-manager::corp-health.purge_squads_removed', ['count' => count($removed)]);
+
+        return redirect()
+            ->route('hr-manager.corp-health.index', ['corporation_id' => $status->corporation_id, 'ch_tab' => 'purge'])
+            ->with(empty($removed) ? 'info' : 'success', $message);
+    }
+
+    /**
      * Personnel-Manager coherence check: list users with hr-manager.recruiter
      * (or above) and surface whether any of their characters hold the
      * in-game "Personnel_Manager" corp role. Soft signal so operators can
