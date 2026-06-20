@@ -78,16 +78,22 @@ class SeatSquadService
             return [];
         }
 
-        return $user->squads->map(function ($squad) {
-            $since = $squad->pivot->created_at ?? null;
-            $type  = (string) $squad->type;
+        $excluded = $this->excludedSquadIds();
+
+        return $user->squads->map(function ($squad) use ($excluded) {
+            $since         = $squad->pivot->created_at ?? null;
+            $type          = (string) $squad->type;
+            $typeRemovable = $this->isRemovableType($type);
+            $isExcluded    = in_array((int) $squad->id, $excluded, true);
 
             return [
-                'id'           => (int) $squad->id,
-                'name'         => (string) $squad->name,
-                'type'         => $type,
-                'member_since' => $since ? Carbon::parse($since)->format('M d, Y') : null,
-                'removable'    => $this->isRemovableType($type),
+                'id'             => (int) $squad->id,
+                'name'           => (string) $squad->name,
+                'type'           => $type,
+                'member_since'   => $since ? Carbon::parse($since)->format('M d, Y') : null,
+                'type_removable' => $typeRemovable,                 // manual / hidden
+                'excluded'       => $isExcluded,                    // operator never-touch list
+                'removable'      => $typeRemovable && !$isExcluded, // what the button actually clears
             ];
         })->values()->all();
     }
@@ -102,7 +108,7 @@ class SeatSquadService
      *
      * @return array<int, array{id:int,name:string}>
      */
-    public function removeUserFromRemovableSquads(int $userId): array
+    public function removeUserFromRemovableSquads(int $userId, ?array $excludedSquadIds = null): array
     {
         if (!$this->available()) {
             return [];
@@ -113,11 +119,15 @@ class SeatSquadService
             return [];
         }
 
-        $removed = [];
+        $excluded = $excludedSquadIds ?? $this->excludedSquadIds();
+        $removed  = [];
 
         foreach ($user->squads as $squad) {
             if (!$this->isRemovableType((string) $squad->type)) {
                 continue; // auto squad — leave it to SeAT's own recompute
+            }
+            if (in_array((int) $squad->id, $excluded, true)) {
+                continue; // operator-excluded squad (Former Member / Alliance keep-in-touch)
             }
 
             $squad->members()->detach($userId);
@@ -125,5 +135,45 @@ class SeatSquadService
         }
 
         return $removed;
+    }
+
+    /**
+     * Every squad on the install (id / name / type), bypassing SeAT's
+     * SquadScope so the settings exclusions picker can list hidden squads too
+     * (a "Former Member" squad is often hidden). Admin-tier surface.
+     *
+     * @return array<int, array{id:int,name:string,type:string}>
+     */
+    public function allSquads(): array
+    {
+        if (!$this->available()) {
+            return [];
+        }
+
+        return \Seat\Web\Models\Squads\Squad::withoutGlobalScope(\Seat\Web\Http\Scopes\SquadScope::class)
+            ->orderBy('name')
+            ->get(['id', 'name', 'type'])
+            ->map(fn ($s) => [
+                'id'   => (int) $s->id,
+                'name' => (string) $s->name,
+                'type' => (string) $s->type,
+            ])->all();
+    }
+
+    /**
+     * Squad ids the operator has excluded from HR removal (Settings, key
+     * `purge_squad_exclusions`). HR never detaches these (the Former Member /
+     * Alliance keep-in-touch squads). Always a list of ints.
+     *
+     * @return array<int>
+     */
+    public function excludedSquadIds(): array
+    {
+        $raw = \HrManager\Models\Setting::getValue('purge_squad_exclusions', []);
+        if (!is_array($raw)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_map('intval', $raw)));
     }
 }

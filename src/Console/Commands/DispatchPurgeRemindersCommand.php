@@ -31,6 +31,14 @@ class DispatchPurgeRemindersCommand extends Command
         $total = array_sum($counts);
         $this->info("Done. {$total} reminder(s) dispatched.");
 
+        // Opt-in safety auto squad cleanup: clear manual/hidden squads (minus
+        // the operator's excluded list) for purges that have left the corp or
+        // reached T-minus-X of the kick date. No-op when the toggle is off.
+        $squadsProcessed = $purge->processAutoSquadRemovals();
+        if ($squadsProcessed > 0) {
+            $this->info("Auto squad cleanup: {$squadsProcessed} purge(s) processed.");
+        }
+
         return 0;
     }
 }

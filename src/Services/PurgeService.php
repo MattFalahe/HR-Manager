@@ -5,7 +5,9 @@ namespace HrManager\Services;
 use Carbon\Carbon;
 use HrManager\Models\PlayerStatus;
 use HrManager\Models\PurgeReminder;
+use HrManager\Models\Setting;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 /**
@@ -223,5 +225,125 @@ class PurgeService
         } catch (\Throwable $e) {
             Log::warning("[HR Manager] Topics publish failed for {$eventName}: " . $e->getMessage());
         }
+    }
+
+    // -----------------------------------------------------------------
+    // Opt-in auto squad cleanup (Settings -> Purge squad cleanup)
+    // -----------------------------------------------------------------
+
+    /** Master toggle for the opt-in auto squad cleanup. Off by default. */
+    public function autoSquadRemovalEnabled(): bool
+    {
+        return (bool) Setting::getValue('purge_auto_squad_removal', false);
+    }
+
+    /**
+     * Hours before the scheduled kick date that the safety auto-removal fires
+     * (operator-configurable: 24 or 12; default 24).
+     */
+    public function autoSquadRemovalHours(): int
+    {
+        $h = (int) Setting::getValue('purge_auto_squad_removal_hours', 24);
+
+        return in_array($h, [12, 24], true) ? $h : 24;
+    }
+
+    /**
+     * Cron pass: for every still-active purge, run the opt-in auto squad
+     * cleanup when it is due. "Due" means either the player has already left
+     * the corp (no cancellation risk) OR the kick date is within T-minus-X
+     * hours (the safety window). Fires once per purge via the
+     * purge_squads_removed_at marker. No-op when the toggle is off.
+     *
+     * @return int number of purges whose squads were processed this run
+     */
+    public function processAutoSquadRemovals(): int
+    {
+        if (!$this->autoSquadRemovalEnabled()
+            || !Schema::hasColumn('hr_manager_player_status', 'purge_squads_removed_at')) {
+            return 0;
+        }
+
+        $hours = $this->autoSquadRemovalHours();
+        $count = 0;
+
+        $rows = PlayerStatus::where('status', PlayerStatus::STATUS_MARKED_FOR_PURGE)
+            ->whereNull('purge_squads_removed_at')
+            ->get();
+
+        foreach ($rows as $s) {
+            $due = false;
+
+            if ($s->purge_left_corp_at !== null) {
+                $due = true; // already gone — no cancellation risk
+            } elseif ($s->purge_scheduled_for !== null
+                && now()->gte($s->purge_scheduled_for->copy()->subHours($hours))) {
+                $due = true; // within the T-minus-X safety window
+            }
+
+            if (!$due) {
+                continue;
+            }
+
+            try {
+                $this->removeSquadsForPurge($s, 'purge_auto');
+                $count++;
+            } catch (\Throwable $e) {
+                Log::warning('[HR Manager] auto squad cleanup failed for status ' . $s->id . ': ' . $e->getMessage());
+            }
+        }
+
+        return $count;
+    }
+
+    /**
+     * Called when a purge-scheduled player is newly detected as having left the
+     * corp (PurgeBoardService::recordLeft). Clears their squads immediately when
+     * the opt-in cleanup is on (no cancellation risk once they are gone).
+     */
+    public function maybeRemoveSquadsOnDeparture(PlayerStatus $status): void
+    {
+        if (!$this->autoSquadRemovalEnabled()
+            || !Schema::hasColumn('hr_manager_player_status', 'purge_squads_removed_at')
+            || $status->purge_squads_removed_at !== null) {
+            return;
+        }
+
+        $this->removeSquadsForPurge($status, 'purge_auto');
+    }
+
+    /**
+     * Execute the squad cleanup for one purge: detach the removable (manual /
+     * hidden, non-excluded) squads via SeatSquadService, stamp
+     * purge_squads_removed_at so it fires exactly once, and record one
+     * hr.squad.removed history event per squad. Returns the removed squads.
+     *
+     * @param  string  $via  audit tag ('purge_auto' | 'purge_manual')
+     * @return array<int, array{id:int,name:string}>
+     */
+    public function removeSquadsForPurge(PlayerStatus $status, string $via = 'purge_manual'): array
+    {
+        $removed = app(\HrManager\Services\SeatSquadService::class)
+            ->removeUserFromRemovableSquads((int) $status->user_id);
+
+        // Stamp the marker even when nothing was removed, so the cron pass
+        // doesn't re-scan this purge on every run.
+        if (Schema::hasColumn('hr_manager_player_status', 'purge_squads_removed_at')) {
+            $status->update(['purge_squads_removed_at' => now()]);
+        }
+
+        foreach ($removed as $squad) {
+            $this->history->record('hr.squad.removed', [
+                'squad_id'   => $squad['id'],
+                'squad_name' => $squad['name'],
+                'via'        => $via,
+            ], [
+                'user_id'        => (int) $status->user_id,
+                'corporation_id' => (int) $status->corporation_id,
+                'occurred_at'    => now(),
+            ]);
+        }
+
+        return $removed;
     }
 }

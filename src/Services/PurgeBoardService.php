@@ -170,6 +170,16 @@ class PurgeBoardService
             'purge_left_corp_at' => now(),
             'purge_left_corp_to' => $destinationCorp,
         ]);
+
+        // Opt-in: once the player has actually left the corp there is no
+        // cancellation risk, so clear their SeAT squads immediately (which, with
+        // Connector, drops the matching Discord roles). No-op when the toggle is
+        // off or the squads were already cleared.
+        try {
+            app(PurgeService::class)->maybeRemoveSquadsOnDeparture($s->fresh());
+        } catch (\Throwable $e) {
+            Log::warning('[HR Manager] purge squad cleanup on departure failed for status ' . $s->id . ': ' . $e->getMessage());
+        }
     }
 
     /** @return string 'in' | 'out' | 'unknown' */
