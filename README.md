@@ -50,7 +50,7 @@ What leadership sees while doing the actual work of keeping the corp alive.
 - **Structure compliance via Structure Manager** (when installed): Corp Health renders Structure Manager's per-structure doctrine compliance (rigs / services / online state vs your alliance fits) on its own tab, pulled live through Manager Core's PluginBridge. Structure Manager owns the doctrines and the data; HR just displays the verdict
 - **Multi-handler tracking**: any recruiter can join an application; the page shows everyone working on it with optional role labels ("Reviewer", "Background check"). Auto-tracks on status changes
 - **Temporary SeAT access for handlers** (opt-in): joining an application's handler list auto-attaches a SeAT role granting view permissions for the applicant's character data (wallet / mail / assets / skills), scoped strictly to the applicant's character IDs (+ alts via PlayerIdentity). Auto-revoked on leave / application close / expiry. Existing roles untouched, never widens beyond the applicant. A one-click **Grant access now** covers handlers who joined before the feature was enabled, and enabling it grants every current handler retroactively
-- **Purge workflow** with T-7 / T-3 / T-48 / T-0 reminder ladder, SeAT squad cleanup (Discord roles auto-cascade via seat-connector), and a blinking warning banner urging operators to strip in-game titles + roles before the EVE 24-hour cooldown bites
+- **Purge workflow** with T-7 / T-3 / T-48 / T-0 reminder ladder, a one-button **Remove from all squads** (mirrors SeAT's native kick, so Connector-managed Discord roles drop), and a blinking warning banner urging operators to strip in-game titles + roles before the EVE 24-hour cooldown bites
 - **In-game titles + roles surfacing**: corp titles and direct character roles are shown on every member / player profile, with high-impact roles (Director / Personnel Manager / Accountant / etc.) called out for the purge-strip checklist
 - **History timeline**: 20+ event types (wallet signals / classifier transitions / purge milestones / LOA / squad removals / contribution drops / unusual recipients) rendered with semantic icons
 - **Corp-join detection**: scans `character_corporation_histories` every 30 minutes for accepted applicants who actually joined. Surfaces "accepted but never joined" backlog on Corp Health
@@ -115,37 +115,15 @@ Every status change is logged with actor + timestamp + optional comment. A hidde
 
 ---
 
-## Discord squad routing
+## Squad memberships & purge cleanup
 
-HR Manager can shepherd applicants through SeAT Squads automatically — a `@Prospect` Discord role while their application is open, swapped to `@Member` on accept. Discord role assignment itself stays downstream (warlof/seat-connector reads squad membership and pushes roles), so HR Manager only moves users between squads. HR adds/removes membership through SeAT's own relationship, so the squad's **attached roles are conferred to the applicant** (and stripped on removal) by SeAT's squad observer — that role inheritance is how the applicant picks up any permission the squad carries.
+HR surfaces each player's **SeAT squad memberships** on the player profile (director-tier), and gives directors a one-button **Remove from all squads** as part of the purge workflow.
 
-Wired under **Settings → Recruitment squads** (the tab only appears when SeAT Squads is installed). Per-corp table with two dropdowns: Prospect squad + Member squad. Pick from any squad on your install.
+Removal uses SeAT's own native-kick call (`$squad->members()->detach()`), so the core squad observer fires, and when **SeAT Connector** is installed and the squad is bound to a Discord role, the matching Discord roles cascade off exactly as a manual kick would. Without Connector it simply clears the SeAT squad membership. Each removal lands on the player's history timeline.
 
-**Lifecycle:**
+HR reads and detaches through SeAT's own squad relationship; it never owns squads, recomputes membership, or auto-removes anyone. The removal is always an explicit operator action, consistent with the rest of the purge workflow: HR hands the human the tools, it doesn't silently strip access.
 
-| Status change | What HR Manager does |
-|---|---|
-| Submit | Add applicant to per-corp Prospect squad → Connector syncs `@Prospect` role |
-| Accept | Remove from Prospects, add to Members (if configured) → role swap |
-| Reject / Withdraw | Remove from Prospects, no Member change |
-
-**Three setup scenarios** (covered in detail in Help & Documentation → Recruitment Site → Discord squad routing):
-
-| Scenario | When | HR Manager settings |
-|---|---|---|
-| **A — Auto Members squad exists** | You already have an auto squad rule "user in corp X → Members squad" with Connector pushing the Discord role | Prospect: pick the new manual squad you create. **Member: `(none)`** — let the existing auto squad handle it. |
-| **B — Both squads HR-managed** | No auto squad, OR you want the `@Member` role assigned the moment recruiter clicks Accept (before applicant joins corp in EVE) | Prospect + Member: both pointing at manual squads HR Manager populates directly. |
-| **C — No Connector / no Squads** | SeAT Connector or Squads framework isn't installed | The Recruitment squads tab doesn't appear. Set the landing's `discord_invite_url` instead — the apply form shows a "Join our Discord server" button as fallback. |
-
-**Letting applicants reach the "link Discord" page:** the SeAT Connector identity page is permission-gated, so a brand-new applicant can only see the link button if they hold the Connector **view** permission. Deliver it through the squad: attach a role carrying *only* that permission to your Prospect squad (SeAT → Squads → the squad's Roles section, needs a SeAT superuser). HR adds the applicant to the squad; SeAT confers the squad's roles to them; the button appears. Keep that role permission-light so applicants don't inherit anything sensitive. HR never attaches roles to squads for you — that's a deliberate boundary (a plugin silently granting permissions via squads is a security smell).
-
-**Common gotchas:**
-
-- Squad type must be **`manual`** or **`hidden`** — `auto` rebuilds membership from rules and would evict the user; `apply` requires user-initiated requests. HR now warns you (Settings picker + diagnostic + runtime log) if a Prospect/Member map points at an `auto` squad.
-- Discord role appears within Connector's sync window (typically 30s – few minutes). Squad change is immediate; the Discord push waits on Connector.
-- The apply form and the post-application page surface a "Link Discord" button when Connector is installed (the link is auto-derived from your SeAT address). You can also fall back to a plain `discord_invite_url`, or pick the **None** post-submission mode for corps that don't onboard via Discord.
-- One alliance Discord, multiple corps? Point every corp row at the same Prospect/Member squad.
-- Squad sync failures log a warning but never block the status change. Reconciling drift is operator work.
+> **Recruitment onboarding note:** earlier builds shepherded applicants through Prospect/Member squads to auto-assign Discord roles. That recruitment-squad *routing* was retired (it churned Connector re-syncs). Discord onboarding now happens via the optional applicant Connector-link grant plus your own Connector role mapping; see the in-app Help → Recruitment Site docs. The squad feature that remains is the purge-time cleanup described above.
 
 ---
 

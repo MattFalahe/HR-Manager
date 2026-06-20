@@ -58,6 +58,7 @@ First release. HR Manager is two faces in one plugin: a **public recruitment fun
 
 - `hr-manager:dispatch-purge-reminders` (every 12h) fires reminders at **T-7d / T-3d / T-48h / T-0** for players flagged for purge. The T-48h notification lists every in-corp character on the account so a human can strip Discord roles and queue the in-game kick before the deadline.
 - No auto-removal (ESI cannot kick, and auto-stripping Discord is a footgun). A director-only **Mark Purge Executed** records the history event and archives the status row. Dedup on `(player_status_id, milestone)` keeps the cron safe to run repeatedly.
+- **Squad memberships + cleanup**: the player profile lists the account's SeAT squad memberships, with a one-button **Remove from all squads** for purge cleanup. Removal uses SeAT's own native-kick call, so the core squad observer fires and any Connector-bound Discord roles cascade off; without Connector it just clears the SeAT membership. Each removal lands on the history timeline. Always an explicit operator action, never automatic.
 
 ### 📜 History timeline
 
