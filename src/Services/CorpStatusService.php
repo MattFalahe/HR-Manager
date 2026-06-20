@@ -87,7 +87,7 @@ class CorpStatusService
     // Section → tab assignment. The controller passes the active tab;
     // only its sections build. Keeping this as a map (not hardcoded per
     // builder) makes it trivial to move a section between tabs later.
-    public const TABS = ['overview', 'composition', 'economy', 'recruitment', 'purge', 'structure-compliance'];
+    public const TABS = ['overview', 'composition', 'economy', 'structure-compliance', 'recruitment', 'purge'];
 
     /**
      * Build ONLY the sections belonging to one tab. Cached per

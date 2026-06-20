@@ -88,6 +88,11 @@
                             <i class="fas fa-coins"></i> {{ trans('hr-manager::corp-health.tab_economy') }}
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ $activeTab === 'structure-compliance' ? 'active' : '' }}" href="{{ $tabLink('structure-compliance') }}">
+                            <i class="fas fa-building"></i> {{ trans('hr-manager::corp-health.tab_structure_compliance') }}
+                        </a>
+                    </li>
                 @endcan
                 <li class="nav-item">
                     <a class="nav-link {{ $activeTab === 'recruitment' ? 'active' : '' }}" href="{{ $tabLink('recruitment') }}">
@@ -98,11 +103,6 @@
                     <li class="nav-item">
                         <a class="nav-link {{ $activeTab === 'purge' ? 'active' : '' }}" href="{{ $tabLink('purge') }}">
                             <i class="fas fa-user-slash"></i> {{ trans('hr-manager::corp-health.tab_purge') }}
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {{ $activeTab === 'structure-compliance' ? 'active' : '' }}" href="{{ $tabLink('structure-compliance') }}">
-                            <i class="fas fa-building"></i> {{ trans('hr-manager::corp-health.tab_structure_compliance') }}
                         </a>
                     </li>
                 @endcan
