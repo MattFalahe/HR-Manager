@@ -40,7 +40,7 @@ First release. HR Manager is two faces in one plugin: a **public recruitment fun
 ### 🩺 Corp Health assessment console (director)
 
 - A nightly classifier (`hr-manager:classify-players`) buckets every player in every tracked corp into **Active / At Risk / Inactive / Dead Weight** from tier and last activity. An L3 player who goes quiet raises a separate **inactive-director** critical alert.
-- Organised into four lazy-loaded tabs (Overview / Composition / Economy / Recruitment); each tab builds only its own sections.
+- Organised into six lazy-loaded tabs (Overview / Composition / Economy / Structure Compliance / Recruitment / Purge); each tab builds only its own sections.
 - **Corp composition chart**: what fraction of the roster rats / mines / trades / does PI / does industry, from a handful of bulk queries.
 - **Corp-wide activity (all members)**: buckets the whole roster (registered or not) on last in-game login, using the same day bands as the Member tier, with a drill-down of flagged members.
 - **Fleet-commander roster + Organizers** (Composition): active / faded / new FCs ranked by broadcasts, plus who *plans* ops, with next-op countdowns.
@@ -58,7 +58,8 @@ First release. HR Manager is two faces in one plugin: a **public recruitment fun
 
 - `hr-manager:dispatch-purge-reminders` (every 12h) fires reminders at **T-7d / T-3d / T-48h / T-0** for players flagged for purge. The T-48h notification lists every in-corp character on the account so a human can strip Discord roles and queue the in-game kick before the deadline.
 - No auto-removal (ESI cannot kick, and auto-stripping Discord is a footgun). A director-only **Mark Purge Executed** records the history event and archives the status row. Dedup on `(player_status_id, milestone)` keeps the cron safe to run repeatedly.
-- **Squad memberships + cleanup**: the player profile lists the account's SeAT squad memberships, split into removable (`manual` / `hidden`) and `auto`. A one-button **Remove from these squads** clears only the manual / hidden ones via SeAT's own native-kick call, so the core squad observer fires and any Connector-bound Discord roles cascade off (without Connector it just clears the SeAT membership). `auto` squads are shown for information only and never touched: SeAT recomputes them from filters and would re-add an eligible member, so they are left to resolve themselves once the player no longer matches (for example, after they leave the corp). Each removal lands on the history timeline; always an explicit operator action, never automatic.
+- **Squad memberships + cleanup**: the player profile and the purge board list the account's SeAT squads, split three ways: removable (`manual` / `hidden`), kept (on the operator's never-touch list), and `auto`. A one-button **Remove from these squads** clears only the removable ones via SeAT's own native-kick call, so the core squad observer fires and any Connector-bound Discord roles cascade off (without Connector it just clears the SeAT membership).
+- **Opt-in auto squad cleanup** (Settings, Squad cleanup tab, off by default) clears a purged member's removable squads on a safety schedule so a scheduled purge never leaves stale Discord access: immediately once the member is detected as having left the corp (no cancellation risk), otherwise at a configurable **T-24h / T-12h** before the kick date, fired by the reminder cron and stamped once per purge. A **never-touch exclusions list** protects keep-in-touch squads such as Former Member or Alliance access; `auto` squads are never touched (SeAT recomputes them from filters and would re-add an eligible member). Every removal, manual or automatic, lands on the history timeline.
 
 ### 📜 History timeline
 

@@ -117,13 +117,22 @@ Every status change is logged with actor + timestamp + optional comment. A hidde
 
 ## Squad memberships & purge cleanup
 
-HR surfaces each player's **SeAT squad memberships** on the player profile (director-tier), split into the squads HR can remove and the ones SeAT manages itself, with a one-button **Remove from these squads** for purge cleanup.
+HR surfaces each player's **SeAT squad memberships** on the player profile (director-tier) and on the purge board, split three ways: the squads HR can remove (`manual` / `hidden`), the ones the operator has **excluded** from cleanup, and the `auto` squads SeAT manages itself. A one-button **Remove from these squads** handles purge cleanup on demand.
 
 **Only `manual` and `hidden` squads are removed** (explicit, operator-assigned membership). Removal uses SeAT's own native-kick call (`$squad->members()->detach()`), so the core squad observer fires, and when **SeAT Connector** is installed and the squad is bound to a Discord role, the matching Discord roles cascade off exactly as a manual kick would. Without Connector it just clears the SeAT squad membership. Each removal lands on the player's history timeline.
 
 **`auto` squads are deliberately never touched** and shown for information only. SeAT recomputes auto-squad membership from filters and would re-add an eligible member on the next ESI sync, so detaching one is futile churn. They resolve themselves once the player stops matching the criteria (for example, after they leave the corp following the purge).
 
-HR reads and detaches through SeAT's own squad relationship; it never owns squads, recomputes membership, or auto-removes anyone. The removal is always an explicit operator action, consistent with the rest of the purge workflow: HR hands the human the tools, it doesn't silently strip access.
+### Opt-in auto cleanup
+
+By default HR never auto-removes anyone: the human clicks the button. You can opt in (Settings, Squad cleanup tab) to have HR clear a purged member's removable squads automatically on a safety schedule, so a scheduled purge never leaves stale Discord access behind:
+
+- **Immediately** once the member is detected as having left the corp (there is no cancellation risk once they are gone), or
+- otherwise at a configurable **T-24h** or **T-12h** before the kick date, fired by the `hr-manager:dispatch-purge-reminders` cron and stamped once per purge so it never repeats.
+
+A **never-touch exclusions list** in the same settings tab protects keep-in-touch squads such as **Former Member** or **Alliance** access, so both the auto cleanup and the manual button skip them. `auto` squads are not offered in the list because they are never removed anyway.
+
+HR reads and detaches through SeAT's own squad relationship; it never owns squads or recomputes membership. Auto cleanup stays off until you enable it, and even then it only ever touches the removable, non-excluded squads of a member already scheduled for purge.
 
 > **Recruitment onboarding note:** earlier builds shepherded applicants through Prospect/Member squads to auto-assign Discord roles. That recruitment-squad *routing* was retired (it churned Connector re-syncs). Discord onboarding now happens via the optional applicant Connector-link grant plus your own Connector role mapping; see the in-app Help → Recruitment Site docs. The squad feature that remains is the purge-time cleanup described above.
 
