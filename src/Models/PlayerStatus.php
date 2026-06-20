@@ -21,6 +21,7 @@ class PlayerStatus extends Model
         'purge_roles_removed_at',
         'purge_left_corp_at',
         'purge_left_corp_to',
+        'purge_squads_removed_at',
         'purge_notes',
         'reason',
         'status_set_by',
@@ -32,6 +33,7 @@ class PlayerStatus extends Model
         'purge_scheduled_for'     => 'date',
         'purge_roles_removed_at'  => 'datetime',
         'purge_left_corp_at'      => 'datetime',
+        'purge_squads_removed_at' => 'datetime',
         'purge_left_corp_to'      => 'integer',
         'status_set_at'           => 'datetime',
     ];
