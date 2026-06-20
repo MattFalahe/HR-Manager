@@ -715,10 +715,14 @@ class CorpStatusService
      */
     private function corpOutflows(int $corpId): array
     {
-        $result = app(CrossPluginDataService::class)->getCorpOutflows($corpId, 3);
-        if (!($result['available'] ?? false)) {
-            return ['available' => false, 'reason' => $result['reason'] ?? 'cwm_absent'];
+        $envelope = app(CrossPluginDataService::class)->getCorpOutflows($corpId, 3);
+        if (!($envelope['available'] ?? false)) {
+            return ['available' => false, 'reason' => $envelope['reason'] ?? 'cwm_absent'];
         }
+
+        // The bridge wraps the capability result under 'data'; tolerate a spread
+        // shape too. (Previously read top-level and always came back empty.)
+        $result = (isset($envelope['data']) && is_array($envelope['data'])) ? $envelope['data'] : $envelope;
 
         $byRecipient = $result['by_recipient'] ?? [];
         // Trim to the top 10 destinations so the card stays scannable.
