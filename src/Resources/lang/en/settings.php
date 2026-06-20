@@ -267,4 +267,19 @@ return [
     'tier_personnel_coherence_rec' => 'Recommended: align in-game Personnel Manager corp role with your SeAT recruiter assignments so application reviews can complete in-game too. The Corp Health page (coming in Phase 3) will surface coherence gaps automatically.',
     'tier_notes_optional'          => 'Notes (optional)',
     'confirm_delete_tier_mapping'  => 'Delete this tier mapping?',
+
+    // Purge squad cleanup tab
+    'purge_squads_tab'           => 'Squad cleanup',
+    'purge_squads_heading'       => 'Purge squad cleanup',
+    'purge_squads_intro'         => 'When you purge a member, HR can clear their manual and hidden SeAT squads (with Connector installed, that drops the matching Discord roles). Auto squads are never touched, since SeAT removes those itself once the member no longer matches. This is opt-in.',
+    'purge_squads_auto_label'    => 'Automatically remove squads during a purge',
+    'purge_squads_auto_help'     => 'Off by default. When on, HR clears removable squads on the safety schedule below so a scheduled purge never leaves stale Discord access behind. You can always remove squads by hand from the purge board, with or without this on.',
+    'purge_squads_hours_label'   => 'When to auto-remove',
+    'purge_squads_hours_24'      => 'T-24h before the kick date (recommended)',
+    'purge_squads_hours_12'      => 'T-12h before the kick date',
+    'purge_squads_hours_help'    => 'If the member is detected as having already left the corp, their squads are cleared immediately regardless of this window (there is no cancellation risk once they are gone).',
+    'purge_squads_excl_heading'  => 'Never-touch squads',
+    'purge_squads_excl_intro'    => 'Squads HR will never remove, even during a purge. Use this for keep-in-touch squads such as Former Member or Alliance access.',
+    'purge_squads_excl_help'     => 'Checked squads are protected. Only manual and hidden squads are listed here; auto squads are managed by SeAT and never removed.',
+    'purge_squads_excl_empty'    => 'No manual or hidden squads on this install yet. Auto squads are never removed, so there is nothing to exclude.',
 ];

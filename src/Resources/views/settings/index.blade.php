@@ -113,6 +113,11 @@
                                 <i class="fas fa-layer-group"></i> {{ trans('hr-manager::settings.tiers_tab') }}
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-toggle="tab" href="#purge-squads">
+                                <i class="fas fa-user-minus"></i> {{ trans('hr-manager::settings.purge_squads_tab') }}
+                            </a>
+                        </li>
 
                         <li class="nav-header mt-2"><i class="fas fa-bullhorn"></i> {{ trans('hr-manager::settings.nav_group_recruitment') }}</li>
                         <li class="nav-item">
@@ -538,6 +543,63 @@
                 </div>
 
                 {{-- Webhooks Tab --}}
+                <div class="tab-pane" id="purge-squads">
+                    @php $excludableSquads = array_values(array_filter($purgeSquads['all_squads'], fn ($s) => in_array($s['type'], ['manual', 'hidden'], true))); @endphp
+                    <div class="alert" style="background: rgba(102,126,234,0.12); border-left: 4px solid #667eea; color: var(--hr-text-light);">
+                        <strong><i class="fas fa-user-minus"></i> {{ trans('hr-manager::settings.purge_squads_heading') }}</strong>
+                        <p class="mb-0 mt-1" style="font-size: 0.9rem;">{{ trans('hr-manager::settings.purge_squads_intro') }}</p>
+                    </div>
+
+                    <form method="POST" action="{{ route('hr-manager.settings.update') }}">
+                        @csrf
+                        <input type="hidden" name="purge_squads_form" value="1">
+
+                        {{-- Master toggle (opt-in; off by default) --}}
+                        <div class="form-group">
+                            <div class="custom-control custom-switch">
+                                <input type="checkbox" class="custom-control-input" id="purge_auto_squad_removal" name="purge_auto_squad_removal" value="1" {{ $purgeSquads['enabled'] ? 'checked' : '' }}>
+                                <label class="custom-control-label" for="purge_auto_squad_removal">{{ trans('hr-manager::settings.purge_squads_auto_label') }}</label>
+                            </div>
+                            <small class="form-text" style="color: var(--hr-text-muted);">{{ trans('hr-manager::settings.purge_squads_auto_help') }}</small>
+                        </div>
+
+                        {{-- Safety-window timing --}}
+                        <div class="form-group">
+                            <label>{{ trans('hr-manager::settings.purge_squads_hours_label') }}</label>
+                            <select name="purge_auto_squad_removal_hours" class="form-control" style="max-width: 360px;">
+                                <option value="24" {{ $purgeSquads['hours'] === 24 ? 'selected' : '' }}>{{ trans('hr-manager::settings.purge_squads_hours_24') }}</option>
+                                <option value="12" {{ $purgeSquads['hours'] === 12 ? 'selected' : '' }}>{{ trans('hr-manager::settings.purge_squads_hours_12') }}</option>
+                            </select>
+                            <small class="form-text" style="color: var(--hr-text-muted);">{{ trans('hr-manager::settings.purge_squads_hours_help') }}</small>
+                        </div>
+
+                        {{-- Never-touch exclusions (manual / hidden only; auto is never removed) --}}
+                        <h5 class="mt-4" style="color: var(--hr-text-white);"><i class="fas fa-lock"></i> {{ trans('hr-manager::settings.purge_squads_excl_heading') }}</h5>
+                        <p style="color: var(--hr-text-muted); font-size: 0.9rem;">{{ trans('hr-manager::settings.purge_squads_excl_intro') }}</p>
+
+                        @if(empty($excludableSquads))
+                            <p style="color: var(--hr-text-muted);"><i class="fas fa-info-circle"></i> {{ trans('hr-manager::settings.purge_squads_excl_empty') }}</p>
+                        @else
+                            <div style="max-height: 280px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 10px 14px;">
+                                @foreach($excludableSquads as $sq)
+                                    <div class="custom-control custom-checkbox mb-1">
+                                        <input type="checkbox" class="custom-control-input" id="excl_squad_{{ $sq['id'] }}" name="purge_squad_exclusions[]" value="{{ $sq['id'] }}" {{ in_array($sq['id'], $purgeSquads['excluded'], true) ? 'checked' : '' }}>
+                                        <label class="custom-control-label" for="excl_squad_{{ $sq['id'] }}">
+                                            {{ $sq['name'] }}
+                                            <span class="badge" style="background: rgba(255,255,255,0.06); color: var(--hr-text-muted); font-weight: normal;">{{ $sq['type'] }}</span>
+                                        </label>
+                                    </div>
+                                @endforeach
+                            </div>
+                            <small class="form-text" style="color: var(--hr-text-muted);">{{ trans('hr-manager::settings.purge_squads_excl_help') }}</small>
+                        @endif
+
+                        <button type="submit" class="btn btn-hr-primary btn-icon mt-3">
+                            <i class="fas fa-save"></i> {{ trans('hr-manager::settings.save_settings') }}
+                        </button>
+                    </form>
+                </div>
+
                 <div class="tab-pane" id="webhooks">
                     @if($webhooks->isEmpty())
                         <p class="text-muted text-center">{{ trans('hr-manager::settings.no_webhooks') }}</p>

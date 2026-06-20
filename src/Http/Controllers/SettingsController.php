@@ -171,6 +171,16 @@ class SettingsController extends Controller
         // risk to flag.
         $ssoScopesLost      = $ssoService->scopesLostVsDefault();
 
+        // Purge squad cleanup: opt-in toggle + timing + the never-touch
+        // exclusions list, plus every squad on the install for the picker.
+        $squadSvc    = app(\HrManager\Services\SeatSquadService::class);
+        $purgeSquads = [
+            'enabled'    => (bool) Setting::getValue('purge_auto_squad_removal', false),
+            'hours'      => (int) Setting::getValue('purge_auto_squad_removal_hours', 24),
+            'excluded'   => $squadSvc->excludedSquadIds(),
+            'all_squads' => $squadSvc->allSquads(),
+        ];
+
         return view('hr-manager::settings.index', compact(
             'settings', 'webhooks', 'corporations',
             'discordRoles', 'discordRolesProvider', 'discordRoleMap',
@@ -179,7 +189,7 @@ class SettingsController extends Controller
             'accessSettings', 'connectorAccessSettings',
             'ssoProfiles', 'ssoSelectedProfile', 'ssoAnalysis', 'ssoScopesLost',
             'allianceTaxExemptText', 'allianceTaxExemptNames',
-            'assessmentCriteria', 'assessmentDefaults', 'standingsSettings'
+            'assessmentCriteria', 'assessmentDefaults', 'standingsSettings', 'purgeSquads'
         ));
     }
 
@@ -218,6 +228,11 @@ class SettingsController extends Controller
             'assess_hostile_corps'           => 'nullable|string|max:20000',
             'assess_friendly_alliances'      => 'nullable|string|max:20000',
             'assess_friendly_corps'          => 'nullable|string|max:20000',
+            // Purge squad cleanup
+            'purge_auto_squad_removal'       => 'nullable|boolean',
+            'purge_auto_squad_removal_hours' => 'nullable|integer|in:12,24',
+            'purge_squad_exclusions'         => 'nullable|array',
+            'purge_squad_exclusions.*'       => 'integer',
         ]);
 
         // Per-tab save guards. Each settings tab is its OWN <form> posting
@@ -338,6 +353,20 @@ class SettingsController extends Controller
             foreach ($lists as $field => $key) {
                 Setting::setValue($key, $this->parseIdList((string) $request->input($field, '')), 'json');
             }
+        }
+
+        // Purge squad cleanup (id=purge-squads). Opt-in auto-removal toggle +
+        // timing + the never-touch exclusions list (Former Member / Alliance).
+        if ($request->has('purge_squads_form')) {
+            Setting::setValue('purge_auto_squad_removal', $request->boolean('purge_auto_squad_removal') ? '1' : '0', 'boolean');
+
+            $hours = (int) $request->input('purge_auto_squad_removal_hours', 24);
+            Setting::setValue('purge_auto_squad_removal_hours', in_array($hours, [12, 24], true) ? $hours : 24, 'integer');
+
+            $exclusions = array_values(array_unique(array_map('intval',
+                array_filter((array) $request->input('purge_squad_exclusions', []), fn ($v) => is_numeric($v))
+            )));
+            Setting::setValue('purge_squad_exclusions', $exclusions, 'json');
         }
 
         // Recruiter access feature — feature toggle + permission set +
