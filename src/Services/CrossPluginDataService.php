@@ -490,6 +490,17 @@ class CrossPluginDataService
     }
 
     /**
+     * Corp-level financial summary from CWM: live wallet balance + income /
+     * expense / net over a window + per-month trend. Powers the Corp Health
+     * Economy "financial pulse" strip. Needs CWM v3.1+ (the wallet.getCorpSummary
+     * capability); older CWM / no MC returns the standard unavailable envelope.
+     */
+    public function getCorpFinancialSummary(int $corporationId, int $months = 6): array
+    {
+        return $this->callBridge('wallet.getCorpSummary', [$corporationId, $months]);
+    }
+
+    /**
      * Corp-wide per-member financial roll-up from CWM — EVERY member with
      * wallet activity (registered or not), in one call. Powers the Corp
      * Health Wallet Insights cards corp-wide instead of HR's registered-only

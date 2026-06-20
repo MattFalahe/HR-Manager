@@ -982,6 +982,62 @@
             };
         @endphp
 
+        {{-- Corp financial pulse: the corp's OWN wallet health (balance + income
+             / expense / net + monthly trend), via CWM v3.1+ wallet.getCorpSummary.
+             Self-hides when CWM is absent or too old. --}}
+        @php $cfs = $corpStatus['corp_financial_summary'] ?? ['available' => false]; @endphp
+        @if(!empty($cfs['available']))
+            <div class="card card-dark mb-3">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-chart-line"></i> {{ trans('hr-manager::corp-health.fin_pulse_heading') }}</h3>
+                    <div class="card-tools"><small style="color: var(--hr-text-muted);">{{ trans('hr-manager::corp-health.fin_pulse_via', ['months' => $cfs['months']]) }}</small></div>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col">
+                            <div style="font-size: 1.5rem; color: var(--hr-text-white);"><strong>{{ $cfs['balance_available'] ? $iskFmt($cfs['balance']) : '-' }}</strong></div>
+                            <small style="color: var(--hr-text-muted);">{{ trans('hr-manager::corp-health.fin_balance') }}</small>
+                        </div>
+                        <div class="col">
+                            <div style="font-size: 1.5rem; color: var(--hr-success, #28a745);"><strong>{{ $iskFmt($cfs['income_total']) }}</strong></div>
+                            <small style="color: var(--hr-text-muted);">{{ trans('hr-manager::corp-health.fin_income') }}</small>
+                        </div>
+                        <div class="col">
+                            <div style="font-size: 1.5rem; color: var(--hr-danger, #dc3545);"><strong>{{ $iskFmt($cfs['expense_total']) }}</strong></div>
+                            <small style="color: var(--hr-text-muted);">{{ trans('hr-manager::corp-health.fin_expense') }}</small>
+                        </div>
+                        <div class="col">
+                            @php $netPos = $cfs['net_total'] >= 0; @endphp
+                            <div style="font-size: 1.5rem; color: {{ $netPos ? 'var(--hr-success, #28a745)' : 'var(--hr-danger, #dc3545)' }};">
+                                <strong>{{ ($netPos ? '+' : '') . $iskFmt($cfs['net_total']) }}</strong>
+                            </div>
+                            <small style="color: var(--hr-text-muted);">{{ trans('hr-manager::corp-health.fin_net', ['months' => $cfs['months']]) }}</small>
+                        </div>
+                    </div>
+
+                    @if(!empty($cfs['monthly']))
+                        @php
+                            $nets = array_map(fn ($m) => (float) $m['net'], $cfs['monthly']);
+                            $maxAbs = 0; foreach ($nets as $n) { $maxAbs = max($maxAbs, abs($n)); }
+                            $maxAbs = $maxAbs > 0 ? $maxAbs : 1;
+                        @endphp
+                        <div style="display: flex; align-items: flex-end; gap: 6px; height: 64px; margin-top: 18px;">
+                            @foreach($cfs['monthly'] as $m)
+                                @php $n = (float) $m['net']; $h = (int) round(abs($n) / $maxAbs * 48); $pos = $n >= 0; @endphp
+                                <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%;"
+                                     title="{{ $m['period'] }}: {{ ($pos ? '+' : '') . $iskFmt($n) }}">
+                                    <div style="width: 100%; height: {{ max(2, $h) }}px; background: {{ $pos ? 'var(--hr-success, #28a745)' : 'var(--hr-danger, #dc3545)' }}; opacity: 0.78; border-radius: 2px;"></div>
+                                    <small style="color: var(--hr-text-muted); font-size: 0.62rem; margin-top: 3px;">{{ \Carbon\Carbon::parse($m['period'] . '-01')->format('M') }}</small>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    <small style="color: var(--hr-text-muted); display: block; margin-top: 12px;">{{ trans('hr-manager::corp-health.fin_pulse_note') }}</small>
+                </div>
+            </div>
+        @endif
+
         {{-- Corp wallet aggregates --}}
         <div class="card card-dark mb-3">
             <div class="card-header">

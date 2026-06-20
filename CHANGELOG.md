@@ -66,7 +66,7 @@ First release. HR Manager is two faces in one plugin: a **public recruitment fun
 
 ### 🔗 Cross-plugin signals (each self-hides when its source is absent)
 
-- **Corp Wallet Manager**: contribution + tax-compliance + wallet signals on the classifier, a Wallet Activity panel and a Wallet Audit panel on the member profile, and five director Wallet Insights cards on Corp Health (untaxed-earner radar, anomaly board, lowest contributors, loyalty recognition, corp outflows).
+- **Corp Wallet Manager**: contribution + tax-compliance + wallet signals on the classifier, a Wallet Activity panel and a Wallet Audit panel on the member profile, five director Wallet Insights cards on Corp Health (untaxed-earner radar, anomaly board, lowest contributors, loyalty recognition, corp outflows), and a **Financial pulse** strip on the Corp Health Economy tab (corp wallet balance + income / expense / net + per-month trend, via CWM v3.1's `wallet.getCorpSummary`; self-hides on older CWM).
 - **Mining Manager**: favourite ores + systems and corp ore-op attendance ("attended 8 of 12 ops") on member profiles.
 - **Blueprint Manager**: a Blueprint Activity panel on the player profile and a Blueprint Engagement card on Corp Health, with the signal feeding the Industrialist role badge and a positive engagement modifier.
 - **SeAT Broadcast**: an FC Activity profile (broadcasts led, cadence, active span) plus a planning block on the player profile, and the fleet-commander roster + Organizers on Corp Health.

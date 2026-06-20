@@ -137,6 +137,7 @@ class CorpStatusService
                 'fc_status'         => app(FcActivityService::class)->getCorpFcStatus($corporationId),
             ],
             'economy' => [
+                'corp_financial_summary' => $this->corpFinancialSummary($corporationId),
                 'wallet_corp_totals' => $this->walletCorpTotals($corporationId),
                 'top_contributors'   => $this->topContributors($corporationId),
                 'wallet_freeloaders' => $this->walletFreeloaders($corporationId),
@@ -666,6 +667,43 @@ class CorpStatusService
         ])->all();
 
         return ['available' => true, 'list' => $list, 'total' => count($list), 'source' => $data['source']];
+    }
+
+    /**
+     * Corp financial pulse: the corp's OWN wallet health (live balance + income
+     * / expense / net over a window + per-month trend), from CWM's
+     * wallet.getCorpSummary capability (CWM v3.1+). Distinct from the per-member
+     * contribution aggregates on this tab: this answers "is the corp itself
+     * making or losing ISK". Self-hides when CWM is absent or too old.
+     */
+    private function corpFinancialSummary(int $corpId): array
+    {
+        $envelope = app(CrossPluginDataService::class)->getCorpFinancialSummary($corpId, 6);
+        if (!($envelope['available'] ?? false)) {
+            return ['available' => false, 'reason' => $envelope['reason'] ?? 'cwm_absent'];
+        }
+
+        // The bridge wraps the capability result under 'data'; tolerate a
+        // spread shape too so this stays correct regardless of wrapper changes.
+        $data = (isset($envelope['data']) && is_array($envelope['data'])) ? $envelope['data'] : $envelope;
+
+        if (!($data['available'] ?? false)) {
+            return ['available' => false, 'reason' => $data['reason'] ?? 'no_corp_wallet_data'];
+        }
+
+        return [
+            'available'           => true,
+            'balance'             => (float) ($data['balance'] ?? 0),
+            'balance_available'   => (bool) ($data['balance_available'] ?? false),
+            'months'              => (int) ($data['months'] ?? 6),
+            'income_total'        => (float) ($data['income_total'] ?? 0),
+            'expense_total'       => (float) ($data['expense_total'] ?? 0),
+            'net_total'           => (float) ($data['net_total'] ?? 0),
+            'income_avg_monthly'  => (float) ($data['income_avg_monthly'] ?? 0),
+            'expense_avg_monthly' => (float) ($data['expense_avg_monthly'] ?? 0),
+            'net_avg_monthly'     => (float) ($data['net_avg_monthly'] ?? 0),
+            'monthly'             => array_values($data['monthly'] ?? []),
+        ];
     }
 
     /**
