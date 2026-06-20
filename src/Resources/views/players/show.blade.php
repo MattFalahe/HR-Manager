@@ -961,7 +961,8 @@
     @can('hr-manager.director')
         @php
             $removableSquads = array_values(array_filter($squads, fn ($s) => $s['removable']));
-            $autoSquads      = array_values(array_filter($squads, fn ($s) => ! $s['removable']));
+            $keptSquads      = array_values(array_filter($squads, fn ($s) => $s['type_removable'] && $s['excluded']));
+            $autoSquads      = array_values(array_filter($squads, fn ($s) => ! $s['type_removable']));
         @endphp
         <div class="card card-dark mb-3">
             <div class="card-header">
@@ -997,6 +998,27 @@
                         <small style="color: var(--hr-text-muted); display: block; margin-top: 10px;">{{ trans('hr-manager::players.squads_remove_note') }}</small>
                     @else
                         <p style="color: var(--hr-text-muted); font-size: 0.85rem;">{{ trans('hr-manager::players.squads_none_manual') }}</p>
+                    @endif
+
+                    {{-- Excluded manual/hidden squads: the operator put these on the
+                         never-touch list (Settings -> Squad cleanup; e.g. Former
+                         Member / Alliance keep-in-touch), so HR leaves them even
+                         during a purge. Shown so the director knows they were kept
+                         on purpose. --}}
+                    @if(!empty($keptSquads))
+                        <hr style="border-color: rgba(255,255,255,0.08); margin: 14px 0 12px;">
+                        <h6 style="color: var(--hr-text-light); margin-bottom: 8px;">
+                            <i class="fas fa-lock"></i> {{ trans('hr-manager::players.squads_kept_heading') }}
+                        </h6>
+                        <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
+                            @foreach($keptSquads as $squad)
+                                <span class="badge" style="background: rgba(255,255,255,0.03); color: var(--hr-text-muted); border: 1px dashed rgba(255,255,255,0.18); padding: 6px 10px; font-size: 0.8rem; font-weight: normal;">
+                                    <i class="fas fa-lock"></i> {{ $squad['name'] }}
+                                    <small>({{ ucfirst($squad['type']) }})</small>
+                                </span>
+                            @endforeach
+                        </div>
+                        <small style="color: var(--hr-text-muted); display: block;">{{ trans('hr-manager::players.squads_kept_note') }}</small>
                     @endif
 
                     {{-- Auto squads: SeAT manages membership from filters; HR must

@@ -152,6 +152,8 @@ return [
     'squads_remove_confirm' => 'Remove this player from their :count manual / hidden squad(s)? If SeAT Connector is installed, the matching Discord roles drop too. Auto squads are left for SeAT to manage.',
     'squads_remove_note'    => 'Only manual and hidden squads are removed. Discord roles drop when SeAT Connector is installed and the squad is bound to a role; without Connector this just clears the SeAT squad membership.',
     'squads_none_manual'    => 'No manual or hidden squads to remove.',
+    'squads_kept_heading'   => 'Kept (excluded from cleanup)',
+    'squads_kept_note'      => 'These manual or hidden squads are on the never-touch list in Settings, so HR leaves them even during a purge (for example Former Member or Alliance keep-in-touch access).',
     'squads_auto_heading'   => 'Automatic squads (managed by SeAT)',
     'squads_auto_note'      => 'These are assigned automatically from squad criteria, so HR does not touch them: SeAT would re-add an eligible member on the next sync. They drop on their own once the player no longer matches the criteria (for example, after they leave the corp following a purge).',
     'squads_removed'        => 'Removed the player from :count manual / hidden squad(s).',
