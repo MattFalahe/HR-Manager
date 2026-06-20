@@ -145,13 +145,17 @@ return [
 
     // Squad memberships (SeAT core squads; Connector, when installed, maps them to Discord roles)
     'squads_heading'        => 'Squad Memberships',
-    'squads_intro'          => 'SeAT squads this account belongs to. Removing them mirrors a native squad kick; when SeAT Connector is installed, the matching Discord roles drop too.',
+    'squads_intro'          => 'SeAT squads this account belongs to.',
     'squads_empty'          => 'Not in any SeAT squads (that you can see).',
-    'squads_remove_all'     => 'Remove from all squads (:count)',
-    'squads_remove_confirm' => 'Remove this player from all :count of their SeAT squads? If SeAT Connector is installed, their matching Discord roles will be removed too.',
-    'squads_remove_note'    => 'Discord roles only drop when SeAT Connector is installed and the squad is bound to a role. Without Connector, this just clears their SeAT squad membership.',
-    'squads_removed'        => 'Removed the player from :count squad(s).',
-    'squads_none_removed'   => 'No squads were removed (the player was not in any visible squad).',
+    'squads_manual_heading' => 'Manual + hidden squads',
+    'squads_remove_all'     => 'Remove from these squads (:count)',
+    'squads_remove_confirm' => 'Remove this player from their :count manual / hidden squad(s)? If SeAT Connector is installed, the matching Discord roles drop too. Auto squads are left for SeAT to manage.',
+    'squads_remove_note'    => 'Only manual and hidden squads are removed. Discord roles drop when SeAT Connector is installed and the squad is bound to a role; without Connector this just clears the SeAT squad membership.',
+    'squads_none_manual'    => 'No manual or hidden squads to remove.',
+    'squads_auto_heading'   => 'Automatic squads (managed by SeAT)',
+    'squads_auto_note'      => 'These are assigned automatically from squad criteria, so HR does not touch them: SeAT would re-add an eligible member on the next sync. They drop on their own once the player no longer matches the criteria (for example, after they leave the corp following a purge).',
+    'squads_removed'        => 'Removed the player from :count manual / hidden squad(s).',
+    'squads_none_removed'   => 'No squads were removed (no manual or hidden squads; any auto squads are left for SeAT to manage).',
 
     // Action labels / messages
     'loa_marked'                  => 'Player marked on LOA.',

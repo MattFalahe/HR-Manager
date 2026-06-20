@@ -117,9 +117,11 @@ Every status change is logged with actor + timestamp + optional comment. A hidde
 
 ## Squad memberships & purge cleanup
 
-HR surfaces each player's **SeAT squad memberships** on the player profile (director-tier), and gives directors a one-button **Remove from all squads** as part of the purge workflow.
+HR surfaces each player's **SeAT squad memberships** on the player profile (director-tier), split into the squads HR can remove and the ones SeAT manages itself, with a one-button **Remove from these squads** for purge cleanup.
 
-Removal uses SeAT's own native-kick call (`$squad->members()->detach()`), so the core squad observer fires, and when **SeAT Connector** is installed and the squad is bound to a Discord role, the matching Discord roles cascade off exactly as a manual kick would. Without Connector it simply clears the SeAT squad membership. Each removal lands on the player's history timeline.
+**Only `manual` and `hidden` squads are removed** (explicit, operator-assigned membership). Removal uses SeAT's own native-kick call (`$squad->members()->detach()`), so the core squad observer fires, and when **SeAT Connector** is installed and the squad is bound to a Discord role, the matching Discord roles cascade off exactly as a manual kick would. Without Connector it just clears the SeAT squad membership. Each removal lands on the player's history timeline.
+
+**`auto` squads are deliberately never touched** and shown for information only. SeAT recomputes auto-squad membership from filters and would re-add an eligible member on the next ESI sync, so detaching one is futile churn. They resolve themselves once the player stops matching the criteria (for example, after they leave the corp following the purge).
 
 HR reads and detaches through SeAT's own squad relationship; it never owns squads, recomputes membership, or auto-removes anyone. The removal is always an explicit operator action, consistent with the rest of the purge workflow: HR hands the human the tools, it doesn't silently strip access.
 

@@ -478,7 +478,7 @@ class PlayerController extends Controller
         $this->assertCanAccessCorp($corporationId);
         $this->assertPlayerExistsInCorp($userId, $corporationId);
 
-        $removed = app(\HrManager\Services\SeatSquadService::class)->removeUserFromAllSquads($userId);
+        $removed = app(\HrManager\Services\SeatSquadService::class)->removeUserFromRemovableSquads($userId);
 
         foreach ($removed as $squad) {
             app(HistoryEventService::class)->record('hr.squad.removed', [

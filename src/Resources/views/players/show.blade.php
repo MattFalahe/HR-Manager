@@ -959,6 +959,10 @@
          Connector-managed Discord roles cascade off.
          ================================================================= --}}
     @can('hr-manager.director')
+        @php
+            $removableSquads = array_values(array_filter($squads, fn ($s) => $s['removable']));
+            $autoSquads      = array_values(array_filter($squads, fn ($s) => ! $s['removable']));
+        @endphp
         <div class="card card-dark mb-3">
             <div class="card-header">
                 <h3 class="card-title">
@@ -970,23 +974,50 @@
                     <p style="color: var(--hr-text-muted); margin: 0;">{{ trans('hr-manager::players.squads_empty') }}</p>
                 @else
                     <p style="color: var(--hr-text-muted); font-size: 0.85rem;">{{ trans('hr-manager::players.squads_intro') }}</p>
-                    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px;">
-                        @foreach($squads as $squad)
-                            <span class="badge" style="background: rgba(255,255,255,0.05); color: var(--hr-text-light); border: 1px solid rgba(255,255,255,0.12); padding: 6px 10px; font-size: 0.8rem; font-weight: normal;">
-                                <i class="fas fa-user-friends"></i> {{ $squad['name'] }}
-                                <small style="color: var(--hr-text-muted);">({{ ucfirst($squad['type']) }}@if($squad['member_since']), {{ $squad['member_since'] }}@endif)</small>
-                            </span>
-                        @endforeach
-                    </div>
-                    <form method="POST" action="{{ route('hr-manager.players.remove-squads', $user->id) }}"
-                          onsubmit="return confirm('{{ trans('hr-manager::players.squads_remove_confirm', ['count' => count($squads)]) }}');">
-                        @csrf
-                        <input type="hidden" name="corporation_id" value="{{ $corporationId }}">
-                        <button type="submit" class="btn btn-sm btn-outline-danger">
-                            <i class="fas fa-user-minus"></i> {{ trans('hr-manager::players.squads_remove_all', ['count' => count($squads)]) }}
-                        </button>
-                    </form>
-                    <small style="color: var(--hr-text-muted); display: block; margin-top: 10px;">{{ trans('hr-manager::players.squads_remove_note') }}</small>
+
+                    {{-- Manual / hidden squads: explicit membership, safe to remove. --}}
+                    @if(!empty($removableSquads))
+                        <h6 style="color: var(--hr-text-light); margin-bottom: 8px;">{{ trans('hr-manager::players.squads_manual_heading') }}</h6>
+                        <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;">
+                            @foreach($removableSquads as $squad)
+                                <span class="badge" style="background: rgba(255,255,255,0.05); color: var(--hr-text-light); border: 1px solid rgba(255,255,255,0.12); padding: 6px 10px; font-size: 0.8rem; font-weight: normal;">
+                                    <i class="fas fa-user-friends"></i> {{ $squad['name'] }}
+                                    <small style="color: var(--hr-text-muted);">({{ ucfirst($squad['type']) }}@if($squad['member_since']), {{ $squad['member_since'] }}@endif)</small>
+                                </span>
+                            @endforeach
+                        </div>
+                        <form method="POST" action="{{ route('hr-manager.players.remove-squads', $user->id) }}"
+                              onsubmit="return confirm('{{ trans('hr-manager::players.squads_remove_confirm', ['count' => count($removableSquads)]) }}');">
+                            @csrf
+                            <input type="hidden" name="corporation_id" value="{{ $corporationId }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                <i class="fas fa-user-minus"></i> {{ trans('hr-manager::players.squads_remove_all', ['count' => count($removableSquads)]) }}
+                            </button>
+                        </form>
+                        <small style="color: var(--hr-text-muted); display: block; margin-top: 10px;">{{ trans('hr-manager::players.squads_remove_note') }}</small>
+                    @else
+                        <p style="color: var(--hr-text-muted); font-size: 0.85rem;">{{ trans('hr-manager::players.squads_none_manual') }}</p>
+                    @endif
+
+                    {{-- Auto squads: SeAT manages membership from filters; HR must
+                         NOT detach (it would just be re-added on the next sync).
+                         Shown as information so the operator knows they resolve
+                         themselves once the player no longer matches. --}}
+                    @if(!empty($autoSquads))
+                        <hr style="border-color: rgba(255,255,255,0.08); margin: 14px 0 12px;">
+                        <h6 style="color: var(--hr-text-light); margin-bottom: 8px;">
+                            <i class="fas fa-robot"></i> {{ trans('hr-manager::players.squads_auto_heading') }}
+                        </h6>
+                        <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
+                            @foreach($autoSquads as $squad)
+                                <span class="badge" style="background: rgba(102,126,234,0.12); color: var(--hr-text-light); border: 1px solid rgba(102,126,234,0.35); padding: 6px 10px; font-size: 0.8rem; font-weight: normal;">
+                                    <i class="fas fa-robot"></i> {{ $squad['name'] }}
+                                    @if($squad['member_since'])<small style="color: var(--hr-text-muted);">({{ $squad['member_since'] }})</small>@endif
+                                </span>
+                            @endforeach
+                        </div>
+                        <small style="color: var(--hr-text-muted); display: block;">{{ trans('hr-manager::players.squads_auto_note') }}</small>
+                    @endif
                 @endif
             </div>
         </div>
