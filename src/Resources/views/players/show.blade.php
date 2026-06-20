@@ -953,6 +953,46 @@
     </div>
 
     {{-- =================================================================
+         SeAT squad memberships (account-level). Director-only. Lets a
+         director see which squads the player carries and clear them as
+         part of a purge. Removal mirrors SeAT's native kick, so any
+         Connector-managed Discord roles cascade off.
+         ================================================================= --}}
+    @can('hr-manager.director')
+        <div class="card card-dark mb-3">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-user-friends"></i> {{ trans('hr-manager::players.squads_heading') }}
+                </h3>
+            </div>
+            <div class="card-body">
+                @if(empty($squads))
+                    <p style="color: var(--hr-text-muted); margin: 0;">{{ trans('hr-manager::players.squads_empty') }}</p>
+                @else
+                    <p style="color: var(--hr-text-muted); font-size: 0.85rem;">{{ trans('hr-manager::players.squads_intro') }}</p>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px;">
+                        @foreach($squads as $squad)
+                            <span class="badge" style="background: rgba(255,255,255,0.05); color: var(--hr-text-light); border: 1px solid rgba(255,255,255,0.12); padding: 6px 10px; font-size: 0.8rem; font-weight: normal;">
+                                <i class="fas fa-user-friends"></i> {{ $squad['name'] }}
+                                <small style="color: var(--hr-text-muted);">({{ ucfirst($squad['type']) }}@if($squad['member_since']), {{ $squad['member_since'] }}@endif)</small>
+                            </span>
+                        @endforeach
+                    </div>
+                    <form method="POST" action="{{ route('hr-manager.players.remove-squads', $user->id) }}"
+                          onsubmit="return confirm('{{ trans('hr-manager::players.squads_remove_confirm', ['count' => count($squads)]) }}');">
+                        @csrf
+                        <input type="hidden" name="corporation_id" value="{{ $corporationId }}">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                            <i class="fas fa-user-minus"></i> {{ trans('hr-manager::players.squads_remove_all', ['count' => count($squads)]) }}
+                        </button>
+                    </form>
+                    <small style="color: var(--hr-text-muted); display: block; margin-top: 10px;">{{ trans('hr-manager::players.squads_remove_note') }}</small>
+                @endif
+            </div>
+        </div>
+    @endcan
+
+    {{-- =================================================================
          Identity admin: ownership audit trail (every mapping current +
          historical), reassign action per current mapping, merge action.
          Director-only. Surfaces the data that lived on the standalone

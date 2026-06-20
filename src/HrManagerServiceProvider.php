@@ -116,6 +116,7 @@ class HrManagerServiceProvider extends AbstractSeatPlugin
             \HrManager\Services\StructureIncidentService::class,
             \HrManager\Services\PublicCorpLookupService::class,
             \HrManager\Services\PurgeBoardService::class,
+            \HrManager\Services\SeatSquadService::class,
         ] as $service) {
             $this->app->singleton($service);
         }

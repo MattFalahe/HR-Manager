@@ -159,11 +159,17 @@ class PlayerController extends Controller
             ? app(\HrManager\Services\SeatConnectorService::class)->getIdentityForUser((int) $userId)
             : ['available' => false, 'roles' => []];
 
+        // SeAT squad memberships (account-level). Shown so a director can see
+        // what groups the player carries and clear them as part of a purge.
+        $squads = ($userId !== null && $userId > 0)
+            ? app(\HrManager\Services\SeatSquadService::class)->squadsForUser((int) $userId)
+            : [];
+
         return view('hr-manager::players.show', compact(
             'summary', 'notes', 'history', 'corporationId',
             'corporations', 'tierAuto', 'titleSnapshot',
             'identity', 'identityCharNames', 'roleProfiles', 'fcActivity',
-            'blueprintActivity', 'accessDepth', 'discord',
+            'blueprintActivity', 'accessDepth', 'discord', 'squads',
             'noteAuthorNames', 'noteAuthorAdmins'
         ));
     }
@@ -451,6 +457,49 @@ class PlayerController extends Controller
         return redirect()->route('hr-manager.players.show', [
             'id' => $id, 'corporation_id' => $corporationId,
         ])->with('success', $message);
+    }
+
+    /**
+     * Remove the player from all their SeAT squads (purge cleanup). Director
+     * only. Mirrors SeAT's native squad kick, so the core SquadMemberObserver
+     * fires and any Connector-managed Discord roles cascade off. Records one
+     * history-timeline event per squad removed.
+     */
+    public function removeSquads(Request $request, int $id)
+    {
+        $userId = $this->resolveUserId($id);
+        $request->validate(['corporation_id' => 'required|integer']);
+
+        if (!auth()->user()->can('hr-manager.director')) {
+            abort(403, 'Director permission required.');
+        }
+
+        $corporationId = (int) $request->corporation_id;
+        $this->assertCanAccessCorp($corporationId);
+        $this->assertPlayerExistsInCorp($userId, $corporationId);
+
+        $removed = app(\HrManager\Services\SeatSquadService::class)->removeUserFromAllSquads($userId);
+
+        foreach ($removed as $squad) {
+            app(HistoryEventService::class)->record('hr.squad.removed', [
+                'squad_id'   => $squad['id'],
+                'squad_name' => $squad['name'],
+            ], [
+                'user_id'        => $userId,
+                'corporation_id' => $corporationId,
+                'occurred_at'    => now(),
+            ]);
+        }
+
+        if (empty($removed)) {
+            return redirect()->route('hr-manager.players.show', [
+                'id' => $id, 'corporation_id' => $corporationId,
+            ])->with('info', trans('hr-manager::players.squads_none_removed'));
+        }
+
+        return redirect()->route('hr-manager.players.show', [
+            'id' => $id, 'corporation_id' => $corporationId,
+        ])->with('success', trans('hr-manager::players.squads_removed', ['count' => count($removed)]));
     }
 
     public function clearStatus(Request $request, int $id)

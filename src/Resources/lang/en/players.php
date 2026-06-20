@@ -143,6 +143,16 @@ return [
     'cancel_purge'         => 'Cancel Purge',
     'refresh_assessments'  => 'Refresh All Assessments',
 
+    // Squad memberships (SeAT core squads; Connector, when installed, maps them to Discord roles)
+    'squads_heading'        => 'Squad Memberships',
+    'squads_intro'          => 'SeAT squads this account belongs to. Removing them mirrors a native squad kick; when SeAT Connector is installed, the matching Discord roles drop too.',
+    'squads_empty'          => 'Not in any SeAT squads (that you can see).',
+    'squads_remove_all'     => 'Remove from all squads (:count)',
+    'squads_remove_confirm' => 'Remove this player from all :count of their SeAT squads? If SeAT Connector is installed, their matching Discord roles will be removed too.',
+    'squads_remove_note'    => 'Discord roles only drop when SeAT Connector is installed and the squad is bound to a role. Without Connector, this just clears their SeAT squad membership.',
+    'squads_removed'        => 'Removed the player from :count squad(s).',
+    'squads_none_removed'   => 'No squads were removed (the player was not in any visible squad).',
+
     // Action labels / messages
     'loa_marked'                  => 'Player marked on LOA.',
     'purge_marked'                => 'Player flagged for purge.',

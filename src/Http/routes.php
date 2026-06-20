@@ -166,6 +166,9 @@ Route::group([
         Route::post('/{id}/notes',               ['as' => 'hr-manager.players.notes',         'uses' => 'PlayerController@addNote']);
         Route::post('/{id}/reassign/{characterId}', ['as' => 'hr-manager.players.reassign-character', 'uses' => 'PlayerController@reassignCharacter']);
         Route::post('/{id}/merge',               ['as' => 'hr-manager.players.merge-identity', 'uses' => 'PlayerController@mergeIdentity']);
+        // Remove the player from their SeAT squads (purge cleanup). Mirrors
+        // SeAT's native kick so Connector-managed Discord roles cascade off.
+        Route::post('/{id}/remove-squads',       ['as' => 'hr-manager.players.remove-squads', 'uses' => 'PlayerController@removeSquads']);
     });
 
     Route::group(['prefix' => 'watchlist', 'middleware' => 'can:hr-manager.recruiter'], function () {
