@@ -601,6 +601,7 @@ docker compose -f docker-compose.yml -f docker-compose.mariadb.yml -f docker-com
                         <li>{!! trans('hr-manager::help.feat_n_cap_3') !!}</li>
                         <li>{!! trans('hr-manager::help.feat_n_cap_4') !!}</li>
                         <li>{!! trans('hr-manager::help.feat_n_cap_5') !!}</li>
+                        <li>{!! trans('hr-manager::help.feat_n_cap_6') !!}</li>
                     </ul>
 
                     <div class="info-box">

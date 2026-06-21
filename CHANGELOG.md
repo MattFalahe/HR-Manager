@@ -82,7 +82,7 @@ First release. HR Manager is two faces in one plugin: a **public recruitment fun
 
 ### 🔔 Notifications & routing
 
-- Discord + Slack webhooks, editable inline, each row showing the categories it fires and an Enabled toggle. Categories cover the application lifecycle, classifier flags (inactive-director / dead-weight), purge reminders, and player-status changes (LOA / purge / cleared, fired inline).
+- Discord + Slack webhooks, editable inline, each row showing the categories it fires and an Enabled toggle. Categories cover the application lifecycle, classifier flags (inactive-director / dead-weight), purge reminders, player-status changes (LOA / purge / cleared, fired inline), and SeAT token revocations (a dedicated security category).
 - Discord role-mention picker with an AJAX-lazy-loaded, cached, multi-source role list (Broadcast / Connector / legacy warlof), per-source colour badges, and search.
 - **Notification Routing Map** (Settings): a read-only view of which webhooks fire for each category and which role each pings.
 - HTTPS-only webhook URLs with an end-anchored host allowlist (`discord.com` / `hooks.slack.com` / `slack.com`), no IP literals, a port 443 lock, and a 2-retry policy with backoff.
@@ -107,6 +107,7 @@ First release. HR Manager is two faces in one plugin: a **public recruitment fun
 - **Private notes** are visible only to their author, enforced at query-scope level: not even directors or admins can read another user's private notes.
 - The application state machine gates director-only actions (accept / reject) with transactional, lock-protected transitions.
 - Discord role-id validation, and HTTPS-only webhook validation with an end-anchored host check.
+- **Token-loss detection**: a 10-minute cron (`hr-manager:detect-token-loss`) watches SeAT for tracked members whose refresh token has gone — delinked, or rejected by CCP after a password change / app de-authorization (SeAT soft-deletes the token either way). It fires the dedicated **SeAT Token Revoked** webhook category, records a critical history event, and can optionally auto-schedule a security purge at T+N hours. Catches passive token death, not just deliberate delinks. The Members roster separately shows who currently holds a working token (registered vs unregistered count).
 
 ### 🗄️ Schema
 

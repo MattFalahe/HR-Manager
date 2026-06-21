@@ -54,6 +54,7 @@ What leadership sees while doing the actual work of keeping the corp alive.
 - **In-game titles + roles surfacing**: corp titles and direct character roles are shown on every member / player profile, with high-impact roles (Director / Personnel Manager / Accountant / etc.) called out for the purge-strip checklist
 - **History timeline**: 20+ event types (wallet signals / classifier transitions / purge milestones / LOA / squad removals / contribution drops / unusual recipients) rendered with semantic icons
 - **Corp-join detection**: scans `character_corporation_histories` every 30 minutes for accepted applicants who actually joined. Surfaces "accepted but never joined" backlog on Corp Health
+- **Token tracking + loss alerts**: the Members roster shows who currently holds a working SeAT token (registered vs unregistered count), and a 10-minute cron watches for tracked members whose refresh token has gone — delinked, or rejected by CCP after a password change / app de-authorization (SeAT soft-deletes the token in both cases). It fires a dedicated **SeAT Token Revoked** webhook category to your security channel, records a critical history event, and can optionally auto-schedule a security purge (Settings → security policy)
 
 ---
 
