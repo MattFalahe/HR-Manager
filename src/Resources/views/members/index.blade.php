@@ -127,13 +127,22 @@
                                         <small class="ml-2" style="color: var(--hr-text-muted);">#{{ $member->character_id }}</small>
                                     </td>
                                     <td>
-                                        @if($member->is_registered)
-                                            <span class="badge badge-hr badge-accepted" title="{{ trans('hr-manager::members.registered_help') }}">
-                                                <i class="fas fa-check-circle"></i> {{ trans('hr-manager::members.registered') }}
+                                        @php $ts = $member->token_status ?? ($member->is_registered ? 'valid' : 'never_linked'); @endphp
+                                        @if($ts === 'valid')
+                                            <span class="badge badge-hr badge-accepted" title="{{ trans('hr-manager::members.token_valid_help') }}">
+                                                <i class="fas fa-check-circle"></i> {{ trans('hr-manager::members.token_valid') }}
+                                            </span>
+                                        @elseif($ts === 'insufficient')
+                                            <span class="badge badge-hr badge-review" title="{{ trans('hr-manager::members.token_insufficient_help') }}: {{ implode(', ', $member->token_missing ?? []) }}">
+                                                <i class="fas fa-user-lock"></i> {{ trans('hr-manager::members.token_insufficient') }}
+                                            </span>
+                                        @elseif($ts === 'lost')
+                                            <span class="badge badge-hr badge-rejected" title="{{ trans('hr-manager::members.token_lost_help') }}">
+                                                <i class="fas fa-unlink"></i> {{ trans('hr-manager::members.token_lost') }}
                                             </span>
                                         @else
                                             <span class="badge badge-hr badge-withdrawn" title="{{ trans('hr-manager::members.unregistered_help') }}">
-                                                <i class="fas fa-user-slash"></i> {{ trans('hr-manager::members.unregistered') }}
+                                                <i class="fas fa-user-slash"></i> {{ trans('hr-manager::members.token_never') }}
                                             </span>
                                         @endif
                                     </td>

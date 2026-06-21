@@ -108,6 +108,18 @@ class MemberController extends Controller
             : [];
         $registeredSet = array_flip($registered);
 
+        // Token-health map: full refresh_tokens row (including trashed) per
+        // character so the roster can badge valid / missing-scopes / lost /
+        // never-linked against the corp requirement profile.
+        $tokenHealth   = app(\HrManager\Services\TokenHealthService::class);
+        $tokenRequired = $tokenHealth->requiredScopes();
+        $tokenMap = !empty($charIds)
+            ? DB::table('refresh_tokens')
+                ->whereIn('character_id', $charIds)
+                ->get(['character_id', 'scopes', 'deleted_at'])
+                ->keyBy(fn ($r) => (int) $r->character_id)
+            : collect();
+
         // Resolve corp name once (every row shares the same corp).
         // Also resolve the corp's alliance_id so unregistered chars
         // without their own alliance_id in character_affiliations
@@ -162,13 +174,16 @@ class MemberController extends Controller
         // (corporation/alliance pseudo-relations matching the previous
         // CharacterAffiliation hydration).
         $resolver = app(NameResolutionService::class);
-        $members->getCollection()->transform(function ($row) use ($universeNames, $registeredSet, $corpName, $allianceNames, $corpAllianceId, $resolver) {
+        $members->getCollection()->transform(function ($row) use ($universeNames, $registeredSet, $corpName, $allianceNames, $corpAllianceId, $resolver, $tokenHealth, $tokenRequired, $tokenMap) {
             $cid = (int) $row->character_id;
             $infoName = $row->info_name;
             $row->display_name = ($resolver->isUsableName($infoName) ? (string) $infoName : null)
                 ?? ($universeNames[$cid] ?? null)
                 ?? ('Character #' . $cid);
             $row->is_registered = isset($registeredSet[$cid]);
+            $tokenClass = $tokenHealth->classify($tokenMap->get($cid), $tokenRequired);
+            $row->token_status = $tokenClass['status'];
+            $row->token_missing = $tokenClass['missing'];
             $row->corporation = $corpName !== null ? (object) ['name' => $corpName] : null;
             // Alliance fallback: when row has no alliance_id but the
             // corp is in an alliance, inherit. Real-world: every char

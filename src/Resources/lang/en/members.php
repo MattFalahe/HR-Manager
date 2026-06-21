@@ -42,6 +42,14 @@ return [
     'registered_help'     => 'Character has a SeAT refresh token (registered with this install).',
     'unregistered'        => 'Unregistered',
     'unregistered_help'   => 'Character visible to ESI corp-member tracking but has no SeAT refresh token.',
+    // Token-health badge (registration column)
+    'token_valid'             => 'Token OK',
+    'token_valid_help'        => 'Has a working SeAT token. With a member requirement profile set, it also carries every required scope.',
+    'token_insufficient'      => 'Missing scopes',
+    'token_insufficient_help' => 'Has a token but is missing required scopes',
+    'token_lost'              => 'Token lost',
+    'token_lost_help'         => 'Had a SeAT token that is now gone (delinked, or rejected by CCP). The install can no longer sync this character.',
+    'token_never'             => 'Never linked',
     'roster_partial_heading' => 'Showing partial roster',
     'roster_partial_body'    => 'SeAT has not synced the full corporation member list for this corp yet. Add an ESI refresh token from a Director character with the read_corporation_membership scope under Seat → Settings → API → Refresh tokens to see every member (registered or not).',
 
