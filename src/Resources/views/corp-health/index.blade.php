@@ -1636,49 +1636,67 @@
                             $sqAuto      = $e['squads_auto'] ?? [];
                             $sqDone      = $e['squads_removed_at'] ?? null;
                             $sqCfg       = $e['auto_squad'] ?? ['enabled' => false, 'hours' => 24];
+                            $sqActionNeeded = empty($sqDone) && !empty($sqRemovable);
                         @endphp
                         @if(!empty($sqRemovable) || !empty($sqExcluded) || !empty($sqAuto) || $sqDone)
-                            <small style="color: var(--hr-text-muted); text-transform: uppercase; letter-spacing: 0.4px; font-size: 0.7rem; display: block; margin-top: 12px;">
-                                <i class="fas fa-user-friends"></i> {{ trans('hr-manager::corp-health.purge_squads_label') }}
-                            </small>
+                            <div class="mt-3" style="border-radius: 8px; padding: 12px 14px;
+                                @if($sqActionNeeded) background: rgba(220,53,69,0.10); border: 1px solid rgba(220,53,69,0.40); border-left: 4px solid #dc3545;
+                                @elseif($sqDone) background: rgba(40,167,69,0.08); border: 1px solid rgba(40,167,69,0.28); border-left: 4px solid #28a745;
+                                @else background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.08); border-left: 4px solid rgba(255,255,255,0.18); @endif">
 
-                            @if($sqDone)
-                                <div class="mt-1 mb-2"><small style="color: #28a745;"><i class="fas fa-check-circle"></i> {{ trans('hr-manager::corp-health.purge_squads_done', ['when' => $sqDone->diffForHumans()]) }}</small></div>
-                            @elseif(!empty($sqRemovable))
-                                <div class="mt-1" style="display: flex; flex-wrap: wrap; gap: 6px;">
-                                    @foreach($sqRemovable as $q)
-                                        <span class="badge" style="background: rgba(255,255,255,0.05); color: var(--hr-text-light); border: 1px solid rgba(255,255,255,0.12); font-weight: normal;"><i class="fas fa-user-friends"></i> {{ $q['name'] }}</span>
-                                    @endforeach
+                                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; {{ ($sqActionNeeded || $sqDone || !empty($sqRemovable)) ? 'margin-bottom: 8px;' : '' }}">
+                                    <i class="fas {{ $sqActionNeeded ? 'fa-user-slash' : ($sqDone ? 'fa-check-circle' : 'fa-user-friends') }}"
+                                       style="color: {{ $sqActionNeeded ? '#ff6b6b' : ($sqDone ? '#28a745' : 'var(--hr-text-muted)') }};"></i>
+                                    <strong style="color: {{ $sqActionNeeded ? '#ff8585' : 'var(--hr-text-light)' }}; text-transform: uppercase; letter-spacing: 0.4px; font-size: 0.72rem;">
+                                        {{ trans('hr-manager::corp-health.purge_squads_label') }}
+                                    </strong>
+                                    @if($sqActionNeeded)
+                                        <span class="badge" style="background: #dc3545; color: #fff; font-weight: 600; letter-spacing: 0.3px;"><i class="fas fa-exclamation-triangle"></i> {{ trans('hr-manager::corp-health.purge_squads_action_badge') }}</span>
+                                    @endif
                                 </div>
-                                <form method="POST" action="{{ route('hr-manager.corp-health.purge-remove-squads', $e['status_id']) }}"
-                                      onsubmit="return confirm('{{ trans('hr-manager::corp-health.purge_squads_confirm', ['count' => count($sqRemovable)]) }}');" class="mt-2">
-                                    @csrf
-                                    <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-user-minus"></i> {{ trans('hr-manager::corp-health.purge_squads_btn', ['count' => count($sqRemovable)]) }}</button>
-                                </form>
-                                @if($sqCfg['enabled'])
-                                    <small class="d-block mt-1" style="color: #f59e0b;"><i class="fas fa-exclamation-triangle"></i> {{ trans('hr-manager::corp-health.purge_squads_auto_warn', ['hours' => $sqCfg['hours']]) }}</small>
+
+                                @if($sqDone)
+                                    <div style="color: #6ee7a0; font-size: 0.85rem;"><i class="fas fa-check-circle"></i> {{ trans('hr-manager::corp-health.purge_squads_done', ['when' => $sqDone->diffForHumans()]) }}</div>
+                                @elseif(!empty($sqRemovable))
+                                    <p style="color: var(--hr-text-light); font-size: 0.84rem; margin-bottom: 8px;">{{ trans('hr-manager::corp-health.purge_squads_action_intro') }}</p>
+                                    <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;">
+                                        @foreach($sqRemovable as $q)
+                                            <span class="badge" style="background: rgba(220,53,69,0.18); color: #ffb3b3; border: 1px solid rgba(220,53,69,0.45); font-weight: normal; padding: 5px 9px;"><i class="fas fa-user-friends"></i> {{ $q['name'] }}</span>
+                                        @endforeach
+                                    </div>
+                                    <form method="POST" action="{{ route('hr-manager.corp-health.purge-remove-squads', $e['status_id']) }}"
+                                          onsubmit="return confirm('{{ trans('hr-manager::corp-health.purge_squads_confirm', ['count' => count($sqRemovable)]) }}');">
+                                        @csrf
+                                        <button type="submit" class="btn btn-sm btn-danger"><i class="fas fa-user-minus"></i> {{ trans('hr-manager::corp-health.purge_squads_btn', ['count' => count($sqRemovable)]) }}</button>
+                                    </form>
+                                    @if($sqCfg['enabled'])
+                                        <div class="mt-2" style="color: #f59e0b; font-size: 0.8rem;"><i class="fas fa-clock"></i> {{ trans('hr-manager::corp-health.purge_squads_auto_warn', ['hours' => $sqCfg['hours']]) }}</div>
+                                    @endif
+                                @else
+                                    <div style="color: var(--hr-text-muted); font-size: 0.84rem;"><i class="fas fa-check"></i> {{ trans('hr-manager::corp-health.purge_squads_none_removable') }}</div>
                                 @endif
-                            @else
-                                <div class="mt-1 mb-1"><small style="color: var(--hr-text-muted);">{{ trans('hr-manager::corp-health.purge_squads_none_removable') }}</small></div>
-                            @endif
 
-                            @if(!empty($sqExcluded))
-                                <div class="mt-1" style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
-                                    <small style="color: var(--hr-text-muted);">{{ trans('hr-manager::corp-health.purge_squads_kept') }}</small>
-                                    @foreach($sqExcluded as $q)
-                                        <span class="badge" style="background: rgba(255,255,255,0.03); color: var(--hr-text-muted); border: 1px dashed rgba(255,255,255,0.15); font-weight: normal;"><i class="fas fa-lock"></i> {{ $q['name'] }}</span>
-                                    @endforeach
-                                </div>
-                            @endif
-
-                            @if(!empty($sqAuto))
-                                <div class="mt-1" style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
-                                    <small style="color: var(--hr-text-muted);">{{ trans('hr-manager::corp-health.purge_squads_auto_managed') }}</small>
-                                    @foreach($sqAuto as $q)
-                                        <span class="badge" style="background: rgba(102,126,234,0.10); color: var(--hr-text-muted); border: 1px solid rgba(102,126,234,0.30); font-weight: normal;"><i class="fas fa-robot"></i> {{ $q['name'] }}</span>
-                                    @endforeach
-                                </div>
-                            @endif
+                                @if(!empty($sqExcluded) || !empty($sqAuto))
+                                    <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06);">
+                                        @if(!empty($sqExcluded))
+                                            <div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 4px;">
+                                                <small style="color: var(--hr-text-muted);"><i class="fas fa-lock"></i> {{ trans('hr-manager::corp-health.purge_squads_kept') }}</small>
+                                                @foreach($sqExcluded as $q)
+                                                    <span class="badge" style="background: rgba(255,255,255,0.03); color: var(--hr-text-muted); border: 1px dashed rgba(255,255,255,0.18); font-weight: normal;">{{ $q['name'] }}</span>
+                                                @endforeach
+                                            </div>
+                                        @endif
+                                        @if(!empty($sqAuto))
+                                            <div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
+                                                <small style="color: var(--hr-text-muted);"><i class="fas fa-robot"></i> {{ trans('hr-manager::corp-health.purge_squads_auto_managed') }}</small>
+                                                @foreach($sqAuto as $q)
+                                                    <span class="badge" style="background: rgba(102,126,234,0.10); color: var(--hr-text-muted); border: 1px solid rgba(102,126,234,0.30); font-weight: normal;">{{ $q['name'] }}</span>
+                                                @endforeach
+                                            </div>
+                                        @endif
+                                    </div>
+                                @endif
+                            </div>
                         @endif
 
                         {{-- Notes --}}

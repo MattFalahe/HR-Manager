@@ -784,10 +784,12 @@
     margin: 15px 0;
     border-radius: 5px;
     color: #d1d5db !important;
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    flex-wrap: wrap;
+    /* flow-root (not flex): a flexbox turns the leading icon, the bold label,
+       and every text run around an inline <strong> into separate flex items
+       that wrap independently — which broke a label like "Heads up: HR Manager
+       does not" onto one line and the rest onto the next. Block flow with a
+       floated icon (below) lets the whole callout read as one paragraph. */
+    display: flow-root;
 }
 
 .hr-manager-wrapper .info-box {
@@ -865,8 +867,9 @@
 .hr-manager-wrapper .info-box > i,
 .hr-manager-wrapper .warning-box > i,
 .hr-manager-wrapper .success-box > i {
+    float: left;
+    margin-right: 10px;
     margin-top: 3px;
-    flex-shrink: 0;
 }
 
 .hr-manager-wrapper .info-box > i { color: var(--hr-info); }

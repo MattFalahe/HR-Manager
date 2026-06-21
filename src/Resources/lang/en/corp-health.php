@@ -118,6 +118,8 @@ return [
     'purge_note_saved'    => 'Purge note saved.',
     // Squad cleanup on the purge board
     'purge_squads_label'        => 'Squad cleanup',
+    'purge_squads_action_badge' => 'Action needed',
+    'purge_squads_action_intro' => 'This member still holds removable squads. Clearing them now drops the matching Discord roles (with Connector installed), so do it before the kick lands or they keep that access.',
     'purge_squads_btn'          => 'Remove from squads now (:count)',
     'purge_squads_confirm'      => 'Remove this player from :count manual / hidden squad(s)? If SeAT Connector is installed, the matching Discord roles drop too. Auto and excluded squads are left alone.',
     'purge_squads_auto_warn'    => 'If no action is taken, HR will auto-remove these :hours hours before the kick date (safety).',
