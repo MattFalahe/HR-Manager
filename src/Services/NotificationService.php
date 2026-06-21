@@ -68,11 +68,17 @@ class NotificationService
             ? (app(NameResolutionService::class)->getUserNames([$actorUserId])[$actorUserId] ?? ('User #' . $actorUserId))
             : null;
 
+        // Human-readable status labels (e.g. under_review -> "Under review") used
+        // in BOTH the embed description and the fields, so the description never
+        // shows raw status keys like "under_review -> rejected".
+        $oldLabel = ucfirst(str_replace('_', ' ', $oldStatus));
+        $newLabel = ucfirst(str_replace('_', ' ', $newStatus));
+
         foreach ($webhooks as $webhook) {
             $fields = [
                 ['name' => 'Applicant', 'value' => $characterName, 'inline' => true],
-                ['name' => 'Old Status', 'value' => ucfirst(str_replace('_', ' ', $oldStatus)), 'inline' => true],
-                ['name' => 'New Status', 'value' => ucfirst(str_replace('_', ' ', $newStatus)), 'inline' => true],
+                ['name' => 'Old Status', 'value' => $oldLabel, 'inline' => true],
+                ['name' => 'New Status', 'value' => $newLabel, 'inline' => true],
             ];
             if ($actorName) {
                 $fields[] = ['name' => 'Changed by', 'value' => $actorName, 'inline' => true];
@@ -85,7 +91,7 @@ class NotificationService
 
             $this->send($webhook, $event, [
                 'character_id' => $application->character_id,
-                'description'  => "**{$characterName}**'s application status changed: **{$oldStatus}** -> **{$newStatus}**"
+                'description'  => "**{$characterName}**'s application status changed: **{$oldLabel}** -> **{$newLabel}**"
                     . ($actorName ? " by **{$actorName}**" : ''),
                 'fields'       => $fields,
             ]);
