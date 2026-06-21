@@ -93,6 +93,11 @@
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a href="#" class="nav-link" data-section="custom-styling">
+                                <i class="fas fa-paint-brush"></i> {{ trans('hr-manager::help.custom_styling') }}
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a href="#" class="nav-link" data-section="faq">
                                 <i class="fas fa-question-circle"></i> {{ trans('hr-manager::help.faq') }}
                             </a>
@@ -1210,6 +1215,61 @@ docker compose -f docker-compose.yml -f docker-compose.mariadb.yml -f docker-com
                     <div class="info-box">
                         <i class="fas fa-info-circle"></i>
                         {!! trans('hr-manager::help.commands_schedule_note') !!}
+                    </div>
+                </div>
+            </div>
+
+            {{-- ============================================================
+                 Custom Styling
+                 ============================================================ --}}
+            <div id="custom-styling" class="help-section">
+                <div class="help-card">
+                    <h3><i class="fas fa-paint-brush"></i> {{ trans('hr-manager::help.custom_styling_guide') }}</h3>
+                    <p>{{ trans('hr-manager::help.custom_styling_intro') }}</p>
+
+                    <h4>{{ trans('hr-manager::help.css_class_hierarchy') }}</h4>
+                    <p>{{ trans('hr-manager::help.css_class_hierarchy_desc') }}</p>
+                    <ul>
+                        <li>{!! trans('hr-manager::help.css_base_class') !!}</li>
+                        <li>{!! trans('hr-manager::help.css_diagnostic_class') !!}</li>
+                    </ul>
+
+                    <h4>{{ trans('hr-manager::help.css_vars_title') }}</h4>
+                    <p>{{ trans('hr-manager::help.css_vars_desc') }}</p>
+                    <ul>
+                        <li>{!! trans('hr-manager::help.css_var_primary') !!}</li>
+                        <li>{!! trans('hr-manager::help.css_var_surface') !!}</li>
+                        <li>{!! trans('hr-manager::help.css_var_text') !!}</li>
+                        <li>{!! trans('hr-manager::help.css_var_status') !!}</li>
+                    </ul>
+
+                    <h4>{{ trans('hr-manager::help.css_components_title') }}</h4>
+                    <p>{{ trans('hr-manager::help.css_components_desc') }}</p>
+                    <ul>
+                        <li>{!! trans('hr-manager::help.css_component_card') !!}</li>
+                        <li>{!! trans('hr-manager::help.css_component_cardtitle') !!}</li>
+                        <li>{!! trans('hr-manager::help.css_component_box') !!}</li>
+                        <li>{!! trans('hr-manager::help.css_component_btn') !!}</li>
+                    </ul>
+
+                    <h4>{{ trans('hr-manager::help.css_example_title') }}</h4>
+
+                    <h5>{{ trans('hr-manager::help.css_example_vars') }}</h5>
+                    <pre><code>{{ trans('hr-manager::help.css_example_vars_code') }}</code></pre>
+
+                    <h5>{{ trans('hr-manager::help.css_example_global') }}</h5>
+                    <pre><code>{{ trans('hr-manager::help.css_example_global_code') }}</code></pre>
+
+                    <h5>{{ trans('hr-manager::help.css_example_specific') }}</h5>
+                    <pre><code>{{ trans('hr-manager::help.css_example_specific_code') }}</code></pre>
+
+                    <div class="info-box">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>{{ trans('hr-manager::help.css_where_to_add') }}:</strong> {!! trans('hr-manager::help.css_where_to_add_desc') !!}
+                    </div>
+                    <div class="info-box">
+                        <i class="fas fa-lightbulb"></i>
+                        {{ trans('hr-manager::help.custom_styling_note') }}
                     </div>
                 </div>
             </div>

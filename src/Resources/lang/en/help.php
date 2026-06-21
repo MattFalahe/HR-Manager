@@ -613,6 +613,39 @@ return [
     'commands_schedule_note' => 'Cron schedules are registered by HR Manager\'s ScheduleSeeder and visible in <strong>Settings → Schedules</strong>.',
 
     // ============================================================
+    // Custom Styling
+    // ============================================================
+    'custom_styling' => 'Custom Styling',
+    'custom_styling_guide' => 'CSS Overrides Guide',
+    'custom_styling_intro' => 'HR Manager wraps every page in CSS hook classes and drives its whole look from a small palette of CSS variables, so you can retheme any part of the plugin from SeAT\'s custom stylesheet without editing the plugin\'s files (which are overwritten on every update).',
+    'css_class_hierarchy' => 'CSS Class Hierarchy',
+    'css_class_hierarchy_desc' => 'HR Manager uses a small, deliberate set of hook classes:',
+    'css_base_class' => '<code>.hr-manager-wrapper</code> — present on EVERY plugin page. The global hook: style this (or redefine the palette variables on it) to affect all of HR Manager at once.',
+    'css_diagnostic_class' => '<code>.diagnostic-page</code> — added alongside the wrapper on the admin Diagnostics page only (<code>class="hr-manager-wrapper diagnostic-page"</code>), so you can target that one page without touching the rest.',
+    'css_vars_title' => 'Theme Colour Variables',
+    'css_vars_desc' => 'The cleanest way to retheme: every colour, radius and transition is a CSS variable defined on the wrapper. Redefine any of them inside <code>.hr-manager-wrapper</code> and the whole plugin follows, because the cards, buttons and badges all read these variables.',
+    'css_var_primary' => '<code>--hr-primary-start</code> / <code>--hr-primary-end</code> — the indigo accent gradient used by primary buttons, headers and highlights.',
+    'css_var_surface' => '<code>--hr-dark-bg</code> / <code>--hr-dark-card</code> / <code>--hr-border</code> — the page, card and border surfaces.',
+    'css_var_text' => '<code>--hr-text-white</code> / <code>--hr-text-light</code> / <code>--hr-text-muted</code> — the three text tones.',
+    'css_var_status' => '<code>--hr-success</code> / <code>--hr-warning</code> / <code>--hr-danger</code> / <code>--hr-info</code> — semantic status colours (callout boxes, badges, status pills).',
+    'css_components_title' => 'Reusable Component Classes',
+    'css_components_desc' => 'Most of the plugin\'s chrome is built from a few shared component classes — target these to restyle a widget everywhere it appears:',
+    'css_component_card' => '<code>.card-dark</code> — the dark card chrome (header + body) used on every page.',
+    'css_component_cardtitle' => '<code>.card-title</code> — the heading inside a card header.',
+    'css_component_box' => '<code>.info-box</code> / <code>.warning-box</code> / <code>.success-box</code> — the tinted callout panels (each with a leading icon).',
+    'css_component_btn' => '<code>.btn-hr-primary</code> / <code>.btn-hr-secondary</code> — the primary (indigo gradient) and secondary buttons.',
+    'css_example_title' => 'Example Overrides',
+    'css_example_vars' => '/* Retheme the whole plugin by redefining the palette */',
+    'css_example_vars_code' => ".hr-manager-wrapper {\n    --hr-primary-start: #0ea5e9;\n    --hr-primary-end:   #2563eb;\n    --hr-dark-bg:       #0d1117;\n}",
+    'css_example_global' => '/* Tint the background of every HR Manager page */',
+    'css_example_global_code' => '.hr-manager-wrapper { background-color: #0d0d12; }',
+    'css_example_specific' => '/* Restyle the cards on the Diagnostics page only */',
+    'css_example_specific_code' => '.diagnostic-page .card-dark { border-color: #667eea; }',
+    'css_where_to_add' => 'Where to Add Custom CSS',
+    'css_where_to_add_desc' => 'SeAT auto-loads <code>custom-layout.css</code> from its <code>public/</code> directory app-wide if the file exists. On a bare-metal install, drop it at <code>/var/www/seat/public/custom-layout.css</code>. On SeAT Docker, place it in your custom mount (for example <code>/opt/seat-docker/custom/</code>) and map it to <code>/var/www/seat/public/custom-layout.css</code> via <code>docker-compose.override.yml</code>, then bring the stack back up. It is detected automatically — there is no SeAT setting to toggle. Never edit the plugin\'s own files; they are overwritten on every update. Full guide: <a href="https://eveseat.github.io/docs/styling/" target="_blank" rel="noopener">SeAT styling docs</a>.',
+    'custom_styling_note' => 'HR Manager\'s own stylesheet is written for the standard SeAT layout. If you run a custom SeAT theme, keep your tweaks in your theme\'s CSS (or the variable overrides above) rather than editing the plugin — that way the plugin and your theme survive updates independently.',
+
+    // ============================================================
     // FAQ
     // ============================================================
     'faq_title' => 'Frequently Asked Questions',
