@@ -22,6 +22,7 @@
         'notify_purge_reminder'             => true,
         'notify_player_status'              => true,
         'notify_token_revoked'              => true,
+        'notify_token_coverage'             => false,
         'notify_wallet_stalled'             => false,
         'notify_wallet_compliance_dropped'  => false,
         'notify_wallet_milestone'           => false,
@@ -33,7 +34,7 @@
     // Grouped exactly as the original form: application / director / wallet.
     $whGroups = [
         ['notify_application_submitted', 'notify_application_accepted', 'notify_application_rejected', 'notify_status_change'],
-        ['notify_inactive_director', 'notify_dead_weight', 'notify_purge_reminder', 'notify_player_status', 'notify_token_revoked'],
+        ['notify_inactive_director', 'notify_dead_weight', 'notify_purge_reminder', 'notify_player_status', 'notify_token_revoked', 'notify_token_coverage'],
         ['notify_wallet_stalled', 'notify_wallet_compliance_dropped', 'notify_wallet_milestone'],
     ];
 @endphp

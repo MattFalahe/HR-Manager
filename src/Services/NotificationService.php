@@ -571,6 +571,72 @@ class NotificationService
         }
     }
 
+    /**
+     * Periodic token-coverage digest for one corp. Opt-in per webhook
+     * (notify_token_coverage, default off). Summarises the corp's token + scope
+     * health and names who needs attention. No-op when no webhook subscribes or
+     * the corp has no roster.
+     */
+    public function notifyTokenCoverage(int $corporationId): void
+    {
+        $webhooks = WebhookConfiguration::enabled()
+            ->forCorporation($corporationId)
+            ->where('notify_token_coverage', true)
+            ->get();
+
+        if ($webhooks->isEmpty()) {
+            return;
+        }
+
+        $health = app(\HrManager\Services\TokenHealthService::class)->corpTokenHealth($corporationId);
+        if (!($health['available'] ?? false) || ($health['total'] ?? 0) === 0) {
+            return;
+        }
+
+        $corpName = CorporationInfo::where('corporation_id', $corporationId)->value('name') ?? ('#' . $corporationId);
+        $pct = $health['total'] > 0 ? (int) round($health['valid'] / $health['total'] * 100) : 0;
+
+        $sample = function (array $list, int $n = 15): string {
+            $names = array_map(fn ($m) => $m['name'], array_slice($list, 0, $n));
+            $extra = count($list) - count($names);
+            $text  = implode(', ', $names);
+            if ($extra > 0) {
+                $text .= " (+{$extra} more)";
+            }
+
+            return $text !== '' ? $text : '-';
+        };
+
+        $fields = [
+            ['name' => 'Corp', 'value' => $corpName, 'inline' => true],
+            ['name' => 'Valid', 'value' => $health['valid'] . ' / ' . $health['total'] . " ({$pct}%)", 'inline' => true],
+        ];
+        if ($health['requirement_active']) {
+            $fields[] = ['name' => 'Missing scopes', 'value' => (string) $health['insufficient'], 'inline' => true];
+        }
+        $fields[] = ['name' => 'Lost', 'value' => $health['lost'] . ($health['lost_recent'] > 0 ? " (+{$health['lost_recent']} recent)" : ''), 'inline' => true];
+        $fields[] = ['name' => 'Never linked', 'value' => (string) $health['never_linked'], 'inline' => true];
+
+        if ($health['requirement_active'] && !empty($health['lists']['insufficient'])) {
+            $fields[] = ['name' => 'Members missing scopes', 'value' => $sample($health['lists']['insufficient']), 'inline' => false];
+        }
+        if (!empty($health['lists']['lost'])) {
+            $fields[] = ['name' => 'Token lost', 'value' => $sample($health['lists']['lost']), 'inline' => false];
+        }
+
+        $profileNote = $health['requirement_active']
+            ? "Measured against profile **{$health['profile_name']}**."
+            : 'Token existence only (no requirement profile set).';
+
+        foreach ($webhooks as $webhook) {
+            $this->send($webhook, 'token_coverage', [
+                'character_id' => null,
+                'description'  => "Token coverage for **{$corpName}**: **{$health['valid']}/{$health['total']}** members hold a valid token ({$pct}%). {$profileNote}",
+                'fields'       => $fields,
+            ]);
+        }
+    }
+
     private function characterName(int $characterId): string
     {
         // Resolve through HR's shared NameResolutionService (character_infos

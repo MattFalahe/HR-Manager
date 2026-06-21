@@ -50,6 +50,7 @@ class HrManagerServiceProvider extends AbstractSeatPlugin
                 Console\Commands\DetectTokenLossCommand::class,
                 Console\Commands\ScanWatchlistCommand::class,
                 Console\Commands\SweepExpiredAccessGrantsCommand::class,
+                Console\Commands\TokenCoverageDigestCommand::class,
             ]);
         }
 

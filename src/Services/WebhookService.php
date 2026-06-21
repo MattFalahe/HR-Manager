@@ -75,6 +75,7 @@ class WebhookService
             'player_status_marked_for_purge' => 0xe83e8c,
             'player_status_status_cleared' => 0x28a745,
             'token_revoked' => 0xdc3545,
+            'token_coverage' => 0x17a2b8,
         ];
 
         // Human-readable embed titles. The raw event key (e.g.
@@ -94,6 +95,7 @@ class WebhookService
             'player_status_marked_for_purge' => 'Player marked for purge',
             'player_status_status_cleared'   => 'Player status cleared',
             'token_revoked'                  => 'Security: SeAT token revoked',
+            'token_coverage'                 => 'Token coverage digest',
         ];
         $title = $titles[$event]
             ?? ucfirst(trim(str_replace(['player_status_', '_'], ['', ' '], $event)));

@@ -131,6 +131,19 @@ class ScheduleSeeder extends AbstractScheduleSeeder
                 'ping_before'       => null,
                 'ping_after'        => null,
             ],
+
+            // Token-coverage digest - weekly (Monday 09:00). Opt-in summary of
+            // each corp's token + scope health to any webhook with
+            // notify_token_coverage on. No-op when no webhook subscribes, so
+            // the weekly tick is cheap on installs that never enabled it.
+            [
+                'command'           => 'hr-manager:token-coverage-digest',
+                'expression'        => '0 9 * * 1',
+                'allow_overlap'     => false,
+                'allow_maintenance' => false,
+                'ping_before'       => null,
+                'ping_after'        => null,
+            ],
         ];
     }
 
