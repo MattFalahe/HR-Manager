@@ -172,6 +172,13 @@ class SettingsController extends Controller
         // risk to flag.
         $ssoScopesLost      = $ssoService->scopesLostVsDefault();
 
+        // Member token requirement: which SSO profile a member token must carry
+        // (drives the Members token badge + Corp Health token-coverage card).
+        $tokenHealthSvc       = app(\HrManager\Services\TokenHealthService::class);
+        $tokenRequiredProfile = $tokenHealthSvc->requiredProfileName();
+        $tokenReqStale        = $tokenHealthSvc->requirementStale();
+        $tokenRequiredScopes  = $tokenHealthSvc->requiredScopes();
+
         // Purge squad cleanup: opt-in toggle + timing + the never-touch
         // exclusions list, plus every squad on the install for the picker.
         $squadSvc    = app(\HrManager\Services\SeatSquadService::class);
@@ -190,7 +197,8 @@ class SettingsController extends Controller
             'accessSettings', 'connectorAccessSettings',
             'ssoProfiles', 'ssoSelectedProfile', 'ssoAnalysis', 'ssoScopesLost',
             'allianceTaxExemptText', 'allianceTaxExemptNames',
-            'assessmentCriteria', 'assessmentDefaults', 'standingsSettings', 'purgeSquads'
+            'assessmentCriteria', 'assessmentDefaults', 'standingsSettings', 'purgeSquads',
+            'tokenRequiredProfile', 'tokenReqStale', 'tokenRequiredScopes'
         ));
     }
 
@@ -214,6 +222,7 @@ class SettingsController extends Controller
             // Recruitment SSO scope profile (free string; self-heals to
             // default if it names a profile that no longer exists)
             'recruitment_sso_profile'           => 'nullable|string|max:255',
+            'token_required_profile'            => 'nullable|string|max:255',
             // Applicant assessment criteria (scoring thresholds)
             'assess_min_age_days'        => 'nullable|integer|min:0|max:3650',
             'assess_hopper_corps_12mo'   => 'nullable|integer|min:1|max:50',
@@ -307,6 +316,16 @@ class SettingsController extends Controller
             Setting::setValue(
                 \HrManager\Services\RecruitmentSsoService::SETTING_PROFILE,
                 $profile,
+                'string'
+            );
+        }
+
+        // Member token requirement profile (id=sso, second form). The SSO scope
+        // profile a member's token must satisfy for the token-health check.
+        if ($request->has('token_req_form')) {
+            Setting::setValue(
+                \HrManager\Services\TokenHealthService::SETTING_REQUIRED_PROFILE,
+                trim((string) $request->input('token_required_profile', '')),
                 'string'
             );
         }
@@ -481,6 +500,7 @@ class SettingsController extends Controller
         elseif ($request->has('access_settings_form')) $tabHash = '#recruiter-access';
         elseif ($request->has('connector_access_form')) $tabHash = '#recruiter-access';
         elseif ($request->has('sso_settings_form'))    $tabHash = '#sso';
+        elseif ($request->has('token_req_form'))       $tabHash = '#sso';
         elseif ($request->has('assessment_criteria_form')) $tabHash = '#assessment';
         if ($tabHash) {
             return redirect()

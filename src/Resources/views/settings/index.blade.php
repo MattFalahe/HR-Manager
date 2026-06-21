@@ -1130,6 +1130,52 @@
                                 {{ trans('hr-manager::settings.sso_edit_pointer') }}
                             @endif
                         </p>
+
+                        {{-- Member token requirement: which SSO profile a member's
+                             token must satisfy. Drives the Members token badge +
+                             the Corp Health token-coverage card. --}}
+                        <hr style="border-color: rgba(255,255,255,0.08); margin: 24px 0;">
+                        <h4 style="color: var(--hr-text-white);">
+                            <i class="fas fa-user-shield"></i> {{ trans('hr-manager::settings.token_req_heading') }}
+                        </h4>
+                        <p style="color: var(--hr-text-muted);">{{ trans('hr-manager::settings.token_req_intro') }}</p>
+
+                        <form method="POST" action="{{ route('hr-manager.settings.update') }}">
+                            @csrf
+                            <input type="hidden" name="token_req_form" value="1">
+                            <div class="form-group" style="max-width: 560px;">
+                                <label>{{ trans('hr-manager::settings.token_req_profile_label') }}</label>
+                                <select name="token_required_profile" class="form-control">
+                                    <option value="">{{ trans('hr-manager::settings.token_req_profile_none') }}</option>
+                                    @foreach($ssoProfiles as $p)
+                                        <option value="{{ $p->name }}" {{ (string) $tokenRequiredProfile === (string) $p->name ? 'selected' : '' }}>
+                                            {{ $p->name }}@if(!empty($p->default)) ({{ trans('hr-manager::settings.sso_profile_is_default') }})@endif - {{ count($p->scopes ?? []) }} {{ trans('hr-manager::settings.sso_scopes_word') }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <small class="form-text" style="color: var(--hr-text-muted);">{{ trans('hr-manager::settings.token_req_profile_help') }}</small>
+                            </div>
+
+                            @if($tokenReqStale)
+                                <div class="alert alert-warning">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    {{ trans('hr-manager::settings.token_req_stale', ['name' => $tokenRequiredProfile]) }}
+                                </div>
+                            @endif
+
+                            @if(!empty($tokenRequiredScopes))
+                                <p style="color: var(--hr-text-muted); margin-bottom: 6px;">{{ trans('hr-manager::settings.token_req_scopes_label') }}</p>
+                                <div style="margin-bottom: 12px;">
+                                    @foreach($tokenRequiredScopes as $s)
+                                        <span class="sso-scope-chip">{{ $s }}</span>
+                                    @endforeach
+                                </div>
+                            @endif
+
+                            <button type="submit" class="btn btn-hr-primary btn-icon">
+                                <i class="fas fa-save"></i> {{ trans('hr-manager::settings.save_settings') }}
+                            </button>
+                        </form>
                     @endif
                 </div>
 

@@ -189,6 +189,15 @@ return [
     'sso_edit_pointer'           => 'To change which scopes a profile requests, edit it in SeAT, Settings, SSO Scopes, then re-check here.',
     'sso_edit_pointer_link'      => 'To change which scopes a profile requests, edit it in <a href=":url">SeAT, Settings, SSO Scopes</a>, then re-check here.',
 
+    // --- Member token requirement (token + scope compliance) ---
+    'token_req_heading'          => 'Member token requirement',
+    'token_req_intro'            => 'Pick the SSO scope profile a member token should satisfy. HR then flags members whose token is missing any of its scopes, on the Members page and the Corp Health token-coverage card. Leave as None to check only that a token exists (no scope check).',
+    'token_req_profile_label'    => 'Required scope profile',
+    'token_req_profile_none'     => 'None (check token existence only)',
+    'token_req_profile_help'     => 'These are the same SSO profiles SeAT uses for login, managed in SeAT settings. HR never changes them; it only measures member tokens against the one you pick.',
+    'token_req_stale'            => 'The selected profile ":name" no longer exists in SeAT. The scope check is paused until you pick another.',
+    'token_req_scopes_label'     => 'Scopes a compliant member token must carry:',
+
     // --- Applicant assessment criteria (tab + form) ---
     'assess_tab'                  => 'Assessment',
     'assess_settings_heading'     => 'Applicant assessment criteria',
