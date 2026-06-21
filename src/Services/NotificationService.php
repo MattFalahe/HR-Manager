@@ -548,10 +548,7 @@ class NotificationService
     {
         $webhooks = WebhookConfiguration::enabled()
             ->forCorporation($corporationId)
-            ->where(function ($q) {
-                $q->where('notify_inactive_director', true)
-                  ->orWhere('notify_wallet_compliance_dropped', true);
-            })
+            ->where('notify_token_revoked', true)
             ->get();
 
         if ($webhooks->isEmpty()) {
