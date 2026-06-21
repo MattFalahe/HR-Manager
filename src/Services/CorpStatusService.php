@@ -162,6 +162,7 @@ class CorpStatusService
                 'last_login_distribution' => $this->lastLoginDistribution($corporationId),
                 'membership_trend'        => $this->membershipTrend($corporationId, 90),
                 'structure_health'        => $this->structureHealth($corporationId),
+                'token_coverage'          => app(TokenHealthService::class)->corpTokenHealth($corporationId),
             ],
         };
     }

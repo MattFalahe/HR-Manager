@@ -263,6 +263,79 @@
             </div>
         @endif
 
+        {{-- Token + scope coverage: who the install can actually see, and (when a
+             requirement profile is set) whose token carries the required scopes. --}}
+        @php $tc = $corpStatus['token_coverage'] ?? ['available' => false]; @endphp
+        @if(!empty($tc['available']) && ($tc['total'] ?? 0) > 0)
+            @php
+                $tcValidPct  = $tc['total'] > 0 ? (int) round($tc['valid'] / $tc['total'] * 100) : 0;
+                $tcAttention = ($tc['insufficient'] ?? 0) + ($tc['lost'] ?? 0) + ($tc['never_linked'] ?? 0);
+                $tcShow = 12;
+            @endphp
+            <div class="card card-dark mb-3" style="border-left: 4px solid {{ $tcAttention > 0 ? '#f59e0b' : '#28a745' }};">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-key"></i> {{ trans('hr-manager::corp-health.token_cov_heading') }}</h3>
+                    <div class="card-tools"><small style="color: var(--hr-text-muted);">
+                        @if($tc['requirement_active']){{ trans('hr-manager::corp-health.token_cov_profile', ['name' => $tc['profile_name']]) }}@else{{ trans('hr-manager::corp-health.token_cov_no_profile') }}@endif
+                    </small></div>
+                </div>
+                <div class="card-body">
+                    @if($tc['requirement_stale'])
+                        <div class="mb-2" style="color: #f59e0b; font-size: 0.82rem;"><i class="fas fa-exclamation-triangle"></i> {{ trans('hr-manager::corp-health.token_cov_stale') }}</div>
+                    @endif
+
+                    <div class="row text-center">
+                        <div class="col"><div style="font-size: 1.8rem; color: var(--hr-success, #28a745);"><strong>{{ $tc['valid'] }}</strong></div><small style="color: var(--hr-text-muted);">{{ trans('hr-manager::corp-health.token_cov_valid') }}</small></div>
+                        @if($tc['requirement_active'])
+                            <div class="col"><div style="font-size: 1.8rem; color: var(--hr-warning, #ffc107);"><strong>{{ $tc['insufficient'] }}</strong></div><small style="color: var(--hr-text-muted);">{{ trans('hr-manager::corp-health.token_cov_insufficient') }}</small></div>
+                        @endif
+                        <div class="col"><div style="font-size: 1.8rem; color: var(--hr-danger, #dc3545);"><strong>{{ $tc['lost'] }}</strong></div><small style="color: var(--hr-text-muted);">{{ trans('hr-manager::corp-health.token_cov_lost') }}@if(($tc['lost_recent'] ?? 0) > 0) <span style="color:#dc3545;">(+{{ $tc['lost_recent'] }} {{ trans('hr-manager::corp-health.token_cov_recent') }})</span>@endif</small></div>
+                        <div class="col"><div style="font-size: 1.8rem; color: #6c757d;"><strong>{{ $tc['never_linked'] }}</strong></div><small style="color: var(--hr-text-muted);">{{ trans('hr-manager::corp-health.token_cov_never') }}</small></div>
+                    </div>
+
+                    <div class="mt-2" style="height: 8px; border-radius: 4px; background: rgba(255,255,255,0.06); overflow: hidden;">
+                        <div style="height: 100%; width: {{ $tcValidPct }}%; background: var(--hr-success, #28a745);"></div>
+                    </div>
+                    <small class="d-block mt-1" style="color: var(--hr-text-muted);">{{ trans('hr-manager::corp-health.token_cov_summary', ['valid' => $tc['valid'], 'total' => $tc['total'], 'pct' => $tcValidPct]) }}</small>
+
+                    @if($tc['requirement_active'] && !empty($tc['lists']['insufficient']))
+                        <div class="mt-3">
+                            <small style="color: var(--hr-text-muted); text-transform: uppercase; letter-spacing: 0.4px; font-size: 0.7rem;"><i class="fas fa-user-lock"></i> {{ trans('hr-manager::corp-health.token_cov_insufficient_list') }}</small>
+                            <div class="mt-1" style="display: flex; flex-wrap: wrap; gap: 6px;">
+                                @foreach(array_slice($tc['lists']['insufficient'], 0, $tcShow) as $m)
+                                    <span class="badge" style="background: rgba(255,193,7,0.12); color: #ffd97a; border: 1px solid rgba(255,193,7,0.3); font-weight: normal;" title="{{ trans('hr-manager::corp-health.token_cov_missing') }}: {{ implode(', ', $m['missing']) }}">{{ $m['name'] }}</span>
+                                @endforeach
+                                @if(count($tc['lists']['insufficient']) > $tcShow)<span class="badge" style="background: rgba(255,255,255,0.05); color: var(--hr-text-muted);">+{{ count($tc['lists']['insufficient']) - $tcShow }}</span>@endif
+                            </div>
+                        </div>
+                    @endif
+                    @if(!empty($tc['lists']['lost']))
+                        <div class="mt-2">
+                            <small style="color: var(--hr-text-muted); text-transform: uppercase; letter-spacing: 0.4px; font-size: 0.7rem;"><i class="fas fa-unlink"></i> {{ trans('hr-manager::corp-health.token_cov_lost_list') }}</small>
+                            <div class="mt-1" style="display: flex; flex-wrap: wrap; gap: 6px;">
+                                @foreach(array_slice($tc['lists']['lost'], 0, $tcShow) as $m)
+                                    <span class="badge" style="background: rgba(220,53,69,0.12); color: #ffb3b3; border: 1px solid rgba(220,53,69,0.3); font-weight: normal;" title="{{ $m['lost_at'] }}">{{ $m['name'] }}</span>
+                                @endforeach
+                                @if(count($tc['lists']['lost']) > $tcShow)<span class="badge" style="background: rgba(255,255,255,0.05); color: var(--hr-text-muted);">+{{ count($tc['lists']['lost']) - $tcShow }}</span>@endif
+                            </div>
+                        </div>
+                    @endif
+                    @if(!empty($tc['lists']['never_linked']))
+                        <div class="mt-2">
+                            <small style="color: var(--hr-text-muted); text-transform: uppercase; letter-spacing: 0.4px; font-size: 0.7rem;"><i class="fas fa-user-slash"></i> {{ trans('hr-manager::corp-health.token_cov_never_list') }}</small>
+                            <div class="mt-1" style="display: flex; flex-wrap: wrap; gap: 6px;">
+                                @foreach(array_slice($tc['lists']['never_linked'], 0, $tcShow) as $m)
+                                    <span class="badge" style="background: rgba(255,255,255,0.04); color: var(--hr-text-muted); border: 1px solid rgba(255,255,255,0.1); font-weight: normal;">{{ $m['name'] }}</span>
+                                @endforeach
+                                @if(count($tc['lists']['never_linked']) > $tcShow)<span class="badge" style="background: rgba(255,255,255,0.05); color: var(--hr-text-muted);">+{{ count($tc['lists']['never_linked']) - $tcShow }}</span>@endif
+                            </div>
+                        </div>
+                    @endif
+                    <small class="d-block mt-2" style="color: var(--hr-text-muted); font-size: 0.75rem;"><i class="fas fa-info-circle"></i> {{ trans('hr-manager::corp-health.token_cov_footnote') }}</small>
+                </div>
+            </div>
+        @endif
+
         {{-- Corp-wide activity — ALL members by last login (registered or not) --}}
         @php $ra = $rosterActivity ?? ['available' => false]; @endphp
         @if(!empty($ra['available']))

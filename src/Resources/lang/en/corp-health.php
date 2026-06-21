@@ -89,6 +89,23 @@ return [
     'structure_inc_lost'          => 'lost',
     'structure_most_hit'          => 'Most hit: :name (:count times)',
 
+    // Token + scope coverage card (Overview tab)
+    'token_cov_heading'           => 'Token & scope coverage',
+    'token_cov_profile'           => 'vs :name',
+    'token_cov_no_profile'        => 'token existence only',
+    'token_cov_stale'             => 'The required scope profile no longer exists in SeAT; the scope check is paused. Pick another in Settings.',
+    'token_cov_valid'             => 'Valid',
+    'token_cov_insufficient'      => 'Missing scopes',
+    'token_cov_lost'              => 'Lost',
+    'token_cov_recent'            => 'recent',
+    'token_cov_never'             => 'Never linked',
+    'token_cov_summary'           => ':valid of :total members hold a valid token (:pct%).',
+    'token_cov_insufficient_list' => 'Token missing required scopes',
+    'token_cov_missing'           => 'Missing',
+    'token_cov_lost_list'         => 'Token lost (delinked or rejected by CCP)',
+    'token_cov_never_list'        => 'Never linked a token',
+    'token_cov_footnote'          => 'A valid token lets HR and SeAT see the character. With a requirement profile set, valid also means the token carries every required scope.',
+
     // Purge tab (director worklist)
     'tab_purge'           => 'Purge',
     'purge_heading'       => 'Scheduled purges',
