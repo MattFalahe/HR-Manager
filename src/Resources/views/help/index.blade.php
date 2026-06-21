@@ -466,6 +466,9 @@ docker compose -f docker-compose.yml -f docker-compose.mariadb.yml -f docker-com
                     <h4>{{ trans('hr-manager::help.feat_mpv_titles_heading') }}</h4>
                     <p>{!! trans('hr-manager::help.feat_mpv_titles_body') !!}</p>
 
+                    <h4>{{ trans('hr-manager::help.feat_mpv_token_heading') }}</h4>
+                    <p>{!! trans('hr-manager::help.feat_mpv_token_body') !!}</p>
+
                     <div class="info-box">
                         <i class="fas fa-map-marker-alt"></i>
                         <strong>{{ trans('hr-manager::help.feat_where_label') }}:</strong>
@@ -1221,6 +1224,9 @@ docker compose -f docker-compose.yml -f docker-compose.mariadb.yml -f docker-com
 
                     <h4><code>hr-manager:sweep-access-grants</code></h4>
                     <p>{{ trans('hr-manager::help.cmd_sweep_access_grants') }}</p>
+
+                    <h4><code>hr-manager:token-coverage-digest</code></h4>
+                    <p>{{ trans('hr-manager::help.cmd_token_coverage') }}</p>
 
                     <h4><code>hr-manager:diagnose</code></h4>
                     <p>{{ trans('hr-manager::help.cmd_diagnose') }}</p>

@@ -54,7 +54,8 @@ What leadership sees while doing the actual work of keeping the corp alive.
 - **In-game titles + roles surfacing**: corp titles and direct character roles are shown on every member / player profile, with high-impact roles (Director / Personnel Manager / Accountant / etc.) called out for the purge-strip checklist
 - **History timeline**: 20+ event types (wallet signals / classifier transitions / purge milestones / LOA / squad removals / contribution drops / unusual recipients) rendered with semantic icons
 - **Corp-join detection**: scans `character_corporation_histories` every 30 minutes for accepted applicants who actually joined. Surfaces "accepted but never joined" backlog on Corp Health
-- **Token tracking + loss alerts**: the Members roster shows who currently holds a working SeAT token (registered vs unregistered count), and a 10-minute cron watches for tracked members whose refresh token has gone — delinked, or rejected by CCP after a password change / app de-authorization (SeAT soft-deletes the token in both cases). It fires a dedicated **SeAT Token Revoked** webhook category to your security channel, records a critical history event, and can optionally auto-schedule a security purge (Settings → security policy)
+- **Token tracking + loss alerts**: the Members roster shows who currently holds a working SeAT token, and a 10-minute cron watches for tracked members whose refresh token has gone — delinked, or rejected by CCP after a password change / app de-authorization (SeAT soft-deletes the token in both cases). It fires a dedicated **SeAT Token Revoked** webhook category to your security channel, records a critical history event, and can optionally auto-schedule a security purge (Settings → security policy)
+- **Token + scope compliance**: pick a SeAT SSO scope profile as your corp requirement (Settings → SSO & Scopes → Member token requirement) and HR grades every member token against it — **Token OK / Missing scopes / Token lost / Never linked** — as a badge on the Members roster (insufficient ones name the exact scopes they lack), a **Token & scope coverage** card on Corp Health (counts, coverage bar, lost-this-week, drill-down lists), and an opt-in **weekly digest** to a webhook (`hr-manager:token-coverage-digest`). Leave the profile as None to check token existence only. Reads `refresh_tokens.scopes` against the global `sso_scopes` profiles — no ESI, no changes to SeAT
 
 ---
 
@@ -224,6 +225,7 @@ HR also **subscribes** to:
 | `hr-manager:detect-token-loss` | every 10 minutes | Surface members whose ESI refresh token has lapsed |
 | `hr-manager:sweep-access-grants` | nightly 04:00 | Revoke expired recruiter + applicant access grants |
 | `hr-manager:cleanup` | nightly 03:00 | Permanently delete soft-deleted applications older than N days |
+| `hr-manager:token-coverage-digest` | weekly (Mon 09:00) | Opt-in token + scope coverage summary per corp to subscribing webhooks |
 | `hr-manager:diagnose` | on-demand | Tables / bridge / event traffic / quick stats summary |
 
 ---
