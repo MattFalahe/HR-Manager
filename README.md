@@ -50,7 +50,7 @@ What leadership sees while doing the actual work of keeping the corp alive.
 - **Structure compliance via Structure Manager** (when installed): Corp Health renders Structure Manager's per-structure doctrine compliance (rigs / services / online state vs your alliance fits) on its own tab, pulled live through Manager Core's PluginBridge. Structure Manager owns the doctrines and the data; HR just displays the verdict
 - **Multi-handler tracking**: any recruiter can join an application; the page shows everyone working on it with optional role labels ("Reviewer", "Background check"). Auto-tracks on status changes
 - **Temporary SeAT access for handlers** (opt-in): joining an application's handler list auto-attaches a SeAT role granting view permissions for the applicant's character data (wallet / mail / assets / skills), scoped strictly to the applicant's character IDs (+ alts via PlayerIdentity). Auto-revoked on leave / application close / expiry. Existing roles untouched, never widens beyond the applicant. A one-click **Grant access now** covers handlers who joined before the feature was enabled, and enabling it grants every current handler retroactively
-- **Purge workflow** with T-7 / T-3 / T-48 / T-0 reminder ladder, a one-button **Remove from all squads** (mirrors SeAT's native kick, so Connector-managed Discord roles drop), and a blinking warning banner urging operators to strip in-game titles + roles before the EVE 24-hour cooldown bites
+- **Purge workflow** with T-7 / T-3 / T-48 / T-0 reminder ladder, one-button (or opt-in automatic) **squad cleanup** that clears a member's removable squads (manual / hidden, minus a never-touch exclusions list) so Connector-managed Discord roles drop, and a blinking warning banner urging operators to strip in-game titles + roles before the EVE 24-hour cooldown bites
 - **In-game titles + roles surfacing**: corp titles and direct character roles are shown on every member / player profile, with high-impact roles (Director / Personnel Manager / Accountant / etc.) called out for the purge-strip checklist
 - **History timeline**: 20+ event types (wallet signals / classifier transitions / purge milestones / LOA / squad removals / contribution drops / unusual recipients) rendered with semantic icons
 - **Corp-join detection**: scans `character_corporation_histories` every 30 minutes for accepted applicants who actually joined. Surfaces "accepted but never joined" backlog on Corp Health
@@ -219,6 +219,9 @@ HR also **subscribes** to:
 | `hr-manager:classify-players` | nightly 02:00 | Run the Corp Health classifier across every active player |
 | `hr-manager:dispatch-purge-reminders` | every 12 hours | Fire T-7 / T-3 / T-48 / T-0 reminders for scheduled purges |
 | `hr-manager:detect-corp-joins` | every 30 minutes | Watch SeAT histories for accepted applicants who actually joined the corp |
+| `hr-manager:scan-watchlist` | every 15 minutes | Scheduled blacklist match check + intel scope-corp pass |
+| `hr-manager:detect-token-loss` | every 10 minutes | Surface members whose ESI refresh token has lapsed |
+| `hr-manager:sweep-access-grants` | nightly 04:00 | Revoke expired recruiter + applicant access grants |
 | `hr-manager:cleanup` | nightly 03:00 | Permanently delete soft-deleted applications older than N days |
 | `hr-manager:diagnose` | on-demand | Tables / bridge / event traffic / quick stats summary |
 

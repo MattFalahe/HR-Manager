@@ -84,7 +84,7 @@ return [
     'two_faces_title'      => 'Two Faces',
     'two_faces_intro'      => 'Most HR plugins solve half the problem. HR Manager treats recruitment and retention as <strong>one closed loop</strong>: a public funnel that brings prospects in, a director console that keeps them once they\'re here. Same data, two faces, one promise.',
     'face_recruiter_title' => 'The Recruiter Face',
-    'face_recruiter_body'  => 'What your prospects see, without a SeAT account. Public landing pages at <code>/recruit/{ticker}/{slug}</code>, four visual templates, an eligibility engine that gates weak applications, three post-submission modes, IP-hashed analytics, and a public tracking page applicants can bookmark to check status.',
+    'face_recruiter_body'  => 'What your prospects see, without a SeAT account. Public landing pages at <code>/recruit/{ticker}/{slug}</code>, four visual templates, an eligibility engine that gates weak applications, four post-submission modes, IP-hashed analytics, and a public tracking page applicants can bookmark to check status.',
     'face_director_title'  => 'The Director Face',
     'face_director_body'   => 'What leadership sees while doing the actual work. Player-centric view (one row per human), Corp Health classifier, purge workflow with 24-hour cooldown warnings, in-game titles + roles surfacing, history timeline, wallet signals via Corp Wallet Manager when installed.',
 
@@ -151,7 +151,7 @@ return [
     'feat_rf_cap_1' => '<strong>Four visual templates</strong> — Classic (hero + body + CTA), Showcase (image-heavy), Minimal (text-only, fast-loading), Industrial (utility-style). Pick per landing.',
     'feat_rf_cap_2' => '<strong>Per-corp ticker URLs</strong> in the form <code>/recruit/{ticker}/{slug}</code>. Multiple landings per corp allowed (e.g. one for PvP recruits, one for industrial).',
     'feat_rf_cap_3' => '<strong>Eligibility engine</strong>: security status min/max, total SP minimum, character age in days, blacklist / whitelist corps and alliances, SeAT Connector requirement. Applicants who fail can still submit via a manual-review escape hatch — the recruiter sees which checks failed.',
-    'feat_rf_cap_4' => '<strong>Three post-submission modes</strong>: show Discord invite, hand off to SeAT Connector for auto-roling, or render custom Markdown. Pair any of them with the always-visible <em>Next steps notes</em> field for free-form director-authored messages.',
+    'feat_rf_cap_4' => '<strong>Four post-submission modes</strong>: show a Discord invite, hand off to SeAT Connector for auto-roling, render custom Markdown, or a deliberate None (show nothing extra). Pair any of them with the always-visible <em>Next steps notes</em> field for free-form director-authored messages.',
     'feat_rf_cap_5' => '<strong>IP-hashed analytics</strong> dashboard per landing: visits, conversion to apply-click, conversion to submission, top referrers. No raw IPs stored; analytics survive privacy audits.',
     'feat_rf_where' => 'Sidebar &rarr; <strong>Recruitment Pages</strong> for landing CRUD. Sidebar &rarr; <strong>Templates</strong> for the application forms each landing uses. The public URL is shown at the top of every landing edit page.',
 
@@ -602,13 +602,17 @@ return [
     // COMMANDS
     // ============================================================
     'commands_title' => 'Artisan Commands',
-    'commands_intro' => 'HR Manager ships a small set of artisan commands. All run on cron via SeAT\'s scheduler; you should not need to invoke them by hand under normal operation.',
+    'commands_intro' => 'HR Manager ships a small set of artisan commands. Most run on cron via SeAT\'s scheduler; you should not need to invoke them by hand under normal operation.',
 
-    'cmd_cache_assessments' => 'Refresh the cached MemberAssessment rows for every tracked character. Runs hourly.',
-    'cmd_cleanup'           => 'Garbage-collect expired application drafts, stale tokens, and orphaned notes.',
-    'cmd_classify'          => 'Run the Corp Health classifier across every active player. Runs every six hours.',
-    'cmd_purge'             => 'Dispatch the next due purge reminder (T-7 / T-3 / T-48 / T-0). Runs every fifteen minutes.',
-    'cmd_diagnose'          => 'Print a self-test summary to stdout for support tickets.',
+    'cmd_cache_assessments' => 'Refresh the cached MemberAssessment rows for every tracked character. Runs every 2 hours.',
+    'cmd_cleanup'           => 'Permanently delete long-soft-deleted applications and orphaned notes. Runs nightly.',
+    'cmd_classify'          => 'Run the Corp Health classifier across every active player. Runs nightly.',
+    'cmd_purge'             => 'Dispatch due purge reminders (T-7 / T-3 / T-48 / T-0) and run the opt-in auto squad cleanup. Runs every 12 hours.',
+    'cmd_detect_corp_joins' => 'Detect accepted applicants who actually joined the corp by watching SeAT corp histories, and flag accepted-but-never-joined. Runs every 30 minutes.',
+    'cmd_scan_watchlist'    => 'Scheduled blacklist match check across registered characters, plus the intel scope-corp pass. Runs every 15 minutes.',
+    'cmd_detect_token_loss' => 'Surface members whose ESI refresh token has lapsed, for the security / token-loss workflow. Runs every 10 minutes.',
+    'cmd_sweep_access_grants' => 'Revoke expired recruiter and applicant access grants (a defensive backstop for the lifecycle hooks). Runs nightly.',
+    'cmd_diagnose'          => 'Print a self-test summary to stdout for support tickets. Run on demand.',
 
     'commands_schedule_note' => 'Cron schedules are registered by HR Manager\'s ScheduleSeeder and visible in <strong>Settings → Schedules</strong>.',
 
