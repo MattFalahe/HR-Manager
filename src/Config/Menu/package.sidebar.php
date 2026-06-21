@@ -1,0 +1,91 @@
+<?php
+
+return [
+    'hr-manager' => [
+        'name'          => 'HR Manager',
+        'label'         => 'hr-manager::menu.hr_manager',
+        'plural'        => true,
+        'icon'          => 'fas fa-user-tie',
+        'route_segment' => 'hr-manager',
+        'permission'    => 'hr-manager.recruiter',
+        'entries'       => [
+            [
+                'name'       => 'Dashboard',
+                'label'      => 'hr-manager::menu.dashboard',
+                'icon'       => 'fas fa-tachometer-alt',
+                'route'      => 'hr-manager.dashboard',
+                'permission' => 'hr-manager.recruiter',
+            ],
+            [
+                'name'       => 'Applications',
+                'label'      => 'hr-manager::menu.applications',
+                'icon'       => 'fas fa-file-alt',
+                'route'      => 'hr-manager.applications.index',
+                'permission' => 'hr-manager.recruiter',
+            ],
+            [
+                'name'       => 'Players',
+                'label'      => 'hr-manager::menu.players',
+                'icon'       => 'fas fa-user-friends',
+                'route'      => 'hr-manager.players.index',
+                'permission' => 'hr-manager.director',
+            ],
+            [
+                'name'       => 'Members',
+                'label'      => 'hr-manager::menu.members',
+                'icon'       => 'fas fa-users',
+                'route'      => 'hr-manager.members.index',
+                'permission' => 'hr-manager.director',
+            ],
+            [
+                'name'       => 'Corp Health',
+                'label'      => 'hr-manager::menu.corp_health',
+                'icon'       => 'fas fa-heartbeat',
+                'route'      => 'hr-manager.corp-health.index',
+                'permission' => 'hr-manager.director',
+            ],
+            [
+                'name'       => 'Recruitment Pages',
+                'label'      => 'hr-manager::menu.landings',
+                'icon'       => 'fas fa-bullhorn',
+                'route'      => 'hr-manager.landings.index',
+                'permission' => 'hr-manager.director',
+            ],
+            [
+                'name'       => 'Templates',
+                'label'      => 'hr-manager::menu.templates',
+                'icon'       => 'fas fa-clipboard-list',
+                'route'      => 'hr-manager.templates.index',
+                'permission' => 'hr-manager.director',
+            ],
+            [
+                'name'       => 'Watchlist',
+                'label'      => 'hr-manager::menu.watchlist',
+                'icon'       => 'fas fa-clipboard-list',
+                'route'      => 'hr-manager.watchlist.index',
+                'permission' => 'hr-manager.recruiter',
+            ],
+            [
+                'name'       => 'Intel Database',
+                'label'      => 'hr-manager::menu.intel',
+                'icon'       => 'fas fa-user-secret',
+                'route'      => 'hr-manager.intel.index',
+                'permission' => 'hr-manager.recruiter',
+            ],
+            [
+                'name'       => 'Settings',
+                'label'      => 'hr-manager::menu.settings',
+                'icon'       => 'fas fa-cog',
+                'route'      => 'hr-manager.settings.index',
+                'permission' => 'hr-manager.admin',
+            ],
+            [
+                'name'       => 'Help & Documentation',
+                'label'      => 'hr-manager::menu.help',
+                'icon'       => 'fas fa-question-circle',
+                'route'      => 'hr-manager.help',
+                'permission' => 'hr-manager.view',
+            ],
+        ],
+    ],
+];
