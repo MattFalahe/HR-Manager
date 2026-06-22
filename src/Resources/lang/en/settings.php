@@ -256,6 +256,7 @@ return [
     'notify_wallet_milestone'      => 'Contribution Milestone Reached',
 
     // Activity Tiers tab (v1.2.0)
+    'tier'                         => 'Tier',
     'tiers_tab'                    => 'Activity Tiers',
     'tier_mappings_heading'        => 'Discord role to activity tier mappings',
     'tier_mappings_intro'          => 'Map Discord roles to activity tiers. The classifier (Phase 3) uses these to expect activity from each player. Players with multiple roles take the HIGHEST tier they map to.',
