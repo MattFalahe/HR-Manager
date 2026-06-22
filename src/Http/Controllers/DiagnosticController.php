@@ -41,7 +41,8 @@ class DiagnosticController extends Controller
         'hr_manager_watchlist_entries', 'hr_manager_watchlist_detections',
         'hr_manager_intel_notes', 'hr_manager_player_identities',
         'hr_manager_character_identity_mappings', 'hr_manager_recruiter_access_grants',
-        'hr_manager_fc_activity',
+        'hr_manager_fc_activity', 'hr_manager_structure_incidents',
+        'hr_manager_applicant_connector_grants',
     ];
 
     /** Manager Core capabilities HR consumes (plugin:capability). */
@@ -60,6 +61,8 @@ class DiagnosticController extends Controller
         'corp-wallet-manager:wallet.getDirectorAttribution',
         'corp-wallet-manager:wallet.getCorpOutflows',
         'corp-wallet-manager:contribution.getCorpMemberSummary',
+        // Financial pulse strip on the Corp Health Economy tab (CWM v3.1+).
+        'corp-wallet-manager:wallet.getCorpSummary',
         // Blueprint Manager — consumed by the Corp Health blueprint panels and
         // the classifier's blueprint-engagement signal (via CrossPluginDataService).
         'blueprint-manager:blueprint.getCharacterStats',
@@ -119,6 +122,7 @@ class DiagnosticController extends Controller
         'hr-manager:classify-players', 'hr-manager:dispatch-purge-reminders',
         'hr-manager:detect-corp-joins', 'hr-manager:detect-token-loss',
         'hr-manager:scan-watchlist', 'hr-manager:sweep-access-grants',
+        'hr-manager:token-coverage-digest',
     ];
 
     private const VALID_TABS = ['health', 'validation', 'settings', 'integrity', 'notifications', 'trace'];
@@ -431,6 +435,23 @@ class DiagnosticController extends Controller
             $out[] = $this->result('SSO scope sufficiency', 'warn', 'Could not analyse SSO scopes: ' . $e->getMessage());
         }
 
+        // Member token requirement — the SSO profile member tokens are graded
+        // against (drives the Members token badge + the Corp Health coverage card).
+        try {
+            $th = app(\HrManager\Services\TokenHealthService::class);
+            $reqName = $th->requiredProfileName();
+            if ($reqName === '') {
+                $out[] = $this->result('Member token requirement', 'ok', 'No profile set; member tokens are checked for existence only (no scope check)');
+            } elseif ($th->requirementStale()) {
+                $out[] = $this->result('Member token requirement', 'warn', 'Chosen profile "' . $reqName . '" no longer exists in SeAT; the scope check is paused until you re-pick');
+            } else {
+                $n = count($th->requiredScopes());
+                $out[] = $this->result('Member token requirement', 'ok', 'Profile "' . $reqName . '" (' . $n . ' required scope' . ($n === 1 ? '' : 's') . ')');
+            }
+        } catch (\Throwable $e) {
+            $out[] = $this->result('Member token requirement', 'warn', 'Could not resolve: ' . $e->getMessage());
+        }
+
         // Webhook config sanity — HTTPS + non-empty
         if (Schema::hasTable('hr_manager_webhook_configurations')) {
             $webhooks = DB::table('hr_manager_webhook_configurations')->where('is_enabled', true)->get();
@@ -441,6 +462,20 @@ class DiagnosticController extends Controller
                     'Webhook: ' . ($wh->name ?? ('#' . $wh->id)),
                     $https ? 'ok' : 'fail',
                     $https ? ucfirst($wh->type ?? 'discord') . ', HTTPS' : 'NOT HTTPS — will be rejected'
+                );
+            }
+
+            // Security-alert delivery: the token-loss alert goes nowhere if no
+            // enabled webhook subscribes to the SeAT Token Revoked category.
+            if ($webhooks->isNotEmpty()
+                && Schema::hasColumn('hr_manager_webhook_configurations', 'notify_token_revoked')) {
+                $hasTokenCat = $webhooks->contains(fn ($w) => (bool) ($w->notify_token_revoked ?? false));
+                $out[] = $this->result(
+                    'Token-loss alert delivery',
+                    $hasTokenCat ? 'ok' : 'warn',
+                    $hasTokenCat
+                        ? 'A webhook subscribes to the SeAT Token Revoked category'
+                        : 'No enabled webhook has the SeAT Token Revoked category, so token-loss security alerts will not be delivered'
                 );
             }
         }
