@@ -188,6 +188,12 @@
             $implants = $a['signals']['implants'] ?? ['available' => false];
             $roles    = $a['signals']['corp_roles'] ?? ['available' => false];
             $std      = $a['signals']['standings'] ?? ['available' => false];
+            // Unavailable progressive signal: distinguish "scope not granted" from
+            // "scope granted but SeAT has not synced the data yet" (refreshable),
+            // so the recruiter is never told a present scope is missing.
+            $progLabel = fn ($sig) => ($sig['reason'] ?? 'scope') === 'pending'
+                ? trans('hr-manager::applications.assess_pending')
+                : trans('hr-manager::applications.assess_scope_ungranted');
             $vMeta = [
                 'green' => ['#28a745', 'fa-shield-alt', trans('hr-manager::applications.assess_verdict_green')],
                 'amber' => ['#ffc107', 'fa-exclamation-triangle', trans('hr-manager::applications.assess_verdict_amber')],
@@ -202,6 +208,12 @@
                         <strong style="font-size:1.1rem; color:var(--hr-text-white);">{{ trans('hr-manager::applications.assess_heading') }}: {{ $vMeta[2] }}</strong>
                         <div style="color:var(--hr-text-muted); font-size:0.82rem;">{{ trans('hr-manager::applications.assess_subtitle') }}</div>
                     </div>
+                    <form method="POST" action="{{ route('hr-manager.applications.refresh-assessment', $application->id) }}" style="margin-left:auto;">
+                        @csrf
+                        <button type="submit" class="btn btn-sm btn-hr-secondary" title="{{ trans('hr-manager::applications.assess_refresh_help') }}">
+                            <i class="fas fa-sync-alt"></i> {{ trans('hr-manager::applications.assess_refresh') }}
+                        </button>
+                    </form>
                 </div>
 
                 @if(!empty($a['flags']))
@@ -220,6 +232,15 @@
 
                 {{-- Signal summary --}}
                 <div style="display:flex; flex-wrap:wrap; gap:22px; margin-top:14px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.06); font-size:0.86rem;">
+                    @if(!empty($ch['available']) && !empty($ch['current_corp_id']))
+                        <div>
+                            <div style="color:var(--hr-text-muted); font-size:0.74rem; text-transform:uppercase; letter-spacing:0.04em;">{{ trans('hr-manager::applications.assess_current_corp') }}</div>
+                            <div style="color:var(--hr-text-light);">
+                                <strong>{{ $ch['current_corp_name'] ?? ('#' . $ch['current_corp_id']) }}</strong>
+                                @if($ch['current_is_npc'])<span class="badge badge-warning ml-1">{{ trans('hr-manager::applications.assess_npc_corp') }}</span>@else<span class="badge badge-secondary ml-1">{{ trans('hr-manager::applications.assess_player_corp') }}</span>@endif
+                            </div>
+                        </div>
+                    @endif
                     @if(!empty($ch['available']))
                         <div>
                             <div style="color:var(--hr-text-muted); font-size:0.74rem; text-transform:uppercase; letter-spacing:0.04em;">{{ trans('hr-manager::applications.assess_corp_history') }}</div>
@@ -255,7 +276,7 @@
                             @if(!empty($sp['available']))
                                 <strong>{{ number_format($sp['total_sp']) }}</strong> SP
                             @else
-                                <span style="color:var(--hr-text-muted);">{{ trans('hr-manager::applications.assess_scope_ungranted') }}</span>
+                                <span style="color:var(--hr-text-muted);">{{ $progLabel($sp) }}</span>
                             @endif
                         </div>
                     </div>
@@ -265,7 +286,7 @@
                             @if(!empty($implants['available']))
                                 @if(($implants['count'] ?? 0) > 0)<strong>{{ $implants['count'] }}</strong> fitted@else <span style="color:var(--hr-text-muted);">clean clone</span>@endif
                             @else
-                                <span style="color:var(--hr-text-muted);">{{ trans('hr-manager::applications.assess_scope_ungranted') }}</span>
+                                <span style="color:var(--hr-text-muted);">{{ $progLabel($implants) }}</span>
                             @endif
                         </div>
                     </div>
@@ -275,7 +296,7 @@
                             @if(!empty($roles['available']))
                                 @if(!empty($roles['is_director']))<span class="badge badge-warning">Director</span>@elseif(!empty($roles['elevated']))<strong>{{ implode(', ', $roles['elevated']) }}</strong>@elseif(($roles['count'] ?? 0) > 0)<strong>{{ $roles['count'] }}</strong> roles@else <span style="color:var(--hr-text-muted);">none</span>@endif
                             @else
-                                <span style="color:var(--hr-text-muted);">{{ trans('hr-manager::applications.assess_scope_ungranted') }}</span>
+                                <span style="color:var(--hr-text-muted);">{{ $progLabel($roles) }}</span>
                             @endif
                         </div>
                     </div>
@@ -286,7 +307,7 @@
                                 @if(!empty($std['available']))
                                     @if(($std['hostile_count'] ?? 0) > 0)<span class="badge badge-warning">{{ $std['hostile_count'] }} hostile blue(s)</span>@else <span style="color:var(--hr-success, #28a745);">clean</span>@endif
                                 @else
-                                    <span style="color:var(--hr-text-muted);">{{ trans('hr-manager::applications.assess_scope_ungranted') }}</span>
+                                    <span style="color:var(--hr-text-muted);">{{ $progLabel($std) }}</span>
                                 @endif
                             </div>
                         </div>

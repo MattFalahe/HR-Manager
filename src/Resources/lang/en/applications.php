@@ -16,6 +16,13 @@ return [
     'assess_corp_roles'       => 'Corp roles',
     'assess_standings'        => 'Standings',
     'assess_scope_ungranted'  => 'scope not granted',
+    'assess_pending'          => 'not synced yet',
+    'assess_current_corp'     => 'Current corp',
+    'assess_npc_corp'         => 'NPC corp',
+    'assess_player_corp'      => 'Player corp',
+    'assess_refresh'          => 'Refresh',
+    'assess_refresh_help'     => 'Queue a fresh ESI sync (skills, implants, roles, contacts, plus public info and corp history). The numbers update on the next page load.',
+    'assess_refresh_queued'   => 'Assessment data refresh queued. The numbers update once SeAT finishes syncing, usually under a minute. Reload the page to see them.',
 
     'applications'      => 'Applications',
     'application'       => 'Application',

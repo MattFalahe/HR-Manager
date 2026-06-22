@@ -322,6 +322,25 @@ class ApplicationController extends Controller
     }
 
     /**
+     * Queue an ESI re-sync of the data the applicant assessment reads (skills,
+     * implants, corp roles, contacts, plus public info / corp history), so a
+     * recruiter can pull fresh numbers when a signal still shows "not synced
+     * yet". The jobs run on SeAT's queue; the next page load shows the result.
+     */
+    public function refreshAssessment(int $id)
+    {
+        $application = Application::findOrFail($id);
+        $this->assertCanAccessCorp($application->corporation_id);
+
+        app(\HrManager\Services\ApplicantAssessmentService::class)
+            ->refresh((int) $application->character_id);
+
+        return redirect()
+            ->route('hr-manager.applications.show', $application->id)
+            ->with('success', trans('hr-manager::applications.assess_refresh_queued'));
+    }
+
+    /**
      * Remove the current user as a handler. Directors can pass
      * ?user_id=N to remove someone else; recruiters can only remove
      * themselves.

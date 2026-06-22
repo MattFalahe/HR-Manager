@@ -116,7 +116,7 @@ class ApplicantAssessmentService
         // --- Progressive signals: present only when the applicant granted the
         //     scope AND SeAT has synced the data. Absent renders as "scope not
         //     granted" rather than a false negative. ---
-        $signals['skill_points'] = $this->skillPointsSignal($char, $flags);
+        $signals['skill_points'] = $this->skillPointsSignal($char, $scopes, $flags);
         $signals['implants']     = $this->implantsSignal($characterId, $scopes);
         $signals['corp_roles']   = $this->corpRolesSignal($characterId, $scopes, $flags);
         $signals['standings']    = $this->standingsSignal($characterId, $scopes, $flags);
@@ -127,6 +127,46 @@ class ApplicantAssessmentService
             'flags'     => $flags,
             'signals'   => $signals,
         ];
+    }
+
+    /**
+     * Queue an ESI re-sync of the data this assessment reads, so a recruiter can
+     * pull fresh numbers when a signal still shows "not synced yet" (the apply
+     * hydration had not finished, or scopes were granted after). Public jobs go
+     * by character id; auth jobs need the RefreshToken and are only queued when
+     * the matching scope is present (no point queueing a guaranteed ESI 403).
+     * Jobs land on SeAT's normal queue; the next page load reads the result.
+     */
+    public function refresh(int $characterId): void
+    {
+        try {
+            \Seat\Eveapi\Jobs\Character\Info::dispatch($characterId);
+            \Seat\Eveapi\Jobs\Character\CorporationHistory::dispatch($characterId);
+        } catch (\Throwable $e) {
+            Log::warning('[HR Manager] assessment refresh (public jobs) failed: ' . $e->getMessage());
+        }
+
+        try {
+            $token = \Seat\Eveapi\Models\RefreshToken::find($characterId);
+            if (!$token) {
+                return;
+            }
+            $scopes = array_map('strval', (array) $token->scopes);
+
+            \Seat\Eveapi\Jobs\Skills\Character\Skills::dispatch($token);
+
+            if (in_array('esi-clones.read_implants.v1', $scopes, true)) {
+                \Seat\Eveapi\Jobs\Clones\Implants::dispatch($token);
+            }
+            if (in_array('esi-characters.read_corporation_roles.v1', $scopes, true)) {
+                \Seat\Eveapi\Jobs\Character\Roles::dispatch($token);
+            }
+            if (in_array('esi-characters.read_contacts.v1', $scopes, true)) {
+                \Seat\Eveapi\Jobs\Contacts\Character\Contacts::dispatch($token);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('[HR Manager] assessment refresh (auth jobs) failed: ' . $e->getMessage());
+        }
     }
 
     // =================================================================
@@ -243,12 +283,30 @@ class ApplicantAssessmentService
             ];
         }
 
+        // Current corp from character_infos (authoritative now), with a resolved
+        // name + the NPC flag, so the recruiter sees where the applicant sits
+        // right now rather than inferring it from the history rows.
+        $currentCorpId = (int) ($char->corporation_id ?: ($current->corporation_id ?? 0));
+        $currentCorpName = null;
+        if ($currentCorpId > 0) {
+            try {
+                $currentCorpName = \Seat\Eveapi\Models\Corporation\CorporationInfo::where('corporation_id', $currentCorpId)->value('name')
+                    ?? \Illuminate\Support\Facades\DB::table('universe_names')
+                        ->where('entity_id', $currentCorpId)->where('category', 'corporation')->value('name');
+            } catch (\Throwable $e) {
+                // name stays null; the view falls back to the corp id.
+            }
+            $currentIsNpc = $this->isNpcCorp($currentCorpId);
+        }
+
         return [
             'available'           => true,
             'corp_count'          => $count,
             'avg_tenure_days'     => $avgTenure,
             'corps_last_12mo'     => $corpsLast12,
             'npc_days_total'      => $npcDays,
+            'current_corp_id'     => $currentCorpId,
+            'current_corp_name'   => $currentCorpName,
             'current_is_npc'      => $currentIsNpc,
             'current_tenure_days' => $currentTenure,
             'is_hopper'           => $isHopper,
@@ -295,13 +353,23 @@ class ApplicantAssessmentService
         }
     }
 
-    /** Skill points (progressive: needs esi-skills, synced into total_sp). */
-    private function skillPointsSignal(CharacterInfo $char, array &$flags): array
+    /**
+     * Skill points (progressive: needs esi-skills.read_skills.v1). SeAT stores
+     * total SP on character_info_skills, reached via the skillpoints relation —
+     * NOT a column on character_infos. We distinguish three states: scope not
+     * granted ('scope'), scope granted but SeAT has not synced the skill sheet
+     * yet ('pending', refreshable), or available with a value.
+     */
+    private function skillPointsSignal(CharacterInfo $char, array $scopes, array &$flags): array
     {
-        $sp = $char->total_sp ?? null;
+        if (!in_array('esi-skills.read_skills.v1', $scopes, true)) {
+            return ['available' => false, 'reason' => 'scope'];
+        }
+
+        $sp = $char->skillpoints?->total_sp;
         if ($sp === null || (int) $sp <= 0) {
-            // No SP synced -> scope not granted, or not yet hydrated.
-            return ['available' => false];
+            // Scope is granted but the skills sheet is not synced yet.
+            return ['available' => false, 'reason' => 'pending'];
         }
 
         $minSp = (int) $this->criterion('assess_min_sp');
@@ -330,7 +398,7 @@ class ApplicantAssessmentService
     private function implantsSignal(int $characterId, array $scopes): array
     {
         if (!in_array('esi-clones.read_implants.v1', $scopes, true)) {
-            return ['available' => false];
+            return ['available' => false, 'reason' => 'scope'];
         }
         try {
             $count = \Seat\Eveapi\Models\Clones\CharacterImplant::where('character_id', $characterId)->count();
@@ -350,7 +418,7 @@ class ApplicantAssessmentService
     private function corpRolesSignal(int $characterId, array $scopes, array &$flags): array
     {
         if (!in_array('esi-characters.read_corporation_roles.v1', $scopes, true)) {
-            return ['available' => false];
+            return ['available' => false, 'reason' => 'scope'];
         }
         try {
             $roles = \Seat\Eveapi\Models\Character\CharacterRole::where('character_id', $characterId)

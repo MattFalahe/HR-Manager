@@ -138,6 +138,7 @@ Route::group([
         // Manual re-trigger of the temporary applicant-data access grant for
         // the current viewer (a handler) — no leave/re-join needed.
         Route::post('/{id}/grant-access',    ['as' => 'hr-manager.applications.grant-access',    'uses' => 'ApplicationController@grantAccess']);
+        Route::post('/{id}/refresh-assessment', ['as' => 'hr-manager.applications.refresh-assessment', 'uses' => 'ApplicationController@refreshAssessment']);
     });
 
     // --- DIRECTOR-ONLY: member + player profiles ---
