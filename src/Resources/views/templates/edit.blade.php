@@ -169,9 +169,11 @@ $hrExistingQuestions = $template->questions->map(function ($q) {
 })->values();
 @endphp
 <script>
-// Translated labels; @json gives us safe JS string literals out of trans()
-// values — avoids the broken `${{{ json_encode(...) }}}` pattern that
-// double-escaped through Blade.
+// Translated labels via the JSON directive: safe JS string literals out of the
+// lang values, avoiding the broken triple-brace json-encode pattern that
+// double-escaped through Blade. (Directive names are kept out of this comment
+// on purpose: Blade scans raw comment text and a bare directive token here
+// miscompiles into invalid PHP.)
 const HR_LABELS = @json($hrLabels);
 
 // HTML-attribute-safe escape. The earlier `.replace(/"/g, '&quot;')` was
@@ -270,8 +272,8 @@ document.getElementById('addQuestion').addEventListener('click', function() {
     addQuestion({});
 });
 
-// Load existing questions (pre-built in the @php block above so @json
-// receives a single comma-free expression).
+// Load existing questions (pre-built in the PHP block above so the JSON
+// directive receives a single comma-free expression).
 const existingQuestions = @json($hrExistingQuestions);
 
 existingQuestions.forEach(function(q) {
