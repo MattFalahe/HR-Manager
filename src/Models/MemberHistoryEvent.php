@@ -22,6 +22,7 @@ class MemberHistoryEvent extends Model
 
     protected $fillable = [
         'user_id',
+        'actor_user_id',
         'character_id',
         'corporation_id',
         'event_type',
@@ -33,14 +34,20 @@ class MemberHistoryEvent extends Model
     ];
 
     protected $casts = [
-        'payload'     => 'array',
-        'occurred_at' => 'datetime',
-        'recorded_at' => 'datetime',
+        'payload'       => 'array',
+        'actor_user_id' => 'integer',
+        'occurred_at'   => 'datetime',
+        'recorded_at'   => 'datetime',
     ];
 
     public function user()
     {
         return $this->belongsTo(\Seat\Web\Models\User::class, 'user_id');
+    }
+
+    public function actor()
+    {
+        return $this->belongsTo(\Seat\Web\Models\User::class, 'actor_user_id');
     }
 
     public function character()

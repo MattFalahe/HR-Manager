@@ -36,6 +36,14 @@ class HistoryEventService
 
         $data = [
             'user_id'         => $context['user_id'] ?? null,
+            // WHO took the action. Auto-captured from the authenticated request
+            // (a director clicking something); NULL in console / queue / EventBus
+            // context = no human = "automated". An explicit context key wins, so
+            // an automated action running inside an HTTP request (e.g. the
+            // board-triggered squad cleanup) can force NULL.
+            'actor_user_id'   => array_key_exists('actor_user_id', $context)
+                ? $context['actor_user_id']
+                : (auth()->check() ? (int) auth()->id() : null),
             'character_id'    => $context['character_id'] ?? null,
             'corporation_id'  => $context['corporation_id'] ?? null,
             'event_type'      => $eventType,

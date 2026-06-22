@@ -86,6 +86,13 @@ class PlayerController extends Controller
         $notes = $playerService->notesForPlayer($userId, $characterIds, $viewerId);
         $history = app(HistoryEventService::class)->timelineForPlayer($userId, $characterIds, 100);
 
+        // Resolve the actor (who took each action) on the history timeline to a
+        // main-character name. NULL actor = automated (rendered as "HR").
+        $historyActorIds = $history->pluck('actor_user_id')->map(fn ($id) => (int) $id)->filter()->unique()->values()->all();
+        $historyActorNames = empty($historyActorIds)
+            ? []
+            : app(NameResolutionService::class)->getUserNames($historyActorIds);
+
         // Resolve note authors (SeAT user_id) to their main-character name so
         // the notes list never shows a bare "User #2", and flag which authors
         // are SeAT superusers so the view can badge them ADMIN.
@@ -170,7 +177,7 @@ class PlayerController extends Controller
             'corporations', 'tierAuto', 'titleSnapshot',
             'identity', 'identityCharNames', 'roleProfiles', 'fcActivity',
             'blueprintActivity', 'accessDepth', 'discord', 'squads',
-            'noteAuthorNames', 'noteAuthorAdmins'
+            'noteAuthorNames', 'noteAuthorAdmins', 'historyActorNames'
         ));
     }
 

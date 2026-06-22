@@ -173,6 +173,9 @@ return [
     'mark_purge_executed_help'    => 'Confirm the in-game kick is done. Records the history event and clears the flag.',
     'history_heading'             => 'History',
     'no_history'                  => 'No recorded history events yet.',
+    'history_by'                  => 'by',
+    'history_via'                 => 'via',
+    'history_automated'           => 'HR (automated)',
 
     // Reason form fields
     'reason_optional'   => 'Reason (optional)',

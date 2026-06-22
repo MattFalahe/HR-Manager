@@ -777,6 +777,21 @@
                     $t = str_replace(['.', '_'], ' ', $t);
                     return ucfirst(trim($t));
                 };
+
+                // Events with no human actor (cron / classifier / a purge_auto
+                // squad cleanup) render as "HR (automated)" when actor is NULL.
+                // External-plugin events are handled by the "via <plugin>" line.
+                $isAutomatedEvent = function ($event) {
+                    $t = $event->event_type;
+                    return str_starts_with($t, 'hr.player.flagged_')
+                        || str_starts_with($t, 'hr.purge.reminder_')
+                        || in_array($t, [
+                            'player.token_revoked', 'hr.player.classification_changed',
+                            'hr.player.inactive_director', 'hr.player.silent_wallet_director',
+                            'hr.player.milestone_reached',
+                        ], true)
+                        || (($event->payload['via'] ?? null) === 'purge_auto');
+                };
             @endphp
             <div class="card card-dark mb-3">
                 <div class="card-header">
@@ -791,6 +806,9 @@
                             [$icon, $color] = $eventIcons[$event->event_type] ?? ['fa-circle', 'var(--hr-text-muted, #9ca3af)'];
                             $payloadReason = $event->payload['reason'] ?? null;
                             $eventLabel = $eventLabels[$event->event_type] ?? $humanizeEvent($event->event_type);
+                            $actorId = $event->actor_user_id;
+                            $actorName = $actorId ? ($historyActorNames[$actorId] ?? ('User #' . $actorId)) : null;
+                            $isAuto = $isAutomatedEvent($event);
                         @endphp
                         <div class="d-flex align-items-start mb-2" style="gap: 8px;">
                             <i class="fas {{ $icon }} mt-1" style="color: {{ $color }}; width: 18px; text-align: center;"></i>
@@ -803,8 +821,12 @@
                                 </div>
                                 <small style="color: var(--hr-text-muted);">
                                     @hrDate($event->occurred_at)
-                                    @if($event->source_plugin && $event->source_plugin !== 'hr-manager')
-                                        &middot; via <em>{{ $event->source_plugin }}</em>
+                                    @if($actorName)
+                                        &middot; {{ trans('hr-manager::players.history_by') }} <strong style="color: var(--hr-text-light);">{{ $actorName }}</strong>
+                                    @elseif($event->source_plugin && $event->source_plugin !== 'hr-manager')
+                                        &middot; {{ trans('hr-manager::players.history_via') }} <em>{{ $event->source_plugin }}</em>
+                                    @elseif($isAuto)
+                                        &middot; <em>{{ trans('hr-manager::players.history_automated') }}</em>
                                     @endif
                                 </small>
                             </div>

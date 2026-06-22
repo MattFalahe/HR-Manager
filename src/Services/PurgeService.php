@@ -332,6 +332,13 @@ class PurgeService
             $status->update(['purge_squads_removed_at' => now()]);
         }
 
+        // purge_auto is automated even when the board view triggers it inside an
+        // HTTP request, so force a NULL actor; purge_manual is the director who
+        // clicked (auth is captured, but pass it explicitly for clarity).
+        $actorUserId = $via === 'purge_auto'
+            ? null
+            : (auth()->check() ? (int) auth()->id() : null);
+
         foreach ($removed as $squad) {
             $this->history->record('hr.squad.removed', [
                 'squad_id'   => $squad['id'],
@@ -340,6 +347,7 @@ class PurgeService
             ], [
                 'user_id'        => (int) $status->user_id,
                 'corporation_id' => (int) $status->corporation_id,
+                'actor_user_id'  => $actorUserId,
                 'occurred_at'    => now(),
             ]);
         }
