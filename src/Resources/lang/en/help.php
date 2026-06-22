@@ -215,7 +215,7 @@ return [
 
     // 7. History timeline
     'feat_history_section'      => 'History Timeline',
-    'feat_history_section_desc' => 'An append-only timeline of everything that ever happened to a player across all their characters and corporation moves. Survives corp leaves and re-applications — re-applicants get their full prior history visible to recruiters reviewing their new application.',
+    'feat_history_section_desc' => 'An append-only timeline of everything that ever happened to a player across all their characters and corporation moves. Survives corp leaves and re-applications — re-applicants get their full prior history visible to recruiters reviewing their new application. Each entry shows who took the action: the director for a manual action, or HR (automated) for cron / classifier / EventBus events.',
     'feat_h_event_types_heading' => 'Event types HR records',
     'feat_h_ev_1' => '<strong>Application events</strong>: submitted, status changes, accepted, rejected, withdrawn, joined corp, prior application history',
     'feat_h_ev_2' => '<strong>Classifier transitions</strong>: flagged_at_risk, flagged_inactive, flagged_dead_weight, recovered, milestone_reached',

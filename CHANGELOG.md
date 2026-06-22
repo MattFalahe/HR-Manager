@@ -64,6 +64,7 @@ First release. HR Manager is two faces in one plugin: a **public recruitment fun
 ### 📜 History timeline
 
 - An append-only chronological log per player across every character and corp move: corp join/leave, application lifecycle, LOA, purge milestones, tier changes, classifier transitions, and cross-plugin signals. Idempotency keys prevent double-recording on EventBus replays.
+- **Actor attribution**: every entry shows who took the action — the director's name for a manual action (auto-captured from the request), `via <plugin>` for an external EventBus signal, or **HR (automated)** for cron / classifier / the opt-in auto squad cleanup.
 
 ### 🔗 Cross-plugin signals (each self-hides when its source is absent)
 
