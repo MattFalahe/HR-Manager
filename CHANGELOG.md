@@ -25,6 +25,7 @@ First release. HR Manager is two faces in one plugin: a **public recruitment fun
 
 - An automated **green / amber / red verdict** on every application, composing what HR already holds: **corp-hopping** (corporations joined in 12 months), **NPC-corp parking**, character age, security status, a **watchlist cross-check**, a **zKillboard** PvP summary, and skill points.
 - **Progressive by granted scope**: with the optional intel scopes it also reads **implants** (an established main vs a throwaway alt), **current-corp roles** (a Director elsewhere flags amber), and **standings** (flags an applicant blue to an entity you mark hostile, from SeAT's Standings Builder or your own hostile / friendly lists, with a corp-vs-alliance precedence toggle).
+- The panel separates **scope not granted** from **not synced yet** (scope present, ESI data still landing), and a **Refresh** button re-queues the ESI sync (public info / corp history / skills / implants / corp roles / contacts, the intel jobs gated on scope) so a recruiter can pull fresh numbers when apply-time hydration lags or a scope was granted late. It also shows the applicant's **current corporation** with an NPC / player-corp flag.
 - Intel for the recruiter, **never a gate** (the eligibility engine stays the gate). Every threshold is operator-tunable in Settings → Assessment.
 
 ### 🔑 SSO scope profile selection
