@@ -62,6 +62,7 @@
                     <table class="table table-hover mb-0">
                         <thead>
                             <tr>
+                                <th style="width:1%; white-space:nowrap;">#</th>
                                 <th>{{ trans('hr-manager::applications.applicant') }}</th>
                                 <th>{{ trans('hr-manager::applications.status') }}</th>
                                 <th>{{ trans('hr-manager::applications.handlers_heading') }}</th>
@@ -72,6 +73,7 @@
                         <tbody>
                             @foreach($applications as $app)
                                 <tr>
+                                    <td style="color: var(--hr-text-muted); white-space:nowrap;"><code>#{{ $app->id }}</code></td>
                                     <td>
                                         <img src="https://images.evetech.net/characters/{{ $app->character_id }}/portrait?size=32"
                                              class="rounded-circle mr-2" width="32" height="32">

@@ -328,7 +328,9 @@
                         <img src="https://images.evetech.net/characters/{{ $application->character_id }}/portrait?size=128"
                              class="character-avatar" alt="Portrait">
                         <div>
-                            <div class="character-name">{{ $application->character->name ?? ('Character #' . $application->character_id) }}</div>
+                            <div class="character-name">{{ $application->character->name ?? ('Character #' . $application->character_id) }}
+                                <span style="color: var(--hr-text-muted); font-weight: normal; font-size: 0.62em;" title="{{ trans('hr-manager::applications.application_number_help') }}">#{{ $application->id }}</span>
+                            </div>
                             <div class="character-corp">
                                 <span class="badge badge-hr {{ $application->status_badge_class }}">
                                     {{ $application->status_label }}
@@ -600,6 +602,9 @@
                 </div>
                 <div class="card-body">
                     <dl class="row mb-0">
+                        <dt class="col-sm-5" style="color: var(--hr-text-muted);">{{ trans('hr-manager::applications.application_number') }}</dt>
+                        <dd class="col-sm-7"><code>#{{ $application->id }}</code></dd>
+
                         <dt class="col-sm-5" style="color: var(--hr-text-muted);">Template</dt>
                         <dd class="col-sm-7">{{ $application->template->name ?? 'Deleted' }}</dd>
 

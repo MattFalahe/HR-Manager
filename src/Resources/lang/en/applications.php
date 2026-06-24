@@ -26,6 +26,8 @@ return [
 
     'applications'      => 'Applications',
     'application'       => 'Application',
+    'application_number'      => 'Application #',
+    'application_number_help' => 'Application number. Quote this when reporting an issue or in the Diagnostics Application Trace.',
     'all_applications'  => 'All Applications',
     'new_application'   => 'New Application',
     'applicant'         => 'Applicant',
