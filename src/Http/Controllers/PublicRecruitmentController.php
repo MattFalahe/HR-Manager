@@ -215,6 +215,13 @@ class PublicRecruitmentController extends Controller
         // button) for a complete assessment. Main character sorts first.
         $linkedCharacters = $this->resolveLinkedCharacters((int) $user->id, (int) $characterId);
 
+        // Returning-member check: characters HR already associates with this
+        // human that they have NOT re-authed on this apply (registered before,
+        // e.g. while previously a member). Drives the "unauthed characters
+        // found" warning so they re-add everything. Empty for a fresh applicant.
+        $unauthedCharacters = app(\HrManager\Services\PlayerIdentityResolver::class)
+            ->unauthedKnownCharacters((int) $characterId, array_column($linkedCharacters, 'character_id'));
+
         return view('hr-manager::recruit.apply', compact(
             'landing',
             'template',
@@ -224,7 +231,8 @@ class PublicRecruitmentController extends Controller
             'hasDataMissingFailure',
             'connectorAvailable',
             'connectorLinkUrl',
-            'linkedCharacters'
+            'linkedCharacters',
+            'unauthedCharacters'
         ));
     }
 

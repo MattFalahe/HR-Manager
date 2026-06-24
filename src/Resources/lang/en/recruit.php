@@ -23,10 +23,13 @@ return [
     'as_character'          => 'as',
     // Linked-characters card on the apply form
     'linked_chars_heading'  => 'Your linked characters',
-    'linked_chars_body'     => 'These are the characters on your SeAT account that recruiters can review with your application. Linking your alts gives a complete picture and usually speeds up a decision.',
+    'linked_chars_body'     => 'These are the characters on your SeAT account that recruiters can review with your application. Register ALL your characters and alts at this stage, including ones you no longer actively use. Most corporations require every character to be added, and a complete picture speeds up your decision.',
     'linked_chars_main'     => 'Main',
     'linked_chars_add_btn'  => 'Link another character',
-    'linked_chars_help'     => 'Optional. You will be sent to EVE Online SSO to log in the character, then returned here. You can submit with just your main if you prefer.',
+    'linked_chars_help'     => 'Use "Link another character" for every character and alt you have. You log in via EVE Online SSO and come straight back. Adding everyone, even unused alts, is what most corporations expect.',
+    // Returning-member warning: known characters not re-authed on this apply
+    'unauthed_heading'      => 'Unauthed characters found!',
+    'unauthed_body'         => 'We have these characters on record for you that are not linked to this application. Most corporations require every character, including alts you no longer actively use. Use "Link another character" below to add each one before you submit.',
     'link_discord_now_btn'  => 'Link Discord now',
     'link_discord_now_help' => 'Optional. Opens the SeAT Connector page in a new tab so you can link your Discord account and join the server. You can also do this after you submit.',
     'eligibility_passed'    => 'You meet all eligibility requirements.',

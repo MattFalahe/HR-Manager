@@ -70,6 +70,50 @@ class PlayerIdentityResolver
     }
 
     /**
+     * Characters HR already associates with the same human as
+     * $mainCharacterId (current identity mappings) that are NOT in
+     * $authedCharacterIds — i.e. characters they registered with SeAT before
+     * (e.g. while previously a member) but have not re-authed on this apply.
+     *
+     * Drives the apply-form "unauthed characters found" warning for returning
+     * members. Empty for a brand-new applicant HR has no prior record of, and
+     * empty once every known character is re-linked. Characters that were
+     * reassigned to a different human (account takeover) are excluded, since
+     * their mapping to this identity is closed.
+     *
+     * @return array<int, array{character_id:int, name:string}>
+     */
+    public function unauthedKnownCharacters(int $mainCharacterId, array $authedCharacterIds): array
+    {
+        if ($mainCharacterId <= 0 || !Schema::hasTable('hr_manager_character_identity_mappings')) {
+            return [];
+        }
+
+        $identity = $this->forCharacter($mainCharacterId);
+        if (!$identity) {
+            return [];
+        }
+
+        $authed = array_map('intval', $authedCharacterIds);
+        $known  = CharacterIdentityMapping::where('player_identity_id', $identity->id)
+            ->whereNull('effective_to')
+            ->pluck('character_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->all();
+
+        $missing = array_values(array_diff($known, $authed));
+        if (empty($missing)) {
+            return [];
+        }
+
+        return array_map(fn ($id) => [
+            'character_id' => $id,
+            'name'         => $this->lookupCharacterName($id) ?: ('Character #' . $id),
+        ], $missing);
+    }
+
+    /**
      * Return the identity tied to a SeAT user (create if missing), and
      * eagerly sync EVERY character currently linked to that SeAT
      * account as a mapping.

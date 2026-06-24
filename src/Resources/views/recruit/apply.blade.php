@@ -29,14 +29,35 @@
         </div>
     </div>
 
-    {{-- Linked characters — what recruiters will see + an option to link
-         more alts for a complete assessment. Purely optional; the
-         applicant can submit with just their main. --}}
+    {{-- Linked characters — what recruiters will see, with a prompt to register
+         EVERY character / alt. Returning members get a blinking warning listing
+         any character HR already knows that they have not re-authed here. --}}
     <div class="card card-dark mb-3">
         <div class="card-body">
             <h5 style="color: var(--hr-text-white); margin-bottom: 6px;">
                 <i class="fas fa-users"></i> {{ trans('hr-manager::recruit.linked_chars_heading') }}
             </h5>
+
+            @if(!empty($unauthedCharacters))
+                {{-- Wrapped raw (no Blade compilation) so the CSS at-rules below
+                     are not mistaken for Blade directives. --}}
+                @verbatim
+                <style>
+                @keyframes hrUnauthedPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(220,53,69,0.50); } 50% { box-shadow: 0 0 14px 3px rgba(220,53,69,0.60); } }
+                .hr-unauthed-warning { animation: hrUnauthedPulse 1.3s ease-in-out infinite; }
+                @media (prefers-reduced-motion: reduce) { .hr-unauthed-warning { animation: none; } }
+                </style>
+                @endverbatim
+                <div class="hr-unauthed-warning" role="alert" style="margin: 6px 0 14px; padding: 12px 14px; border-radius: 6px; border: 2px solid #dc3545; background: rgba(220,53,69,0.16);">
+                    <strong style="color: #ff6b6b; font-size: 1.04rem;"><i class="fas fa-triangle-exclamation"></i> {{ trans('hr-manager::recruit.unauthed_heading') }}</strong>
+                    <p class="mb-1 mt-1" style="color: var(--hr-text-light);">{{ trans('hr-manager::recruit.unauthed_body') }}</p>
+                    <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                        @foreach($unauthedCharacters as $uc)
+                            <span class="badge" style="background: rgba(220,53,69,0.30); color: #ffd0d0; border: 1px solid rgba(220,53,69,0.60); font-weight: 600; padding: 5px 9px;"><i class="fas fa-user-slash"></i> {{ $uc['name'] }}</span>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
             <p style="color: var(--hr-text-muted); margin-bottom: 10px;">
                 {{ trans('hr-manager::recruit.linked_chars_body') }}
             </p>
