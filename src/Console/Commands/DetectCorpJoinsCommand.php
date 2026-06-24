@@ -16,10 +16,14 @@ use Illuminate\Support\Str;
  * and then ghost — never apply in-game, never click the Discord invite,
  * never become a member. This command closes the funnel by detecting the
  * join from SeAT's synced data and flipping joined_corp_at + joined_corp_id
- * on the matching application row. Two sources: the corp-history table
- * (authoritative, precise join date) and, as a fresher fallback,
- * character_affiliations (catches the join before the laggier history
- * endpoint records it; no precise date, so detection time is used).
+ * on the matching application row.
+ *
+ * Membership is confirmed from the freshest source (character_affiliations,
+ * falling back to the latest corp-history record). The join DATE is the most
+ * recent corp-history record for the target corp — the real stint start, which
+ * is often BEFORE the decision (applicants are frequently already in the corp);
+ * detection time is used only until that history row syncs, and an approximate
+ * date stamped that way is corrected to the real one on a later run.
  *
  * Read-only consumer of SeAT's synced data; no ESI calls.
  * Publishes hr.application.joined_corp to EventBus so downstream
@@ -54,11 +58,13 @@ class DetectCorpJoinsCommand extends Command
             return 0;
         }
 
+        // Already-joined apps are included too: a date stamped via the
+        // affiliation fallback (detection time, approximate) is corrected to the
+        // real corp-history join date once that record is available.
         $candidates = Application::where('status', 'accepted')
-            ->whereNull('joined_corp_at')
             ->whereNotNull('decided_at')
             ->where('decided_at', '>=', now()->subDays($days))
-            ->get(['id', 'character_id', 'corporation_id', 'decided_at']);
+            ->get(['id', 'character_id', 'corporation_id', 'decided_at', 'joined_corp_at']);
 
         if ($candidates->isEmpty()) {
             $this->info('No candidates within the window. Done.');
@@ -69,50 +75,66 @@ class DetectCorpJoinsCommand extends Command
 
         $updated = 0;
         foreach ($candidates as $app) {
-            // 1. Authoritative: the corp-history endpoint shows a join AFTER the
-            //    decision (gives the precise join date).
-            $row = DB::table('character_corporation_histories')
-                ->where('character_id', $app->character_id)
-                ->where('corporation_id', $app->corporation_id)
-                ->where('start_date', '>=', $app->decided_at)
-                ->orderBy('start_date')
-                ->first(['start_date']);
+            $targetCorp = (int) $app->corporation_id;
+            $wasJoined  = $app->joined_corp_at !== null;
 
-            $startDate = $row->start_date ?? null;
-            $via = 'history';
+            // Are they in the TARGET corp right now? character_affiliations is the
+            // freshest signal; fall back to the latest corp-history record when no
+            // affiliation row exists.
+            $affCorp = Schema::hasTable('character_affiliations')
+                ? DB::table('character_affiliations')->where('character_id', $app->character_id)->value('corporation_id')
+                : null;
 
-            // 2. Fallback: the fresher character_affiliations confirms the
-            //    applicant is in the TARGET corp right now, even when the laggier
-            //    corp-history endpoint has not recorded the join yet (long ESI
-            //    cache). No precise date from affiliations, so use detection time
-            //    (always >= the decision date).
-            if ($startDate === null && Schema::hasTable('character_affiliations')) {
-                $affCorp = DB::table('character_affiliations')
+            if ($affCorp !== null) {
+                $inTargetNow = ((int) $affCorp === $targetCorp);
+            } else {
+                $latestCorp = DB::table('character_corporation_histories')
                     ->where('character_id', $app->character_id)
+                    ->orderByDesc('start_date')
                     ->value('corporation_id');
-                if ($affCorp !== null && (int) $affCorp === (int) $app->corporation_id) {
-                    $startDate = now()->toDateTimeString();
-                    $via = 'affiliation';
-                }
+                $inTargetNow = ($latestCorp !== null && (int) $latestCorp === $targetCorp);
             }
 
-            if ($startDate === null) {
+            if (!$inTargetNow) {
+                continue; // not a member of the target corp — leave as NOT JOINED YET
+            }
+
+            // Real join date = the most recent corp-history record for the TARGET
+            // corp. An applicant is frequently ALREADY in the corp by the time the
+            // application is processed (joined before / during recruitment), so do
+            // NOT require the join to be after the decision date — read the actual
+            // stint start. Falls back to detection time only when the history row
+            // has not synced yet.
+            $joinDate = DB::table('character_corporation_histories')
+                ->where('character_id', $app->character_id)
+                ->where('corporation_id', $targetCorp)
+                ->orderByDesc('start_date')
+                ->value('start_date')
+                ?? now()->toDateTimeString();
+
+            // Nothing to do when an already-joined app already carries this date.
+            if ($wasJoined && \Carbon\Carbon::parse($app->joined_corp_at)->equalTo(\Carbon\Carbon::parse($joinDate))) {
                 continue;
             }
 
             if ($dryRun) {
-                $this->line("  [dry] app #{$app->id} char #{$app->character_id} joined corp {$app->corporation_id} at {$startDate} (via {$via})");
+                $label = $wasJoined ? 'correct date ->' : 'join ->';
+                $this->line("  [dry] app #{$app->id} char #{$app->character_id} {$label} corp {$targetCorp} at {$joinDate}");
                 $updated++;
                 continue;
             }
 
             $app->update([
-                'joined_corp_at' => $startDate,
-                'joined_corp_id' => $app->corporation_id,
+                'joined_corp_at' => $joinDate,
+                'joined_corp_id' => $targetCorp,
             ]);
 
-            $this->publishJoinedEvent($app, $startDate);
-            $this->revokeConnectorAccess($app);
+            // Announce + pull Connector access only on the FIRST transition to
+            // joined, never on a date correction of an already-joined app.
+            if (!$wasJoined) {
+                $this->publishJoinedEvent($app, $joinDate);
+                $this->revokeConnectorAccess($app);
+            }
 
             $updated++;
         }
