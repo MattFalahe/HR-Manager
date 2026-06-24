@@ -14,12 +14,14 @@ use Illuminate\Support\Str;
  *
  * "Accepted" doesn't mean "joined". Plenty of applicants get told yes
  * and then ghost — never apply in-game, never click the Discord invite,
- * never become a member. This command closes the funnel by watching
- * SeAT's existing character_corporation_histories table for the join
- * event and flipping joined_corp_at + joined_corp_id on the matching
- * application row.
+ * never become a member. This command closes the funnel by detecting the
+ * join from SeAT's synced data and flipping joined_corp_at + joined_corp_id
+ * on the matching application row. Two sources: the corp-history table
+ * (authoritative, precise join date) and, as a fresher fallback,
+ * character_affiliations (catches the join before the laggier history
+ * endpoint records it; no precise date, so detection time is used).
  *
- * Read-only consumer of SeAT's synced histories — no ESI calls.
+ * Read-only consumer of SeAT's synced data; no ESI calls.
  * Publishes hr.application.joined_corp to EventBus so downstream
  * subscribers (SeAT Broadcast, MC) can announce the milestone.
  *
@@ -67,6 +69,8 @@ class DetectCorpJoinsCommand extends Command
 
         $updated = 0;
         foreach ($candidates as $app) {
+            // 1. Authoritative: the corp-history endpoint shows a join AFTER the
+            //    decision (gives the precise join date).
             $row = DB::table('character_corporation_histories')
                 ->where('character_id', $app->character_id)
                 ->where('corporation_id', $app->corporation_id)
@@ -74,14 +78,30 @@ class DetectCorpJoinsCommand extends Command
                 ->orderBy('start_date')
                 ->first(['start_date']);
 
-            if (!$row) {
+            $startDate = $row->start_date ?? null;
+            $via = 'history';
+
+            // 2. Fallback: the fresher character_affiliations confirms the
+            //    applicant is in the TARGET corp right now, even when the laggier
+            //    corp-history endpoint has not recorded the join yet (long ESI
+            //    cache). No precise date from affiliations, so use detection time
+            //    (always >= the decision date).
+            if ($startDate === null && Schema::hasTable('character_affiliations')) {
+                $affCorp = DB::table('character_affiliations')
+                    ->where('character_id', $app->character_id)
+                    ->value('corporation_id');
+                if ($affCorp !== null && (int) $affCorp === (int) $app->corporation_id) {
+                    $startDate = now()->toDateTimeString();
+                    $via = 'affiliation';
+                }
+            }
+
+            if ($startDate === null) {
                 continue;
             }
 
-            $startDate = $row->start_date;
-
             if ($dryRun) {
-                $this->line("  [dry] app #{$app->id} char #{$app->character_id} joined corp {$app->corporation_id} at {$startDate}");
+                $this->line("  [dry] app #{$app->id} char #{$app->character_id} joined corp {$app->corporation_id} at {$startDate} (via {$via})");
                 $updated++;
                 continue;
             }
