@@ -23,10 +23,10 @@ return [
     'as_character'          => 'as',
     // Linked-characters card on the apply form
     'linked_chars_heading'  => 'Your linked characters',
-    'linked_chars_body'     => 'These are the characters on your SeAT account that recruiters can review with your application. Register ALL your characters and alts at this stage, including ones you no longer actively use. Most corporations require every character to be added, and a complete picture speeds up your decision.',
+    'linked_chars_body'     => 'These are the characters on your SeAT account that recruiters can review with your application. You must register every character and alt you own, including ones you no longer actively use, not just your main. A complete picture speeds up your decision.',
     'linked_chars_main'     => 'Main',
     'linked_chars_add_btn'  => 'Link another character',
-    'linked_chars_help'     => 'Use "Link another character" for every character and alt you have. You log in via EVE Online SSO and come straight back. Adding everyone, even unused alts, is what most corporations expect.',
+    'linked_chars_help'     => 'Use "Link another character" for each one. You log in via EVE Online SSO and come straight back. Every character is required before you submit, even unused alts.',
     // Returning-member warning: known characters not re-authed on this apply
     'unauthed_heading'      => 'Unauthed characters found!',
     'unauthed_body'         => 'We have these characters on record for you that are not linked to this application. Most corporations require every character, including alts you no longer actively use. Use "Link another character" below to add each one before you submit.',
