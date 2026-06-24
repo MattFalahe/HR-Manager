@@ -220,8 +220,11 @@
                                     @php
                                         $roleId = $webhook->discord_role_id ?: null;
                                         $roleLabel = null;
+                                        // roleLookupMap() values are the full role ARRAY
+                                        // (id/name/color/...), so pull ->['name'] rather than
+                                        // concatenating the array (Array to string conversion).
                                         if ($roleId && isset($discordRoleMap[$roleId])) {
-                                            $roleLabel = '@' . $discordRoleMap[$roleId];
+                                            $roleLabel = '@' . ($discordRoleMap[$roleId]['name'] ?? $roleId);
                                         } elseif ($roleId) {
                                             $roleLabel = $roleId;
                                         }
