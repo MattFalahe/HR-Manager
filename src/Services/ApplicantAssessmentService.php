@@ -251,8 +251,19 @@ class ApplicantAssessmentService
         $avgTenure   = $count > 0 ? (int) round(array_sum($tenures) / $count) : 0;
         $corpsLast12 = $values->filter(fn ($r) => Carbon::parse($r->start_date)->gte($now->copy()->subMonths(12)))->count();
         $current     = $values->last();
-        $currentIsNpc   = $current ? $this->isNpcCorp((int) $current->corporation_id) : false;
+        // Freshest current corp: character_affiliations is synced far more often
+        // than the corp-history endpoint (long ESI cache), so a recent move into a
+        // player corp is not still shown as a stale NPC corp + a false "parked"
+        // flag. Falls back to character_infos, then the history last record.
+        $liveCorpId     = $this->liveCorporationId($char, $current);
+        $currentIsNpc   = $liveCorpId > 0 ? $this->isNpcCorp($liveCorpId) : false;
         $currentTenure  = $current ? max(0, Carbon::parse($current->start_date)->diffInDays($now)) : 0;
+        // Tenure only counts toward "parked" when the live corp still matches the
+        // history's last record; if it has moved on more recently than the history
+        // reflects, we have no reliable tenure for the live corp, so do not flag.
+        if ($current && $liveCorpId > 0 && $liveCorpId !== (int) $current->corporation_id) {
+            $currentTenure = 0;
+        }
 
         $hopperLimit = (int) $this->criterion('assess_hopper_corps_12mo');
         $tenureFloor = (int) $this->criterion('assess_min_avg_tenure_days');
@@ -284,21 +295,11 @@ class ApplicantAssessmentService
             ];
         }
 
-        // Current corp from character_infos (authoritative now), with a resolved
+        // Current corp = the freshest live corp resolved above, with a resolved
         // name + the NPC flag, so the recruiter sees where the applicant sits
-        // right now rather than inferring it from the history rows.
-        $currentCorpId = (int) ($char->corporation_id ?: ($current->corporation_id ?? 0));
-        $currentCorpName = null;
-        if ($currentCorpId > 0) {
-            try {
-                $currentCorpName = \Seat\Eveapi\Models\Corporation\CorporationInfo::where('corporation_id', $currentCorpId)->value('name')
-                    ?? \Illuminate\Support\Facades\DB::table('universe_names')
-                        ->where('entity_id', $currentCorpId)->where('category', 'corporation')->value('name');
-            } catch (\Throwable $e) {
-                // name stays null; the view falls back to the corp id.
-            }
-            $currentIsNpc = $this->isNpcCorp($currentCorpId);
-        }
+        // right now rather than inferring it from the (laggier) history rows.
+        $currentCorpId = $liveCorpId;
+        $currentCorpName = $currentCorpId > 0 ? $this->corporationName($currentCorpId) : null;
 
         return [
             'available'           => true,
@@ -386,16 +387,33 @@ class ApplicantAssessmentService
             }
 
             $infos = CharacterInfo::whereIn('character_id', $charIds)
-                ->get(['character_id', 'name', 'corporation_id']);
+                ->get(['character_id', 'name', 'corporation_id'])
+                ->keyBy(fn ($r) => (int) $r->character_id);
 
-            $corpIds = $infos->pluck('corporation_id')->map(fn ($c) => (int) $c)->filter()->unique()->values()->all();
+            // Prefer character_affiliations (fresher) over character_infos for each
+            // character's current corp, same as the headline current-corp signal.
+            $affCorps = [];
+            try {
+                $affCorps = \Seat\Eveapi\Models\Character\CharacterAffiliation::whereIn('character_id', $charIds)
+                    ->pluck('corporation_id', 'character_id')->map(fn ($c) => (int) $c)->toArray();
+            } catch (\Throwable $e) {
+                // affiliations unavailable -> character_infos only
+            }
+
+            $corpOf = [];
+            foreach ($charIds as $cid) {
+                $corpOf[$cid] = (int) ($affCorps[$cid] ?? (optional($infos->get($cid))->corporation_id ?? 0));
+            }
+
+            $corpIds   = array_values(array_unique(array_filter($corpOf)));
             $corpNames = empty($corpIds) ? [] : \Seat\Eveapi\Models\Corporation\CorporationInfo::whereIn('corporation_id', $corpIds)
                 ->pluck('name', 'corporation_id')->toArray();
 
             $npc = 0;
             $player = 0;
-            $characters = $infos->map(function ($r) use ($characterId, $corpNames, &$npc, &$player) {
-                $corpId = (int) $r->corporation_id;
+            $characters = [];
+            foreach ($charIds as $cid) {
+                $corpId = $corpOf[$cid];
                 $isNpc  = $this->isNpcCorp($corpId);
                 if ($isNpc) {
                     $npc++;
@@ -403,15 +421,16 @@ class ApplicantAssessmentService
                     $player++;
                 }
 
-                return [
-                    'character_id' => (int) $r->character_id,
-                    'name'         => $r->name ?: ('Character #' . $r->character_id),
+                $characters[] = [
+                    'character_id' => $cid,
+                    'name'         => (optional($infos->get($cid))->name ?: ('Character #' . $cid)),
                     'corp_id'      => $corpId,
-                    'corp_name'    => $corpNames[$corpId] ?? ('Corp #' . $corpId),
+                    'corp_name'    => $corpNames[$corpId] ?? ($corpId > 0 ? ('Corp #' . $corpId) : 'Unknown'),
                     'is_npc'       => $isNpc,
-                    'is_applicant' => (int) $r->character_id === $characterId,
+                    'is_applicant' => $cid === $characterId,
                 ];
-            })->sortByDesc('is_applicant')->values()->all();
+            }
+            usort($characters, fn ($a, $b) => ($b['is_applicant'] <=> $a['is_applicant']));
 
             return [
                 'available'    => true,
@@ -637,6 +656,42 @@ class ApplicantAssessmentService
     private function isNpcCorp(int $corporationId): bool
     {
         return $corporationId > 0 && $corporationId < self::NPC_CORP_CEILING;
+    }
+
+    /**
+     * Freshest current corporation for a character: character_affiliations
+     * (synced often via the cheap bulk endpoint) over character_infos, over the
+     * corp-history last record. Keeps the "current corp" + NPC flag from lagging
+     * behind a recent corp change (e.g. an applicant who just joined a corp).
+     */
+    private function liveCorporationId(CharacterInfo $char, $historyCurrent): int
+    {
+        try {
+            $affId = \Seat\Eveapi\Models\Character\CharacterAffiliation::where('character_id', $char->character_id)
+                ->value('corporation_id');
+            if ($affId) {
+                return (int) $affId;
+            }
+        } catch (\Throwable $e) {
+            // fall through to character_infos / history
+        }
+
+        return (int) ($char->corporation_id ?: ($historyCurrent->corporation_id ?? 0));
+    }
+
+    /** Resolve a corporation id to its name (corporation_infos -> universe_names), or null. */
+    private function corporationName(int $corporationId): ?string
+    {
+        if ($corporationId <= 0) {
+            return null;
+        }
+        try {
+            return \Seat\Eveapi\Models\Corporation\CorporationInfo::where('corporation_id', $corporationId)->value('name')
+                ?? \Illuminate\Support\Facades\DB::table('universe_names')
+                    ->where('entity_id', $corporationId)->where('category', 'corporation')->value('name');
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     /** Resolve a configurable criterion, falling back to the shipped default. */
