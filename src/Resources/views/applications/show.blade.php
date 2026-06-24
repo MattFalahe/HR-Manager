@@ -313,6 +313,27 @@
                         </div>
                     @endif
                 </div>
+
+                {{-- Applicant as a person: each character on the account with its
+                     corp + an NPC / player flag, so a main in a player corp with an
+                     alt parked in an NPC corp reads clearly. --}}
+                @php $chs = $a['signals']['characters'] ?? ['available' => false]; @endphp
+                @if(!empty($chs['available']) && !empty($chs['characters']))
+                    <div style="margin-top:14px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.06);">
+                        <div style="color:var(--hr-text-muted); font-size:0.74rem; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:6px;">{{ trans('hr-manager::applications.assess_characters') }}</div>
+                        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                            @foreach($chs['characters'] as $pc)
+                                <div style="display:flex; align-items:center; gap:7px; padding:5px 10px; border-radius:5px; background: {{ $pc['is_npc'] ? 'rgba(255,193,7,0.10)' : 'rgba(255,255,255,0.04)' }}; border:1px solid {{ $pc['is_npc'] ? 'rgba(255,193,7,0.30)' : 'rgba(255,255,255,0.08)' }};">
+                                    <img src="https://images.evetech.net/characters/{{ $pc['character_id'] }}/portrait?size=32" style="width:24px; height:24px; border-radius:50%;" alt="">
+                                    <span style="color:var(--hr-text-white);">{{ $pc['name'] }}</span>
+                                    @if($pc['is_applicant'])<span class="badge badge-primary" style="font-size:0.6rem;">{{ trans('hr-manager::applications.assess_char_applicant') }}</span>@endif
+                                    <span style="color:var(--hr-text-muted);">{{ $pc['corp_name'] }}</span>
+                                    @if($pc['is_npc'])<span class="badge badge-warning" style="font-size:0.6rem;">{{ trans('hr-manager::applications.assess_npc_corp') }}</span>@else<span class="badge badge-secondary" style="font-size:0.6rem;">{{ trans('hr-manager::applications.assess_player_corp') }}</span>@endif
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
             </div>
         </div>
     @endif

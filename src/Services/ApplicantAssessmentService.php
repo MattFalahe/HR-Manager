@@ -112,6 +112,7 @@ class ApplicantAssessmentService
         $signals['corp_history'] = $this->corpHistorySignal($char, $flags);
         $signals['watchlist']    = $this->watchlistSignal($characterId, $allowedCorpIds, $char, $flags);
         $signals['pvp']          = $this->pvpSignal($characterId);
+        $signals['characters']   = $this->applicantCharactersSignal($characterId);
 
         // --- Progressive signals: present only when the applicant granted the
         //     scope AND SeAT has synced the data. Absent renders as "scope not
@@ -350,6 +351,77 @@ class ApplicantAssessmentService
             return $this->zkill->getCharacterStats($characterId);
         } catch (\Throwable $e) {
             return ['available' => false, 'reason' => 'fetch_failed'];
+        }
+    }
+
+    /**
+     * The applicant as a PERSON: every character on the same SeAT account with
+     * its current corp + an NPC/player flag. Makes a multi-character applicant
+     * legible — e.g. a main in a player corp with an alt parked in an NPC corp
+     * reads clearly, instead of the single applying-character corp being mistaken
+     * for the whole picture. Only surfaces when the account has more than one
+     * character (a single character is already covered by the Current corp field).
+     */
+    private function applicantCharactersSignal(int $characterId): array
+    {
+        try {
+            $userId = \Illuminate\Support\Facades\DB::table('refresh_tokens')
+                ->where('character_id', $characterId)
+                ->whereNull('deleted_at')
+                ->value('user_id');
+            if ($userId === null) {
+                return ['available' => false];
+            }
+
+            $charIds = \Illuminate\Support\Facades\DB::table('refresh_tokens')
+                ->where('user_id', $userId)
+                ->whereNull('deleted_at')
+                ->pluck('character_id')
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->all();
+
+            if (count($charIds) <= 1) {
+                return ['available' => false]; // single character — Current corp already says it
+            }
+
+            $infos = CharacterInfo::whereIn('character_id', $charIds)
+                ->get(['character_id', 'name', 'corporation_id']);
+
+            $corpIds = $infos->pluck('corporation_id')->map(fn ($c) => (int) $c)->filter()->unique()->values()->all();
+            $corpNames = empty($corpIds) ? [] : \Seat\Eveapi\Models\Corporation\CorporationInfo::whereIn('corporation_id', $corpIds)
+                ->pluck('name', 'corporation_id')->toArray();
+
+            $npc = 0;
+            $player = 0;
+            $characters = $infos->map(function ($r) use ($characterId, $corpNames, &$npc, &$player) {
+                $corpId = (int) $r->corporation_id;
+                $isNpc  = $this->isNpcCorp($corpId);
+                if ($isNpc) {
+                    $npc++;
+                } else {
+                    $player++;
+                }
+
+                return [
+                    'character_id' => (int) $r->character_id,
+                    'name'         => $r->name ?: ('Character #' . $r->character_id),
+                    'corp_id'      => $corpId,
+                    'corp_name'    => $corpNames[$corpId] ?? ('Corp #' . $corpId),
+                    'is_npc'       => $isNpc,
+                    'is_applicant' => (int) $r->character_id === $characterId,
+                ];
+            })->sortByDesc('is_applicant')->values()->all();
+
+            return [
+                'available'    => true,
+                'characters'   => $characters,
+                'npc_count'    => $npc,
+                'player_count' => $player,
+            ];
+        } catch (\Throwable $e) {
+            Log::debug('[HR Manager] applicantCharactersSignal failed: ' . $e->getMessage());
+            return ['available' => false];
         }
     }
 
