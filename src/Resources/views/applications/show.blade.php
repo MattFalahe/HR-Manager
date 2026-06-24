@@ -262,7 +262,7 @@
                         <div style="color:var(--hr-text-muted); font-size:0.74rem; text-transform:uppercase; letter-spacing:0.04em;">zKillboard</div>
                         <div style="color:var(--hr-text-light);">
                             @if(!empty($pvp['available']) && (($pvp['ships_destroyed'] ?? 0) > 0 || ($pvp['ships_lost'] ?? 0) > 0))
-                                <strong>{{ number_format($pvp['ships_destroyed'] ?? 0) }}</strong> kills / <strong>{{ number_format($pvp['ships_lost'] ?? 0) }}</strong> losses@if(isset($pvp['danger_ratio'])) · {{ $pvp['danger_ratio'] }}% danger@endif
+                                <strong>{{ number_format($pvp['ships_destroyed'] ?? 0) }}</strong> kills / <strong>{{ number_format($pvp['ships_lost'] ?? 0) }}</strong> losses{{ isset($pvp['danger_ratio']) ? ' · ' . $pvp['danger_ratio'] . '% danger' : '' }}
                             @elseif(!empty($pvp['available']))
                                 <span style="color:var(--hr-text-muted);">no PvP record</span>
                             @else
@@ -284,7 +284,7 @@
                         <div style="color:var(--hr-text-muted); font-size:0.74rem; text-transform:uppercase; letter-spacing:0.04em;">{{ trans('hr-manager::applications.assess_implants') }}</div>
                         <div style="color:var(--hr-text-light);">
                             @if(!empty($implants['available']))
-                                @if(($implants['count'] ?? 0) > 0)<strong>{{ $implants['count'] }}</strong> fitted@else <span style="color:var(--hr-text-muted);">clean clone</span>@endif
+                                @if(($implants['count'] ?? 0) > 0)<strong>{{ $implants['count'] }}</strong> fitted @else<span style="color:var(--hr-text-muted);">clean clone</span>@endif
                             @else
                                 <span style="color:var(--hr-text-muted);">{{ $progLabel($implants) }}</span>
                             @endif
@@ -294,7 +294,7 @@
                         <div style="color:var(--hr-text-muted); font-size:0.74rem; text-transform:uppercase; letter-spacing:0.04em;">{{ trans('hr-manager::applications.assess_corp_roles') }}</div>
                         <div style="color:var(--hr-text-light);">
                             @if(!empty($roles['available']))
-                                @if(!empty($roles['is_director']))<span class="badge badge-warning">Director</span>@elseif(!empty($roles['elevated']))<strong>{{ implode(', ', $roles['elevated']) }}</strong>@elseif(($roles['count'] ?? 0) > 0)<strong>{{ $roles['count'] }}</strong> roles@else <span style="color:var(--hr-text-muted);">none</span>@endif
+                                @if(!empty($roles['is_director']))<span class="badge badge-warning">Director</span>@elseif(!empty($roles['elevated']))<strong>{{ implode(', ', $roles['elevated']) }}</strong>@elseif(($roles['count'] ?? 0) > 0)<strong>{{ $roles['count'] }}</strong> roles @else<span style="color:var(--hr-text-muted);">none</span>@endif
                             @else
                                 <span style="color:var(--hr-text-muted);">{{ $progLabel($roles) }}</span>
                             @endif
