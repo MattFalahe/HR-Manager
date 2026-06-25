@@ -7,10 +7,24 @@ use Illuminate\Routing\Controller;
 use HrManager\Http\Controllers\Traits\ScopesCorporationAccess;
 use HrManager\Models\Application;
 use HrManager\Models\Note;
+use HrManager\Models\Setting;
 
 class NoteController extends Controller
 {
     use ScopesCorporationAccess;
+
+    /**
+     * Whether notes may be marked private ("Enable Private Notes", Features
+     * tab). When off, the per-note private flag is forced false so every note
+     * is shared with all recruiters.
+     */
+    private function privateNotesEnabled(): bool
+    {
+        return (bool) Setting::getValue(
+            'enable_private_notes',
+            config('hr-manager.features.enable_private_notes', true)
+        );
+    }
 
     public function store(Request $request)
     {
@@ -29,7 +43,7 @@ class NoteController extends Controller
             'noteable_id'   => $request->noteable_id,
             'author_id'     => auth()->user()->id,
             'content'       => $request->content,
-            'is_private'    => !empty($request->is_private),
+            'is_private'    => $this->privateNotesEnabled() && !empty($request->is_private),
         ]);
 
         return redirect()->back()->with('success', trans('hr-manager::notes.note_created'));
@@ -51,7 +65,7 @@ class NoteController extends Controller
 
         $note->update([
             'content'    => $request->content,
-            'is_private' => !empty($request->is_private),
+            'is_private' => $this->privateNotesEnabled() && !empty($request->is_private),
         ]);
 
         return redirect()->back()->with('success', trans('hr-manager::notes.note_updated'));

@@ -10,6 +10,13 @@
 @section('full')
 <div class="hr-manager-wrapper">
 
+    @if(session('success'))
+        <div class="success-box mb-3"><i class="fas fa-check-circle"></i><div>{{ session('success') }}</div></div>
+    @endif
+    @if(session('error'))
+        <div class="warning-box mb-3"><i class="fas fa-exclamation-triangle"></i><div>{{ session('error') }}</div></div>
+    @endif
+
     {{-- Header: character portrait + name + applied-to + status badge --}}
     <div class="card card-dark mb-3">
         <div class="card-body">
@@ -32,6 +39,18 @@
                     </div>
                 </div>
             </div>
+            @if($canWithdraw)
+                <div class="mt-3 pt-3" style="border-top: 1px solid var(--hr-border, rgba(255,255,255,0.08));">
+                    <form method="POST" action="{{ route('hr-manager.recruit.track.withdraw', $application->tracking_token) }}"
+                          onsubmit="return confirm(@js(trans('hr-manager::recruit.withdraw_confirm')))">
+                        @csrf
+                        <button type="submit" class="btn btn-sm btn-outline-danger btn-icon">
+                            <i class="fas fa-times-circle"></i> {{ trans('hr-manager::recruit.withdraw_button') }}
+                        </button>
+                        <small class="ml-2" style="color: var(--hr-text-muted);">{{ trans('hr-manager::recruit.withdraw_hint') }}</small>
+                    </form>
+                </div>
+            @endif
         </div>
     </div>
 

@@ -3,6 +3,7 @@
 namespace HrManager\Services;
 
 use HrManager\Models\MemberAssessment;
+use HrManager\Models\Setting;
 use Seat\Eveapi\Models\Character\CharacterAffiliation;
 
 class AssessmentService
@@ -57,13 +58,20 @@ class AssessmentService
 
         $months = config('hr-manager.assessment.mining_months', 6);
 
-        // Gather mining data
-        $mining = $this->crossPlugin->getMiningHistory($characterId, $months);
-        $taxes = $this->crossPlugin->getTaxHistory($characterId, $months);
-        $oreBreakdown = $this->crossPlugin->getOreBreakdown($characterId, $months);
+        // Feature toggles (Features tab). When off, the corresponding
+        // cross-plugin data is not gathered and every downstream column falls
+        // back to its empty/zero default (the consumers already handle
+        // ['available' => false]).
+        $miningEnabled = (bool) Setting::getValue('enable_mining_data', config('hr-manager.features.enable_mining_data', true));
+        $rattingEnabled = (bool) Setting::getValue('enable_ratting_data', config('hr-manager.features.enable_ratting_data', true));
 
-        // Gather ratting data
-        $ratting = $corporationId
+        // Gather mining data (Mining Manager integration)
+        $mining = $miningEnabled ? $this->crossPlugin->getMiningHistory($characterId, $months) : ['available' => false];
+        $taxes = $miningEnabled ? $this->crossPlugin->getTaxHistory($characterId, $months) : ['available' => false];
+        $oreBreakdown = $miningEnabled ? $this->crossPlugin->getOreBreakdown($characterId, $months) : ['available' => false];
+
+        // Gather ratting data (Corp Wallet Manager integration)
+        $ratting = ($rattingEnabled && $corporationId)
             ? $this->crossPlugin->getRattingIncome($characterId, $corporationId, $months)
             : ['available' => false];
 
@@ -72,13 +80,13 @@ class AssessmentService
         // read. All three calls return ['available' => bool, 'data' => ...];
         // when CWM/MC are absent every call reports available=false and the
         // assessment row's wallet columns stay null.
-        $walletLifetime = $corporationId
+        $walletLifetime = ($rattingEnabled && $corporationId)
             ? $this->crossPlugin->getCharacterLifetimeSummary($characterId, $corporationId)
             : ['available' => false];
-        $walletNet = $corporationId
+        $walletNet = ($rattingEnabled && $corporationId)
             ? $this->crossPlugin->getCharacterNetPosition($characterId, $corporationId, $months)
             : ['available' => false];
-        $walletTax = $corporationId
+        $walletTax = ($rattingEnabled && $corporationId)
             ? $this->crossPlugin->getCharacterTaxCompliance($characterId, $corporationId, $months)
             : ['available' => false];
 

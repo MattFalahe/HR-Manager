@@ -69,12 +69,15 @@
                         <label>{{ trans('hr-manager::notes.note_content') }}</label>
                         <textarea name="content" class="form-control" rows="4" required maxlength="5000"></textarea>
                     </div>
+                    @php $privateNotesEnabled = (bool) \HrManager\Models\Setting::getValue('enable_private_notes', config('hr-manager.features.enable_private_notes', true)); @endphp
+                    @if($privateNotesEnabled)
                     <div class="form-check">
                         <input type="checkbox" name="is_private" value="1" class="form-check-input" id="notePrivate">
                         <label class="form-check-label" for="notePrivate">
                             {{ trans('hr-manager::notes.make_private') }}
                         </label>
                     </div>
+                    @endif
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-hr-secondary" data-dismiss="modal">{{ trans('hr-manager::settings.cancel') }}</button>

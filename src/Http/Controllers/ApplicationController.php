@@ -9,6 +9,7 @@ use HrManager\Http\Controllers\Traits\ScopesCorporationAccess;
 use HrManager\Models\Application;
 use HrManager\Models\ApplicationHandler;
 use HrManager\Models\Note;
+use HrManager\Models\Setting;
 use HrManager\Services\ApplicantAccessService;
 use HrManager\Services\ApplicationService;
 use HrManager\Services\CrossPluginDataService;
@@ -47,7 +48,9 @@ class ApplicationController extends Controller
             $statusCounts[$s] = $statusCounts[$s] ?? 0;
         }
 
-        return view('hr-manager::applications.index', compact('applications', 'statusCounts'));
+        $staleDays = max(1, (int) Setting::getValue('stale_days', config('hr-manager.applications.stale_days', 7)));
+
+        return view('hr-manager::applications.index', compact('applications', 'statusCounts', 'staleDays'));
     }
 
     public function show(int $id)

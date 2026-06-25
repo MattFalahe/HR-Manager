@@ -169,45 +169,100 @@ class ApplicationService
         if ($success && $oldStatus !== null) {
             $this->safelyNotify(fn() => $this->notifications->notifyStatusChange($application, $oldStatus, $newStatus, $userId, $comment));
             $this->publishApplicationEvent($this->eventNameForStatus($newStatus), $application, $oldStatus, $comment);
-
-            // Revoke every recruiter's temporary SeAT access to the
-            // applicant's character data when the application closes
-            // (accepted / rejected / withdrawn). Each recruiter's
-            // attachment to the per-application role is detached
-            // individually; the role itself is dropped when zero
-            // recruiters remain. Other roles each recruiter has
-            // (Director, etc.) are unaffected.
-            if (in_array($newStatus, ['accepted', 'rejected', 'withdrawn'], true)) {
-                try {
-                    app(\HrManager\Services\ApplicantAccessService::class)
-                        ->revokeAllForApplication(
-                            (int) $application->id,
-                            'application_' . $newStatus
-                        );
-                } catch (\Throwable $e) {
-                    Log::warning('[HR Manager] access revoke on application close failed: ' . $e->getMessage());
-                }
-            }
-
-            // The applicant's own temporary Connector-link grant is pulled
-            // when the application closes WITHOUT a join (rejected / withdrawn).
-            // On 'accepted' we KEEP it — they still need to link before the
-            // in-game join; DetectCorpJoinsCommand revokes it once they
-            // actually appear in the corp.
-            if (in_array($newStatus, ['rejected', 'withdrawn'], true)) {
-                try {
-                    app(\HrManager\Services\ApplicantConnectorAccessService::class)
-                        ->revokeForApplication(
-                            (int) $application->id,
-                            'application_' . $newStatus
-                        );
-                } catch (\Throwable $e) {
-                    Log::warning('[HR Manager] connector access revoke on application close failed: ' . $e->getMessage());
-                }
-            }
+            $this->revokeOnApplicationClose($application, $newStatus);
         }
 
         return (bool) $success;
+    }
+
+    /**
+     * Applicant-initiated withdrawal from the public tracking page (gated by
+     * the `allow_withdrawal` setting in the controller). Mirrors the close-side
+     * effects of a recruiter status change — notify, publish
+     * hr.application.withdrawn, revoke recruiter + Connector grants — but
+     * records the APPLICANT as the actor and never auto-adds a handler.
+     *
+     * Returns false when the application can't be withdrawn (wrong state) or
+     * the applicant's SeAT account can't be resolved (changed_by is NOT NULL,
+     * so an unattributable withdrawal is refused rather than mis-recorded).
+     */
+    public function applicantWithdraw(Application $application): bool
+    {
+        // The applicant logged in to apply, so resolve their SeAT user_id from
+        // the applying character for the history actor.
+        $actorUserId = DB::table('refresh_tokens')
+            ->where('character_id', $application->character_id)
+            ->whereNull('deleted_at')
+            ->value('user_id');
+        if ($actorUserId === null) {
+            return false;
+        }
+        $actorUserId = (int) $actorUserId;
+
+        $oldStatus = null;
+        $success = DB::transaction(function () use ($application, $actorUserId, &$oldStatus) {
+            $locked = Application::lockForUpdate()->find($application->id);
+            if (!$locked || !$this->canTransition($locked->status, 'withdrawn')) {
+                return false;
+            }
+
+            $oldStatus = $locked->status;
+            $locked->update(['status' => 'withdrawn']);
+
+            ApplicationStatusHistory::create([
+                'application_id' => $locked->id,
+                'old_status'     => $oldStatus,
+                'new_status'     => 'withdrawn',
+                'changed_by'     => $actorUserId,
+                'comment'        => 'Withdrawn by the applicant.',
+            ]);
+
+            $application->setRawAttributes($locked->getAttributes(), true);
+
+            return true;
+        });
+
+        if ($success && $oldStatus !== null) {
+            $this->safelyNotify(fn() => $this->notifications->notifyStatusChange($application, $oldStatus, 'withdrawn', $actorUserId, 'Withdrawn by the applicant.'));
+            $this->publishApplicationEvent('hr.application.withdrawn', $application, $oldStatus, 'Withdrawn by the applicant.');
+            $this->revokeOnApplicationClose($application, 'withdrawn');
+        }
+
+        return (bool) $success;
+    }
+
+    /**
+     * Close-side cleanup shared by recruiter status changes and applicant
+     * self-withdrawal:
+     *  - On any close (accepted / rejected / withdrawn): pull every recruiter's
+     *    temporary SeAT access to the applicant's character data. Each
+     *    recruiter's attachment to the per-application role is detached
+     *    individually; the role itself drops when zero recruiters remain. Other
+     *    roles (Director, etc.) are unaffected.
+     *  - On a close WITHOUT a join (rejected / withdrawn): pull the applicant's
+     *    own temporary Connector-link grant. On 'accepted' it is KEPT — they
+     *    still need to link before the in-game join, and DetectCorpJoinsCommand
+     *    revokes it once they actually appear in the corp.
+     */
+    private function revokeOnApplicationClose(Application $application, string $newStatus): void
+    {
+        if (in_array($newStatus, ['accepted', 'rejected', 'withdrawn'], true)) {
+            try {
+                app(\HrManager\Services\ApplicantAccessService::class)
+                    ->revokeAllForApplication((int) $application->id, 'application_' . $newStatus);
+            } catch (\Throwable $e) {
+                Log::warning('[HR Manager] access revoke on application close failed: ' . $e->getMessage());
+            }
+        }
+
+        if (in_array($newStatus, ['rejected', 'withdrawn'], true)) {
+            try {
+                app(\HrManager\Services\ApplicantConnectorAccessService::class)
+                    ->revokeForApplication((int) $application->id, 'application_' . $newStatus);
+            } catch (\Throwable $e) {
+                Log::warning('[HR Manager] connector access revoke on application close failed: ' . $e->getMessage());
+            }
+        }
     }
 
     /**
@@ -243,13 +298,21 @@ class ApplicationService
     }
 
     /**
-     * Check if a character has a pending application.
+     * Whether a character has reached the configured limit of concurrent
+     * pending applications. Respects the `max_pending` setting (default 1, so
+     * the historical "one pending at a time" behaviour is unchanged unless an
+     * operator raises it). Used as the apply-flow gate.
      */
     public function hasPendingApplication(int $characterId): bool
     {
+        $max = max(1, (int) \HrManager\Models\Setting::getValue(
+            'max_pending',
+            config('hr-manager.applications.max_pending_per_character', 1)
+        ));
+
         return Application::where('character_id', $characterId)
             ->pending()
-            ->exists();
+            ->count() >= $max;
     }
 
     /**

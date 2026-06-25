@@ -269,6 +269,14 @@ class SettingsController extends Controller
                     Setting::setValue($key, '0', $type);
                 }
             }
+
+            // Advanced: optional SeAT Connector base-URL override (reverse-proxy
+            // setups). Empty clears it back to the env/config default.
+            Setting::setValue(
+                'seat_connector_base_url',
+                trim((string) $request->input('seat_connector_base_url', '')),
+                'string'
+            );
         }
 
         // Features tab (id=features) — feature toggles + security policy +

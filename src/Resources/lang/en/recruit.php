@@ -133,6 +133,14 @@ return [
     'track_not_joined_heading'    => 'Waiting for you to join',
     'track_not_joined_body'       => 'Your application was accepted but we have not seen you in the corporation yet. Apply in-game from the corporation finder to join.',
 
+    // Applicant self-withdrawal (shown only when the corp allows it and the
+    // application is still open).
+    'withdraw_button'  => 'Withdraw application',
+    'withdraw_hint'    => 'Changed your mind? You can withdraw while your application is still open.',
+    'withdraw_confirm' => 'Withdraw your application? This cannot be undone.',
+    'withdraw_done'    => 'Your application has been withdrawn.',
+    'withdraw_failed'  => 'We could not withdraw this application. It may already be closed — please contact a recruiter.',
+
     // Surfacing of the tracking link on the post-submit confirmation page
     'track_your_application'      => 'Track your application',
     'track_your_application_help' => 'Bookmark this link to check your status anytime, without logging in. The link is private to you.',

@@ -14,9 +14,30 @@ class NotificationService
 {
     private WebhookService $webhookService;
 
+    /** Memoized master webhook toggle (resolved once per request). */
+    private ?bool $webhooksEnabled = null;
+
     public function __construct(WebhookService $webhookService)
     {
         $this->webhookService = $webhookService;
+    }
+
+    /**
+     * The global "Enable Webhooks" master switch (Features tab). When off, no
+     * automatic notification is sent regardless of per-webhook config. Manual
+     * "Test" sends bypass this (they call WebhookService directly), so an
+     * operator can still verify a URL while notifications are paused.
+     */
+    private function webhooksEnabled(): bool
+    {
+        if ($this->webhooksEnabled === null) {
+            $this->webhooksEnabled = (bool) \HrManager\Models\Setting::getValue(
+                'enable_webhooks',
+                config('hr-manager.features.enable_webhooks', true)
+            );
+        }
+
+        return $this->webhooksEnabled;
     }
 
     public function notifyApplicationSubmitted(Application $application): void
@@ -661,6 +682,13 @@ class NotificationService
 
     private function send(WebhookConfiguration $webhook, string $event, array $data): void
     {
+        // Master switch: when webhooks are disabled, send nothing. Every
+        // notify* method funnels through here, so this single guard covers
+        // them all.
+        if (!$this->webhooksEnabled()) {
+            return;
+        }
+
         try {
             if ($webhook->type === 'discord') {
                 $embed = $this->webhookService->buildApplicationEmbed($event, $data);

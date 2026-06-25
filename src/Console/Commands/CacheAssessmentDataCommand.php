@@ -4,6 +4,7 @@ namespace HrManager\Console\Commands;
 
 use Illuminate\Console\Command;
 use HrManager\Models\MemberAssessment;
+use HrManager\Models\Setting;
 
 class CacheAssessmentDataCommand extends Command
 {
@@ -30,8 +31,9 @@ class CacheAssessmentDataCommand extends Command
 
             if (!$force) {
                 $query->where(function ($q) {
+                    $cacheMinutes = (int) Setting::getValue('cache_duration', config('hr-manager.assessment.cache_duration', 60));
                     $q->whereNull('cached_at')
-                      ->orWhere('cached_at', '<', now()->subMinutes(config('hr-manager.assessment.cache_duration', 60)));
+                      ->orWhere('cached_at', '<', now()->subMinutes($cacheMinutes));
                 });
             }
 

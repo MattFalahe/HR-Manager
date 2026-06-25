@@ -83,6 +83,12 @@
                                         <span class="badge badge-hr {{ $app->status_badge_class }}">
                                             {{ $app->status_label }}
                                         </span>
+                                        @if($app->isStale($staleDays))
+                                            <span class="badge ml-1" style="background: var(--hr-warning, #ffc107); color: #1a1a1a; font-weight: 600;"
+                                                  title="{{ trans('hr-manager::applications.stale_badge_title', ['days' => $staleDays]) }}">
+                                                <i class="fas fa-hourglass-half"></i> {{ trans('hr-manager::applications.stale_badge') }}
+                                            </span>
+                                        @endif
                                     </td>
                                     <td>
                                         @php

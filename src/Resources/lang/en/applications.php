@@ -39,6 +39,8 @@ return [
     'corporation'       => 'Corporation',
     'actions'           => 'Actions',
     'view'              => 'View',
+    'stale_badge'       => 'Stale',
+    'stale_badge_title' => 'Awaiting review for over :days days.',
     'no_applications'   => 'No applications found.',
 
     // Statuses

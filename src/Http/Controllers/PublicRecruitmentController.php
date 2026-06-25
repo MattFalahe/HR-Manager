@@ -446,7 +446,11 @@ class PublicRecruitmentController extends Controller
      */
     private function connectorIdentitiesUrl(): string
     {
-        $configured = trim((string) config('hr-manager.recruitment.seat_connector_base_url', ''));
+        // Operator-set override (General tab) wins over the env/config default.
+        $configured = trim((string) \HrManager\Models\Setting::getValue(
+            'seat_connector_base_url',
+            config('hr-manager.recruitment.seat_connector_base_url', '')
+        ));
         if ($configured !== '') {
             return rtrim($configured, '/') . '/seat-connector/identities';
         }

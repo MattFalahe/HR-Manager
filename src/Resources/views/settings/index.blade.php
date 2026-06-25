@@ -200,6 +200,15 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="form-group">
+                                    <label>{{ trans('hr-manager::settings.seat_connector_base_url') }}</label>
+                                    <input type="url" name="seat_connector_base_url" class="form-control" value="{{ $settings['seat_connector_base_url'] }}" placeholder="https://seat.example.com" maxlength="255">
+                                    <small class="form-text" style="color: var(--hr-text-muted);">{{ trans('hr-manager::settings.seat_connector_base_url_help') }}</small>
+                                </div>
+                            </div>
+                        </div>
                         <button type="submit" class="btn btn-hr-primary btn-icon">
                             <i class="fas fa-save"></i> {{ trans('hr-manager::settings.save_settings') }}
                         </button>

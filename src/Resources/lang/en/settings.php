@@ -60,6 +60,8 @@ return [
     'allow_withdrawal_help' => 'Allow applicants to withdraw their own application.',
     'cache_duration'    => 'Assessment Cache Duration (minutes)',
     'cache_duration_help' => 'How long to cache member assessment data before refreshing.',
+    'seat_connector_base_url'      => 'SeAT Connector Base URL (advanced)',
+    'seat_connector_base_url_help' => 'Optional. Override the base URL used for the applicant SeAT Connector link (e.g. behind a reverse proxy). Leave blank to use this install\'s own address.',
 
     // Features
     'features'              => 'Feature Toggles',

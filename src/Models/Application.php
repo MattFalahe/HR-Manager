@@ -138,6 +138,18 @@ class Application extends Model
         return $query->where('status', $status);
     }
 
+    /**
+     * A still-open application that has gone unactioned for longer than the
+     * configured `stale_days` window. Drives the "Stale" badge on the
+     * applications list so a review backlog is visible at a glance.
+     */
+    public function isStale(int $days): bool
+    {
+        return in_array($this->status, ['applied', 'under_review', 'interview'], true)
+            && $this->submitted_at !== null
+            && $this->submitted_at->lt(now()->subDays(max(1, $days)));
+    }
+
     public function isPending(): bool
     {
         return in_array($this->status, ['applied', 'under_review', 'interview']);

@@ -31,6 +31,12 @@ Route::group([
         'as'   => 'hr-manager.recruit.track',
         'uses' => 'PublicApplicationTrackingController@track',
     ]);
+    // Applicant self-withdrawal from the tracking page (gated by the
+    // allow_withdrawal setting). Token-authenticated, no SeAT login.
+    Route::post('/track/{token}/withdraw', [
+        'as'   => 'hr-manager.recruit.track.withdraw',
+        'uses' => 'PublicApplicationTrackingController@withdraw',
+    ]);
 
     Route::get('/{ticker}/{slug}', [
         'as'   => 'hr-manager.recruit.show',
