@@ -58,6 +58,7 @@ What leadership sees while doing the actual work of keeping the corp alive.
 - **Corp-join detection**: scans `character_corporation_histories` every 30 minutes for accepted applicants who actually joined. Surfaces "accepted but never joined" backlog on Corp Health
 - **Token tracking + loss alerts**: the Members roster shows who currently holds a working SeAT token, and a 10-minute cron watches for tracked members whose refresh token has gone — delinked, or rejected by CCP after a password change / app de-authorization (SeAT soft-deletes the token in both cases). It fires a dedicated **SeAT Token Revoked** webhook category to your security channel, records a critical history event, and can optionally auto-schedule a security purge (Settings → security policy)
 - **Token + scope compliance**: pick a SeAT SSO scope profile as your corp requirement (Settings → SSO & Scopes → Member token requirement) and HR grades every member token against it — **Token OK / Missing scopes / Token lost / Never linked** — as a badge on the Members roster (insufficient ones name the exact scopes they lack), a **Token & scope coverage** card on Corp Health (counts, coverage bar, lost-this-week, drill-down lists), and an opt-in **weekly digest** to a webhook (`hr-manager:token-coverage-digest`). Leave the profile as None to check token existence only. Reads `refresh_tokens.scopes` against the global `sso_scopes` profiles — no ESI, no changes to SeAT
+- **Corp membership-change alerts**: a 30-minute roster diff notifies on **joins** (classified — an alt of a current member names the main; an applicant is tagged "applied") and **leaves** (noting whether the person still has another character in the corp), plus a **joined-without-a-valid-application** security flag for newcomers who bypassed recruitment. Forward-only: the first scan of each corp seeds the roster silently, so existing members are never announced, and three separate webhook categories let you route the security flag to a leadership channel
 
 ---
 
@@ -226,6 +227,7 @@ HR also **subscribes** to:
 | `hr-manager:classify-players` | nightly 02:00 | Run the Corp Health classifier across every active player |
 | `hr-manager:dispatch-purge-reminders` | every 12 hours | Fire T-7 / T-3 / T-48 / T-0 reminders for scheduled purges |
 | `hr-manager:detect-corp-joins` | every 30 minutes | Watch SeAT histories for accepted applicants who actually joined the corp |
+| `hr-manager:detect-membership-changes` | every 30 minutes | Diff the corp roster for joins / leaves and notify (classified: alt of a member / applied / no application). Forward-only — first run per corp seeds silently |
 | `hr-manager:scan-watchlist` | every 15 minutes | Scheduled blacklist match check + intel scope-corp pass |
 | `hr-manager:detect-token-loss` | every 10 minutes | Surface members whose ESI refresh token has lapsed |
 | `hr-manager:sweep-access-grants` | nightly 04:00 | Revoke expired recruiter + applicant access grants |

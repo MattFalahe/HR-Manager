@@ -86,7 +86,7 @@ First release. HR Manager is two faces in one plugin: a **public recruitment fun
 
 ### 🔔 Notifications & routing
 
-- Discord + Slack webhooks, editable inline, each row showing the categories it fires and an Enabled toggle. Categories cover the application lifecycle, classifier flags (inactive-director / dead-weight), purge reminders, player-status changes (LOA / purge / cleared, fired inline), SeAT token revocations (a dedicated security category), and an opt-in weekly token-coverage digest.
+- Discord + Slack webhooks, editable inline, each row showing the categories it fires and an Enabled toggle. Categories cover the application lifecycle, classifier flags (inactive-director / dead-weight), purge reminders, player-status changes (LOA / purge / cleared, fired inline), SeAT token revocations (a dedicated security category), an opt-in weekly token-coverage digest, and **corp membership changes** — a member joined (naming the account main; an alt of a current member is called out as such), a member left, and a **joined-without-a-valid-application** security flag for newcomers who bypassed recruitment.
 - Discord role-mention picker with an AJAX-lazy-loaded, cached, multi-source role list (Broadcast / Connector / legacy warlof), per-source colour badges, and search.
 - **Notification Routing Map** (Settings): a read-only view of which webhooks fire for each category and which role each pings.
 - HTTPS-only webhook URLs with an end-anchored host allowlist (`discord.com` / `hooks.slack.com` / `slack.com`), no IP literals, a port 443 lock, and a 2-retry policy with backoff.
@@ -143,6 +143,7 @@ Auto-registered via the schedule seeder:
 | `hr-manager:cache-assessments` | Refresh the cached cross-plugin assessment signals |
 | `hr-manager:dispatch-purge-reminders` | Fire the T-7 / T-3 / T-48 / T-0 purge reminders |
 | `hr-manager:detect-corp-joins` | Detect accepted applicants who actually joined the corp |
+| `hr-manager:detect-membership-changes` | Diff the corp roster for joins / leaves and notify (forward-only; first run seeds silently) |
 | `hr-manager:scan-watchlist` | Scheduled blacklist match check + intel scope-corp pass |
 | `hr-manager:sweep-access-grants` | Revoke expired recruiter + applicant access grants |
 | `hr-manager:detect-token-loss` | Surface members whose ESI token has lapsed |
