@@ -190,6 +190,14 @@ class SettingsController extends Controller
             'all_squads' => $squadSvc->allSquads(),
         ];
 
+        // Buyback contribution — every buyback-running corp HR has seen, with
+        // its observed BB target model + the per-corp valuation policy (saved
+        // row or smart default). Empty when BB / MC are absent, which hides the
+        // tab. The $corporations list above feeds the "attributes to" picker.
+        $buybackSvc        = app(\HrManager\Services\BuybackContributionService::class);
+        $buybackProgrammes = $buybackSvc->isAvailable() ? $buybackSvc->detectedProgrammes() : [];
+        $buybackTiers      = \HrManager\Models\BuybackPolicy::TIERS;
+
         return view('hr-manager::settings.index', compact(
             'settings', 'webhooks', 'corporations',
             'discordRoles', 'discordRolesProvider', 'discordRoleMap',
@@ -199,8 +207,41 @@ class SettingsController extends Controller
             'ssoProfiles', 'ssoSelectedProfile', 'ssoAnalysis', 'ssoScopesLost',
             'allianceTaxExemptText', 'allianceTaxExemptNames',
             'assessmentCriteria', 'assessmentDefaults', 'standingsSettings', 'purgeSquads',
-            'tokenRequiredProfile', 'tokenReqStale', 'tokenRequiredScopes'
+            'tokenRequiredProfile', 'tokenReqStale', 'tokenRequiredScopes',
+            'buybackProgrammes', 'buybackTiers'
         ));
+    }
+
+    /**
+     * Save a per-corp buyback contribution policy (Buyback Contribution tab).
+     * Keyed on the buyback-running corporation_id; an empty attributes-to means
+     * "self" (the running corp).
+     */
+    public function updateBuybackPolicy(Request $request)
+    {
+        $request->validate([
+            'corporation_id'            => 'required|integer',
+            'counted'                   => 'nullable|boolean',
+            'tier'                      => 'required|in:' . implode(',', \HrManager\Models\BuybackPolicy::TIERS),
+            'weight'                    => 'required|numeric|min:0|max:100',
+            'attributed_corporation_id' => 'nullable|integer',
+        ]);
+
+        \HrManager\Models\BuybackPolicy::updateOrCreate(
+            ['corporation_id' => (int) $request->corporation_id],
+            [
+                'counted'                   => $request->boolean('counted'),
+                'tier'                      => $request->tier,
+                'weight'                    => (float) $request->weight,
+                'attributed_corporation_id' => $request->filled('attributed_corporation_id')
+                    ? (int) $request->attributed_corporation_id
+                    : null,
+            ]
+        );
+
+        return redirect()
+            ->to(route('hr-manager.settings.index') . '#buyback')
+            ->with('success', trans('hr-manager::settings.buyback_policy_saved'));
     }
 
     public function update(Request $request)

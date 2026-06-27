@@ -147,6 +147,13 @@
                                 <i class="fas fa-project-diagram"></i> {{ trans('hr-manager::settings.routing_map_tab') }}
                             </a>
                         </li>
+                        @if(!empty($buybackProgrammes))
+                        <li class="nav-item">
+                            <a class="nav-link" data-toggle="tab" href="#buyback">
+                                <i class="fas fa-balance-scale"></i> {{ trans('hr-manager::settings.buyback_tab') }}
+                            </a>
+                        </li>
+                        @endif
                     </ul>
                 </div>
             </div>
@@ -1324,6 +1331,86 @@
                     })();
                     </script>
                 </div>
+
+                {{-- Buyback Contribution — per-corp valuation policy. Only
+                     rendered when HR has seen a buyback programme. --}}
+                @if(!empty($buybackProgrammes))
+                <div class="tab-pane" id="buyback">
+                    <h4 class="mb-1">{{ trans('hr-manager::settings.buyback_tab') }}</h4>
+                    <p class="text-muted" style="font-size: 0.85rem;">{{ trans('hr-manager::settings.buyback_intro') }}</p>
+
+                    @foreach($buybackProgrammes as $prog)
+                        @php
+                            $pol = $prog['policy'];
+                            $attr = (int) $pol['attributed_corporation_id'];
+                            $isSelf = $attr === (int) $prog['corporation_id'];
+                            $tt = $prog['observed_target_type'];
+                            $targetCorpName = $prog['target_corporation_id']
+                                ? ($corpNameLookup[$prog['target_corporation_id']] ?? ('Corp #' . $prog['target_corporation_id']))
+                                : null;
+                            $targetLabel = $tt === 'corp'
+                                ? trans('hr-manager::settings.buyback_target_corp', ['corp' => $targetCorpName ?? '?'])
+                                : ($tt === 'player'
+                                    ? trans('hr-manager::settings.buyback_target_player')
+                                    : ($tt === 'my_corp'
+                                        ? trans('hr-manager::settings.buyback_target_my_corp')
+                                        : trans('hr-manager::settings.buyback_target_unknown')));
+                        @endphp
+                        <div class="card card-dark mb-2">
+                            <div class="card-body" style="padding: 0.8rem 1rem;">
+                                <form method="POST" action="{{ route('hr-manager.settings.buyback.policy') }}">
+                                    @csrf
+                                    <input type="hidden" name="corporation_id" value="{{ $prog['corporation_id'] }}">
+
+                                    <div class="d-flex flex-wrap align-items-center" style="gap: 8px; margin-bottom: 8px;">
+                                        <strong style="color: var(--hr-text-white);">{{ $prog['corporation_name'] }}</strong>
+                                        <span class="badge badge-secondary">{{ $targetLabel }}</span>
+                                        @if($pol['is_default'])
+                                            <span class="badge" style="background: var(--hr-warning, #ffc107); color: #1a1a1a;">{{ trans('hr-manager::settings.buyback_default_review') }}</span>
+                                        @endif
+                                        <span class="text-muted" style="font-size: 0.78rem;">
+                                            {{ trans('hr-manager::settings.buyback_counts', ['o' => $prog['offers_count'], 'c' => $prog['completed_count']]) }}
+                                        </span>
+                                    </div>
+
+                                    <div class="form-row align-items-end">
+                                        <div class="col-auto">
+                                            <div class="form-check mb-1">
+                                                <input type="checkbox" class="form-check-input" name="counted" value="1" id="bbcount{{ $prog['corporation_id'] }}" {{ $pol['counted'] ? 'checked' : '' }}>
+                                                <label class="form-check-label" for="bbcount{{ $prog['corporation_id'] }}">{{ trans('hr-manager::settings.buyback_counted') }}</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label style="font-size: 0.74rem;">{{ trans('hr-manager::settings.buyback_tier') }}</label>
+                                            <select name="tier" class="form-control form-control-sm">
+                                                @foreach($buybackTiers as $t)
+                                                    <option value="{{ $t }}" {{ $pol['tier'] === $t ? 'selected' : '' }}>{{ trans('hr-manager::settings.buyback_tier_' . $t) }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label style="font-size: 0.74rem;">{{ trans('hr-manager::settings.buyback_weight') }}</label>
+                                            <input type="number" step="0.05" min="0" max="100" name="weight" class="form-control form-control-sm" value="{{ rtrim(rtrim(number_format($pol['weight'], 2, '.', ''), '0'), '.') }}">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label style="font-size: 0.74rem;">{{ trans('hr-manager::settings.buyback_attributes_to') }}</label>
+                                            <select name="attributed_corporation_id" class="form-control form-control-sm">
+                                                <option value="" {{ $isSelf ? 'selected' : '' }}>{{ trans('hr-manager::settings.buyback_self', ['corp' => $prog['corporation_name']]) }}</option>
+                                                @foreach($corporations as $c)
+                                                    <option value="{{ $c->corporation_id }}" {{ (!$isSelf && $attr === (int) $c->corporation_id) ? 'selected' : '' }}>{{ $c->name }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="col-auto">
+                                            <button type="submit" class="btn btn-sm btn-hr-primary btn-icon"><i class="fas fa-save"></i> {{ trans('hr-manager::settings.save_settings') }}</button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+                @endif
 
                     </div>{{-- /.tab-content --}}
                 </div>{{-- /.card-body --}}

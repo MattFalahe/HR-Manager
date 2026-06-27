@@ -75,6 +75,17 @@ return [
     'bp_last_request'   => 'Last request',
     'bp_footnote'       => 'Blueprint request engagement from Blueprint Manager (via Manager Core), aggregated across this player\'s characters. An active, fulfilled requester is an engaged builder; a high rejection rate is a behaviour flag.',
 
+    // Buyback contribution panel
+    'bb_heading'        => 'Buyback contribution',
+    'bb_completed'      => 'Completed',
+    'bb_raw_value'      => 'ISK sold',
+    'bb_weighted_value' => 'Weighted',
+    'bb_offers'         => 'Offers',
+    'bb_by_tier'        => 'By tier',
+    'bb_credited'       => 'Credited to',
+    'bb_last'           => 'Last activity',
+    'bb_footnote'       => 'Buyback offers + completed contracts from Buyback Manager (via Manager Core), aggregated across this player\'s characters. Each completion is valued through its corp\'s contribution policy (Settings → Buyback Contribution); weighted ISK is what counts toward contribution.',
+
     'fc_heading'       => 'FC activity',
     'fc_window'        => 'last 6 months',
     'fc_total'         => 'broadcasts led',

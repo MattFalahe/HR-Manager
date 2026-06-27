@@ -154,6 +154,12 @@ class PlayerController extends Controller
         $blueprintActivity = app(\HrManager\Services\BlueprintActivityService::class)
             ->getForPlayer($characterIds, $corporationId);
 
+        // Buyback contribution (optional — only when MC + Buyback Manager are
+        // installed). Aggregated across the player's characters and valued
+        // through the per-corp policy.
+        $buyback = app(\HrManager\Services\BuybackContributionService::class)
+            ->forCharacters($characterIds);
+
         // Access depth: in-game corp roles/titles + SeAT account access, with
         // the sensitive access flagged and off-balance indicators surfaced.
         $accessDepth = app(\HrManager\Services\AccessDepthService::class)
@@ -177,7 +183,8 @@ class PlayerController extends Controller
             'corporations', 'tierAuto', 'titleSnapshot',
             'identity', 'identityCharNames', 'roleProfiles', 'fcActivity',
             'blueprintActivity', 'accessDepth', 'discord', 'squads',
-            'noteAuthorNames', 'noteAuthorAdmins', 'historyActorNames'
+            'noteAuthorNames', 'noteAuthorAdmins', 'historyActorNames',
+            'buyback'
         ));
     }
 

@@ -298,4 +298,23 @@ return [
     'purge_squads_excl_intro'    => 'Squads HR will never remove, even during a purge. Use this for keep-in-touch squads such as Former Member or Alliance access.',
     'purge_squads_excl_help'     => 'Checked squads are protected. Only manual and hidden squads are listed here; auto squads are managed by SeAT and never removed.',
     'purge_squads_excl_empty'    => 'No manual or hidden squads on this install yet. Auto squads are never removed, so there is nothing to exclude.',
+
+    // Buyback Contribution tab
+    'buyback_tab'             => 'Buyback Contribution',
+    'buyback_intro'           => 'How each corporation\'s buyback programme counts toward member contribution. Tier and weight are applied on read, so a change re-values history immediately. For an alt or holding corp whose buyback supports your main, set "Attributes to" to the main corp.',
+    'buyback_policy_saved'    => 'Buyback contribution policy saved.',
+    'buyback_counted'         => 'Counted',
+    'buyback_tier'            => 'Tier',
+    'buyback_weight'          => 'Weight',
+    'buyback_attributes_to'   => 'Attributes to',
+    'buyback_tier_direct'     => 'Direct corp',
+    'buyback_tier_community'  => 'Community',
+    'buyback_tier_personal'   => 'Personal',
+    'buyback_target_my_corp'  => 'Targets: own corp',
+    'buyback_target_corp'     => 'Targets: :corp',
+    'buyback_target_player'   => 'Targets: a designated character',
+    'buyback_target_unknown'  => 'Target: unknown',
+    'buyback_default_review'  => 'Auto-default — review',
+    'buyback_self'            => ':corp (self)',
+    'buyback_counts'          => 'offers: :o · completed: :c',
 ];

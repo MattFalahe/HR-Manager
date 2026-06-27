@@ -437,6 +437,60 @@
         </div>
     @endif
 
+    {{-- Buyback contribution — offers + completed contracts valued through the
+         per-corp policy, aggregated across alts. Self-hides when BB/MC absent. --}}
+    @if(!empty($buyback['available']) && !empty($buyback['has_data']))
+        @php
+            $bb = $buyback;
+            $bbLast = !empty($bb['last_activity']) ? \Illuminate\Support\Carbon::parse($bb['last_activity']) : null;
+            $bbIsk = function ($v) {
+                $v = (float) $v;
+                if ($v >= 1e9) return number_format($v / 1e9, 2) . 'B';
+                if ($v >= 1e6) return number_format($v / 1e6, 1) . 'M';
+                if ($v >= 1e3) return number_format($v / 1e3, 0) . 'K';
+                return number_format($v, 0);
+            };
+            $bbTiers = array_filter($bb['by_tier'] ?? [], fn ($v) => $v > 0);
+        @endphp
+        <div class="card card-dark mb-3" style="border-left: 4px solid #14b8a6;">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-balance-scale" style="color: #14b8a6;"></i> {{ trans('hr-manager::players.bb_heading') }}</h3>
+            </div>
+            <div class="card-body">
+                <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                    <div class="impact-stat"><div class="impact-val" style="color: var(--hr-text-white);">{{ $bb['completed_count'] }}</div><div class="impact-lbl">{{ trans('hr-manager::players.bb_completed') }}</div></div>
+                    <div class="impact-stat"><div class="impact-val" style="color: #5eead4;">{{ $bbIsk($bb['raw_value']) }}</div><div class="impact-lbl">{{ trans('hr-manager::players.bb_raw_value') }}</div></div>
+                    <div class="impact-stat"><div class="impact-val" style="color: var(--hr-success, #28a745);">{{ $bbIsk($bb['weighted_value']) }}</div><div class="impact-lbl">{{ trans('hr-manager::players.bb_weighted_value') }}</div></div>
+                    <div class="impact-stat"><div class="impact-val" style="color: var(--hr-text-muted);">{{ $bb['offers_count'] }}</div><div class="impact-lbl">{{ trans('hr-manager::players.bb_offers') }}</div></div>
+                </div>
+                @if(!empty($bbTiers))
+                    <div class="mt-3">
+                        <small style="color: var(--hr-text-muted); text-transform: uppercase; letter-spacing: 0.4px; font-size: 0.7rem;">{{ trans('hr-manager::players.bb_by_tier') }}</small>
+                        <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px;">
+                            @foreach($bbTiers as $bbTier => $bbVal)
+                                <span class="badge" style="background: rgba(20,184,166,0.18); color: #5eead4; border: 1px solid rgba(20,184,166,0.4);">{{ trans('hr-manager::settings.buyback_tier_' . $bbTier) }}: {{ $bbIsk($bbVal) }}</span>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+                @if(!empty($bb['credited_corps']) && count($bb['credited_corps']) > 1)
+                    <div class="mt-2">
+                        <small style="color: var(--hr-text-muted); text-transform: uppercase; letter-spacing: 0.4px; font-size: 0.7rem;">{{ trans('hr-manager::players.bb_credited') }}</small>
+                        <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px;">
+                            @foreach($bb['credited_corps'] as $cc)
+                                <span class="badge" style="background: rgba(255,255,255,0.05); color: var(--hr-text-muted); border: 1px solid rgba(255,255,255,0.1);">{{ $cc['corporation_name'] }}: {{ $bbIsk($cc['weighted_value']) }}</span>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+                @if($bbLast)
+                    <small class="d-block mt-2" style="color: var(--hr-text-muted); font-size: 0.78rem;">{{ trans('hr-manager::players.bb_last') }}: {{ $bbLast->diffForHumans() }}</small>
+                @endif
+                <small class="d-block mt-2 text-center" style="color: var(--hr-text-muted); font-size: 0.75rem;"><i class="fas fa-info-circle"></i> {{ trans('hr-manager::players.bb_footnote') }}</small>
+            </div>
+        </div>
+    @endif
+
     {{-- Access depth — how deep this person reaches, in-game and in SeAT.
          In-game corp roles/titles (critical roles flagged) + SeAT account
          access (superuser, roles, permission depth), with off-balance

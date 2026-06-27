@@ -51,6 +51,7 @@ class HrManagerServiceProvider extends AbstractSeatPlugin
                 Console\Commands\ScanWatchlistCommand::class,
                 Console\Commands\SweepExpiredAccessGrantsCommand::class,
                 Console\Commands\TokenCoverageDigestCommand::class,
+                Console\Commands\BackfillBuybackCommand::class,
             ]);
         }
 
@@ -257,6 +258,18 @@ class HrManagerServiceProvider extends AbstractSeatPlugin
                 fn ($eventName, $publisher, array $payload) => app(\HrManager\Services\StructureIncidentService::class)->record($eventName, $publisher, $payload)
             );
 
+            // Buyback Manager activity. Two handlers accumulate offers
+            // (engagement) + completed contracts (realized contribution) into
+            // hr_manager_buyback_activity; tier + corp attribution are resolved
+            // on read from the per-corp policy. 3-arg signature. HR-side only;
+            // BB already publishes these.
+            $bridge->registerCapability('hr-manager', 'hr.onBuybackOffer',
+                fn ($eventName, $publisher, array $payload) => app(\HrManager\Services\BuybackEventHandler::class)->recordOffer($payload)
+            );
+            $bridge->registerCapability('hr-manager', 'hr.onBuybackCompleted',
+                fn ($eventName, $publisher, array $payload) => app(\HrManager\Services\BuybackEventHandler::class)->recordCompletion($payload)
+            );
+
             // Persistent EventBus subscription. Re-subscribes on every boot via
             // MC's updateOrCreate (subscriber_plugin, event_pattern, handler).
             if (class_exists('ManagerCore\Services\EventBus')) {
@@ -339,6 +352,21 @@ class HrManagerServiceProvider extends AbstractSeatPlugin
                     ['queued' => false, 'priority' => 0]
                 );
 
+                // Buyback Manager: offers (engagement) + completed contracts
+                // (realized contribution). Two exact subscriptions, two handlers.
+                $eventBus->subscribe(
+                    'hr-manager',
+                    'buyback.offer.published',
+                    'hr.onBuybackOffer',
+                    ['queued' => false, 'priority' => 0]
+                );
+                $eventBus->subscribe(
+                    'hr-manager',
+                    'buyback.contract.completed',
+                    'hr.onBuybackCompleted',
+                    ['queued' => false, 'priority' => 0]
+                );
+
                 // ===========================================================
                 // TODO: Future EventBus wiring candidates
                 // ===========================================================
@@ -382,10 +410,11 @@ class HrManagerServiceProvider extends AbstractSeatPlugin
                 // (FC activity) and pings.formup.scheduled (FC planning /
                 // organizer) are wired above into FcActivityService.
                 //
-                // From Buyback Manager (buyback.completed):
-                //   - buyback.completed
-                //       → Member used the buyback service; economic
-                //         participation indicator
+                // From Buyback Manager: DONE — buyback.offer.published +
+                // buyback.contract.completed are subscribed above into
+                // BuybackEventHandler, valued through the per-corp policy
+                // (BuybackContributionService) with alt/holding-corp -> main-corp
+                // attribution.
                 //
                 // Implementation pattern (mirror the existing subscriptions
                 // above): one bridge capability registration via

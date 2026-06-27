@@ -273,6 +273,9 @@ Route::group([
         Route::put('/tiers/{id}',      ['as' => 'hr-manager.settings.tiers.update',    'uses' => 'SettingsController@updateTierMapping']);
         Route::delete('/tiers/{id}',   ['as' => 'hr-manager.settings.tiers.destroy',   'uses' => 'SettingsController@deleteTierMapping']);
         Route::post('/tiers/defaults', ['as' => 'hr-manager.settings.tiers.defaults',  'uses' => 'SettingsController@updateTierDefaults']);
+
+        // Buyback contribution per-corp policy
+        Route::post('/buyback-policy', ['as' => 'hr-manager.settings.buyback.policy', 'uses' => 'SettingsController@updateBuybackPolicy']);
     });
 
     Route::group(['middleware' => 'can:hr-manager.admin'], function () {
