@@ -75,12 +75,13 @@ First release. HR Manager is two faces in one plugin: a **public recruitment fun
 - **Blueprint Manager**: a Blueprint Activity panel on the player profile and a Blueprint Engagement card on Corp Health, with the signal feeding the Industrialist role badge and a positive engagement modifier.
 - **SeAT Broadcast**: an FC Activity profile (broadcasts led, cadence, active span) plus a planning block on the player profile, and the fleet-commander roster + Organizers on Corp Health.
 - **Structure Manager**: per-structure doctrine compliance on a Corp Health tab (each Upwell structure verdicted against the alliance fit, with a slot-by-slot diff and Copy / Appraise buttons). Structure Manager owns the doctrines and the compute; HR renders the report.
+- **Buyback Manager**: buyback engagement (offers) + realized contribution (completed contracts) on a Buyback panel on the player profile and a Corp Health → Economy card (ISK credited + top contributors). Valued through a **per-corp contribution policy** (Settings → Buyback Contribution): each buyback-running corp is **Direct corp / Community / Personal** with a weight, and an alt or holding corp's buyback can be **credited to your main corp** as direct support. The policy default is read from Buyback Manager's own target model; tier + attribution resolve on read, so editing a policy re-values history. `hr-manager:backfill-buyback` seeds history once.
 
 ### 🔌 Cross-plugin integration
 
 - HR works **standalone**; Manager Core is `suggest`-only, with every cross-plugin call guarded by `class_exists`.
 - **Publishes** (via MC's EventBus): `hr.application.*` (submitted / accepted / rejected / withdrawn / status_changed / joined_corp), `hr.player.*` (the flagged / recovered / milestone / director ladder), and `hr.purge.*` (reminders + executed).
-- **Subscribes to**: `mining.*` (Mining Manager), `member.contribution.*` + `member.tax.compliance_dropped` + `wallet.unusual_recipient_detected` (Corp Wallet Manager), `blueprint.request.*` (Blueprint Manager), and `pings.broadcast.sent` + `pings.formup.scheduled` (SeAT Broadcast).
+- **Subscribes to**: `mining.*` (Mining Manager), `member.contribution.*` + `member.tax.compliance_dropped` + `wallet.unusual_recipient_detected` (Corp Wallet Manager), `blueprint.request.*` (Blueprint Manager), `pings.broadcast.sent` + `pings.formup.scheduled` (SeAT Broadcast), and `buyback.offer.published` + `buyback.contract.completed` (Buyback Manager).
 - **Exposes capabilities**: `hr.getAssessment(characterId, callerCorpId)` and `hr.getApplicationStatus(characterId, callerCorpId)`, both corp-scoped to prevent cross-corp leaks. Consumes Structure Manager's `compliance.getForCorporation` and Blueprint Manager's stat capabilities through MC.
 
 ### 🔔 Notifications & routing
@@ -130,6 +131,7 @@ All tables carry the `hr_manager_` prefix and are created by the bundled migrati
 | Watchlist + intel | `watchlist`, `intel_notes` |
 | Access grants | `recruiter_access_grants`, `applicant_connector_grants` |
 | Recruitment | `recruitment_landings`, `recruitment_views` |
+| Buyback contribution | `buyback_activity`, `buyback_policies` |
 
 ### ⏱️ Scheduled jobs + commands
 
@@ -146,6 +148,8 @@ Auto-registered via the schedule seeder:
 | `hr-manager:detect-token-loss` | Surface members whose ESI token has lapsed |
 | `hr-manager:cleanup` | Permanently delete long-soft-deleted applications + orphan notes |
 | `hr-manager:token-coverage-digest` | Weekly opt-in token + scope coverage summary per corp to subscribing webhooks |
+
+Plus one manual (not scheduled) command: **`hr-manager:backfill-buyback`** — a one-time seed of historical Buyback Manager offers + completed contracts, run by hand after installing the integration so the panels have history immediately (live data flows via the EventBus thereafter).
 | `hr-manager:diagnose` | CLI counterpart of the diagnostic dashboard |
 
 ### 🔧 Install
