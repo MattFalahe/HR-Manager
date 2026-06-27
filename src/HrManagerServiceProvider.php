@@ -52,6 +52,7 @@ class HrManagerServiceProvider extends AbstractSeatPlugin
                 Console\Commands\SweepExpiredAccessGrantsCommand::class,
                 Console\Commands\TokenCoverageDigestCommand::class,
                 Console\Commands\BackfillBuybackCommand::class,
+                Console\Commands\InitCommand::class,
             ]);
         }
 
