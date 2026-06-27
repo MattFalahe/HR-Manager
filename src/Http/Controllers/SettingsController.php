@@ -97,6 +97,14 @@ class SettingsController extends Controller
                     ['key' => 'notify_token_coverage',        'label' => trans('hr-manager::settings.notify_token_coverage')],
                 ],
             ],
+            'membership' => [
+                'label' => trans('hr-manager::settings.routing_group_membership'),
+                'items' => [
+                    ['key' => 'notify_member_joined',       'label' => trans('hr-manager::settings.notify_member_joined')],
+                    ['key' => 'notify_member_left',         'label' => trans('hr-manager::settings.notify_member_left')],
+                    ['key' => 'notify_join_no_application', 'label' => trans('hr-manager::settings.notify_join_no_application')],
+                ],
+            ],
             'wallet' => [
                 'label' => trans('hr-manager::settings.routing_group_wallet'),
                 'items' => [
@@ -583,6 +591,9 @@ class SettingsController extends Controller
             'notify_wallet_stalled'        => 'nullable|boolean',
             'notify_wallet_compliance_dropped' => 'nullable|boolean',
             'notify_wallet_milestone'      => 'nullable|boolean',
+            'notify_member_joined'         => 'nullable|boolean',
+            'notify_member_left'           => 'nullable|boolean',
+            'notify_join_no_application'   => 'nullable|boolean',
         ]);
 
         $error = app(WebhookUrlValidator::class)->validate($request->type, $request->webhook_url);
@@ -610,6 +621,9 @@ class SettingsController extends Controller
             'notify_wallet_stalled'        => (bool) $request->input('notify_wallet_stalled', false),
             'notify_wallet_compliance_dropped' => (bool) $request->input('notify_wallet_compliance_dropped', false),
             'notify_wallet_milestone'      => (bool) $request->input('notify_wallet_milestone', false),
+            'notify_member_joined'         => (bool) $request->input('notify_member_joined', false),
+            'notify_member_left'           => (bool) $request->input('notify_member_left', false),
+            'notify_join_no_application'   => (bool) $request->input('notify_join_no_application', false),
         ]);
 
         return redirect()->route('hr-manager.settings.index')
@@ -640,6 +654,9 @@ class SettingsController extends Controller
             'notify_wallet_stalled'        => 'nullable|boolean',
             'notify_wallet_compliance_dropped' => 'nullable|boolean',
             'notify_wallet_milestone'      => 'nullable|boolean',
+            'notify_member_joined'         => 'nullable|boolean',
+            'notify_member_left'           => 'nullable|boolean',
+            'notify_join_no_application'   => 'nullable|boolean',
         ]);
 
         $type = $request->input('type', $webhook->type);
@@ -671,6 +688,9 @@ class SettingsController extends Controller
             'notify_wallet_stalled'        => (bool) $request->input('notify_wallet_stalled', false),
             'notify_wallet_compliance_dropped' => (bool) $request->input('notify_wallet_compliance_dropped', false),
             'notify_wallet_milestone'      => (bool) $request->input('notify_wallet_milestone', false),
+            'notify_member_joined'         => (bool) $request->input('notify_member_joined', false),
+            'notify_member_left'           => (bool) $request->input('notify_member_left', false),
+            'notify_join_no_application'   => (bool) $request->input('notify_join_no_application', false),
         ]);
 
         return redirect()->route('hr-manager.settings.index')

@@ -80,6 +80,7 @@ class InitCommand extends Command
         $steps[] = ['hr-manager:cache-assessments', 'Build the cross-plugin assessment cache'];
         $steps[] = ['hr-manager:classify-players', 'Classify Corp Health across the roster'];
         $steps[] = ['hr-manager:detect-corp-joins', 'Mark accepted applicants who have joined'];
+        $steps[] = ['hr-manager:detect-membership-changes', 'Seed the corp roster baseline (silent first run)'];
 
         $failed = [];
         foreach ($steps as [$cmd, $label]) {

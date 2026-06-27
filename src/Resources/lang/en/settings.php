@@ -33,6 +33,7 @@ return [
     // Category grouping headers
     'routing_group_recruitment'        => 'Recruitment lifecycle',
     'routing_group_retention'          => 'Retention + purge',
+    'routing_group_membership'         => 'Corp membership',
     'routing_group_wallet'             => 'Wallet signals',
 
     // Per-category labels (must match the bool column on
@@ -47,6 +48,9 @@ return [
     'notify_player_status'             => 'Player Status (LOA / marked for purge / cleared)',
     'notify_token_revoked'             => 'SeAT Token Revoked (SECURITY)',
     'notify_token_coverage'            => 'Token Coverage Digest (weekly)',
+    'notify_member_joined'             => 'Member Joined (alt of member / applied)',
+    'notify_member_left'               => 'Member Left',
+    'notify_join_no_application'       => 'Joined Without Application (SECURITY)',
     'notify_wallet_stalled'            => 'Wallet Contributions Stalled',
     'notify_wallet_compliance_dropped' => 'Tax Compliance Dropped (CRITICAL)',
     'notify_wallet_milestone'          => 'Contribution Milestone Reached',
@@ -253,6 +257,9 @@ return [
     'notify_player_status'         => 'Player Status (LOA / marked for purge / cleared)',
     'notify_token_revoked'         => 'SeAT Token Revoked (SECURITY)',
     'notify_token_coverage'        => 'Token Coverage Digest (weekly)',
+    'notify_member_joined'         => 'Member Joined (alt of member / applied)',
+    'notify_member_left'           => 'Member Left',
+    'notify_join_no_application'   => 'Joined Without Application (SECURITY)',
     'notify_wallet_stalled'        => 'Wallet Contributions Stalled',
     'notify_wallet_compliance_dropped' => 'Tax Compliance Dropped (CRITICAL)',
     'notify_wallet_milestone'      => 'Contribution Milestone Reached',

@@ -339,6 +339,133 @@ class NotificationService
     }
 
     /**
+     * A known person joined the corp: an existing member's alt, or someone with
+     * a valid application. The message names the main. Routes to
+     * notify_member_joined.
+     *
+     * @param string $type 'known_alt' | 'applied'
+     */
+    public function notifyMemberJoined(int $corporationId, int $characterId, string $type, ?int $mainCharacterId = null): void
+    {
+        $webhooks = WebhookConfiguration::enabled()
+            ->forCorporation($corporationId)
+            ->where('notify_member_joined', true)
+            ->get();
+        if ($webhooks->isEmpty()) {
+            return;
+        }
+
+        $charName = $this->characterName($characterId);
+        $corpName = CorporationInfo::where('corporation_id', $corporationId)->value('name') ?? ('#' . $corporationId);
+        $mainName = ($mainCharacterId && $mainCharacterId !== $characterId) ? $this->characterName($mainCharacterId) : null;
+
+        if ($type === 'known_alt' && $mainName) {
+            $description = "[MEMBER JOINED] **{$charName}** joined **{$corpName}** — an alt of **{$mainName}** (an existing member).";
+        } elseif ($mainName) {
+            $description = "[MEMBER JOINED] **{$charName}** joined **{$corpName}** (applied; account main: **{$mainName}**).";
+        } else {
+            $description = "[MEMBER JOINED] **{$charName}** joined **{$corpName}** (applied).";
+        }
+
+        $fields = [
+            ['name' => 'Character', 'value' => $charName, 'inline' => true],
+            ['name' => 'Main', 'value' => $mainName ?: $charName, 'inline' => true],
+            ['name' => 'Corp', 'value' => $corpName, 'inline' => true],
+            ['name' => 'Route', 'value' => $type === 'known_alt' ? 'Alt of a current member' : 'Valid application', 'inline' => false],
+        ];
+
+        foreach ($webhooks as $webhook) {
+            $this->send($webhook, 'member_joined', [
+                'character_id' => $mainCharacterId ?: $characterId,
+                'description'  => $description,
+                'fields'       => $fields,
+            ]);
+        }
+    }
+
+    /**
+     * A NEW person joined the corp with no valid application — the security
+     * flag. Forward-only (current members are never flagged). Routes to
+     * notify_join_no_application.
+     */
+    public function notifyJoinNoApplication(int $corporationId, int $characterId, ?int $mainCharacterId = null): void
+    {
+        $webhooks = WebhookConfiguration::enabled()
+            ->forCorporation($corporationId)
+            ->where('notify_join_no_application', true)
+            ->get();
+        if ($webhooks->isEmpty()) {
+            return;
+        }
+
+        $charName = $this->characterName($characterId);
+        $corpName = CorporationInfo::where('corporation_id', $corporationId)->value('name') ?? ('#' . $corporationId);
+        $mainName = ($mainCharacterId && $mainCharacterId !== $characterId) ? $this->characterName($mainCharacterId) : null;
+
+        $description = "[NO APPLICATION] **{$charName}** joined **{$corpName}** with **no valid HR application**"
+            . ($mainName ? " (account main: **{$mainName}**)" : '')
+            . '. Verify this join was expected.';
+
+        $fields = [
+            ['name' => 'Character', 'value' => $charName, 'inline' => true],
+            ['name' => 'Corp', 'value' => $corpName, 'inline' => true],
+        ];
+        if ($mainName) {
+            $fields[] = ['name' => 'Account main', 'value' => $mainName, 'inline' => true];
+        }
+        $fields[] = ['name' => 'zKillboard', 'value' => "https://zkillboard.com/character/{$characterId}/", 'inline' => false];
+
+        foreach ($webhooks as $webhook) {
+            $this->send($webhook, 'join_no_application', [
+                'character_id' => $characterId,
+                'description'  => $description,
+                'fields'       => $fields,
+            ]);
+        }
+    }
+
+    /**
+     * A character left the corp. Routes to notify_member_left, noting whether
+     * the account still has another character in the corp.
+     */
+    public function notifyMemberLeft(int $corporationId, int $characterId, ?int $mainCharacterId = null, bool $playerStillPresent = false): void
+    {
+        $webhooks = WebhookConfiguration::enabled()
+            ->forCorporation($corporationId)
+            ->where('notify_member_left', true)
+            ->get();
+        if ($webhooks->isEmpty()) {
+            return;
+        }
+
+        $charName = $this->characterName($characterId);
+        $corpName = CorporationInfo::where('corporation_id', $corporationId)->value('name') ?? ('#' . $corporationId);
+        $mainName = ($mainCharacterId && $mainCharacterId !== $characterId) ? $this->characterName($mainCharacterId) : null;
+
+        if ($mainName && !$playerStillPresent) {
+            $description = "[MEMBER LEFT] **{$charName}** left **{$corpName}** — this was **{$mainName}**'s last character in the corp.";
+        } elseif ($mainName && $playerStillPresent) {
+            $description = "[MEMBER LEFT] **{$charName}** left **{$corpName}** — an alt of **{$mainName}**, who still has characters in the corp.";
+        } else {
+            $description = "[MEMBER LEFT] **{$charName}** left **{$corpName}**.";
+        }
+
+        $fields = [
+            ['name' => 'Character', 'value' => $charName, 'inline' => true],
+            ['name' => 'Main', 'value' => $mainName ?: $charName, 'inline' => true],
+            ['name' => 'Corp', 'value' => $corpName, 'inline' => true],
+        ];
+
+        foreach ($webhooks as $webhook) {
+            $this->send($webhook, 'member_left', [
+                'character_id' => $characterId,
+                'description'  => $description,
+                'fields'       => $fields,
+            ]);
+        }
+    }
+
+    /**
      * CWM contribution-stalled notification. character-scoped (the upstream
      * event is per-character), with the character's user resolved for the
      * main-character portrait.

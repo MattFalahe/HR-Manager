@@ -26,6 +26,9 @@
         'notify_wallet_stalled'             => false,
         'notify_wallet_compliance_dropped'  => false,
         'notify_wallet_milestone'           => false,
+        'notify_member_joined'              => false,
+        'notify_member_left'                => false,
+        'notify_join_no_application'        => true,
     ];
     $whChecked = function ($key) use ($webhook, $whDefaults) {
         return $webhook ? (bool) $webhook->{$key} : ($whDefaults[$key] ?? false);
@@ -35,6 +38,7 @@
     $whGroups = [
         ['notify_application_submitted', 'notify_application_accepted', 'notify_application_rejected', 'notify_status_change'],
         ['notify_inactive_director', 'notify_dead_weight', 'notify_purge_reminder', 'notify_player_status', 'notify_token_revoked', 'notify_token_coverage'],
+        ['notify_member_joined', 'notify_member_left', 'notify_join_no_application'],
         ['notify_wallet_stalled', 'notify_wallet_compliance_dropped', 'notify_wallet_milestone'],
     ];
 @endphp

@@ -86,6 +86,20 @@ class ScheduleSeeder extends AbstractScheduleSeeder
                 'ping_after'        => null,
             ],
 
+            // Detect corp membership changes - every 30 minutes. Diffs SeAT's
+            // live roster against HR's snapshot to notify on joins (classified:
+            // alt of a current member / valid application / no application) and
+            // leaves. Forward-only: a corp's first scan seeds silently, so
+            // existing members are never announced.
+            [
+                'command'           => 'hr-manager:detect-membership-changes',
+                'expression'        => '*/30 * * * *',
+                'allow_overlap'     => false,
+                'allow_maintenance' => false,
+                'ping_before'       => null,
+                'ping_after'        => null,
+            ],
+
             // Detect token loss - every 10 minutes. Watermarked scan
             // for SeAT refresh_tokens deleted_at > last_scan. Higher
             // cadence than other crons because token revocation is a
