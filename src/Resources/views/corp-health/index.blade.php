@@ -1466,6 +1466,51 @@
                 </div>
             </div>
         @endif
+
+        {{-- Buyback contribution — completions credited to this corp (honouring
+             alt / holding-corp attribution) + the top contributors. From
+             Buyback Manager via MC; self-hides when absent. --}}
+        @if(!empty($buybackCorp['available']) && !empty($buybackCorp['has_data']))
+            @php
+                $bbc = $buybackCorp;
+                $bbcIsk = function ($v) {
+                    $v = (float) $v;
+                    if ($v >= 1e9) return number_format($v / 1e9, 2) . 'B';
+                    if ($v >= 1e6) return number_format($v / 1e6, 1) . 'M';
+                    if ($v >= 1e3) return number_format($v / 1e3, 0) . 'K';
+                    return number_format($v, 0);
+                };
+            @endphp
+            <div class="card card-dark mb-3" style="border-left: 4px solid #14b8a6;">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-balance-scale" style="color: #14b8a6;"></i> {{ trans('hr-manager::corp-health.bb_heading') }}</h3>
+                    <div class="card-tools">
+                        <span class="badge" style="background: rgba(20,184,166,0.2); color: #5eead4;">{{ $bbc['completed_count'] }} {{ trans('hr-manager::corp-health.bb_completed') }}</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div style="display: flex; flex-wrap: wrap; gap: 22px; align-items: baseline;">
+                        <div><div style="font-size: 1.6rem; font-weight: 700; color: var(--hr-success, #28a745);">{{ $bbcIsk($bbc['weighted_value']) }}</div><small style="color: var(--hr-text-muted);">{{ trans('hr-manager::corp-health.bb_weighted') }}</small></div>
+                        <div><div style="font-size: 1.2rem; font-weight: 600; color: #5eead4;">{{ $bbcIsk($bbc['raw_value']) }}</div><small style="color: var(--hr-text-muted);">{{ trans('hr-manager::corp-health.bb_raw') }}</small></div>
+                    </div>
+                    @if(!empty($bbc['top_contributors']))
+                        <div class="mt-3">
+                            <small style="color: var(--hr-text-muted); text-transform: uppercase; letter-spacing: 0.4px; font-size: 0.7rem;">{{ trans('hr-manager::corp-health.bb_top') }}</small>
+                            <div class="mt-2">
+                                @foreach($bbc['top_contributors'] as $tc)
+                                    <div class="d-flex align-items-center" style="gap: 8px; padding: 3px 0;">
+                                        <img src="https://images.evetech.net/characters/{{ $tc['character_id'] }}/portrait?size=32" style="width: 22px; height: 22px; border-radius: 50%;" onerror="this.style.display='none'">
+                                        <span style="color: var(--hr-text-white); flex: 1;">{{ $tc['name'] }}</span>
+                                        <span style="color: #5eead4;">{{ $bbcIsk($tc['weighted_value']) }}</span>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+                    <small class="d-block text-center mt-2" style="color: var(--hr-text-muted); font-size: 0.75rem;"><i class="fas fa-info-circle"></i> {{ trans('hr-manager::corp-health.bb_footnote') }}</small>
+                </div>
+            </div>
+        @endif
     @endif
 
     {{-- =================================================================

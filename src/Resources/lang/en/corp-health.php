@@ -196,6 +196,13 @@ return [
     'bp_oldest_pending'       => 'Oldest pending request was made :when.',
     'bp_col_member'           => 'Member',
     'bp_footnote'             => 'Blueprint request activity from Blueprint Manager (via Manager Core): who uses the library and the fulfilment vs rejection split. Top requesters by volume.',
+    // Buyback contribution card
+    'bb_heading'              => 'Buyback contribution',
+    'bb_completed'            => 'completed',
+    'bb_weighted'            => 'Weighted ISK credited',
+    'bb_raw'                  => 'Raw ISK sold',
+    'bb_top'                  => 'Top contributors',
+    'bb_footnote'             => 'Buyback completions credited to this corp from Buyback Manager (via Manager Core), valued through each programme\'s contribution policy (Settings → Buyback Contribution). An alt or holding corp\'s buyback counts here when you attribute it to this corp.',
     'inactive_directors_heading' => 'Inactive directors (CRITICAL — corp survival depends on active directors)',
     'no_inactive_directors'   => 'No inactive directors. ✓',
     'at_risk_heading'         => 'At-risk + inactive + dead-weight players',

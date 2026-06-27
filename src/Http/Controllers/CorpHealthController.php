@@ -107,6 +107,13 @@ class CorpHealthController extends Controller
             ? app(\HrManager\Services\BlueprintActivityService::class)->getCorpSummary($corporationId)
             : ['available' => false];
 
+        // Buyback contribution rollup (optional — Buyback Manager via MC).
+        // Contributions CREDITED to this corp (honouring alt/holding-corp
+        // attribution) + the top contributors. Lazy: Economy tab only.
+        $buybackCorp = ($activeTab === 'economy')
+            ? app(\HrManager\Services\BuybackContributionService::class)->forCorporation($corporationId)
+            : ['available' => false];
+
         // Structure doctrine compliance (lazy — only on its own tab). Sourced
         // from Structure Manager via Manager Core's PluginBridge: SM owns the
         // feature, HR consumes it. Returns a 'sm_absent' marker (rendered as a
@@ -128,6 +135,7 @@ class CorpHealthController extends Controller
             'latestClassifiedAt',
             'activeTab',
             'blueprintCorpSummary',
+            'buybackCorp',
             'structureCompliance'
         ));
     }
