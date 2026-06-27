@@ -149,7 +149,10 @@ Auto-registered via the schedule seeder:
 | `hr-manager:cleanup` | Permanently delete long-soft-deleted applications + orphan notes |
 | `hr-manager:token-coverage-digest` | Weekly opt-in token + scope coverage summary per corp to subscribing webhooks |
 
-Plus one manual (not scheduled) command: **`hr-manager:backfill-buyback`** — a one-time seed of historical Buyback Manager offers + completed contracts, run by hand after installing the integration so the panels have history immediately (live data flows via the EventBus thereafter).
+Plus two manual (not scheduled) commands:
+
+- **`hr-manager:init`** — guided first-run setup. A readiness check (required vs optional prerequisites — migrations, SeAT synced data, Manager Core + detected suite plugins, recruitment SSO profile, webhooks) that points at the setup steps, then a sequenced load (`backfill-buyback` when BB is present → `cache-assessments` → `classify-players` → `detect-corp-joins`) that populates every dashboard at once instead of waiting for the nightly crons. It deliberately skips the notification passes (token loss / watchlist), so running it before wiring webhooks gives a quiet first load. `--check` runs the readiness pass only; `--force` skips the prompt.
+- **`hr-manager:backfill-buyback`** — a one-time seed of historical Buyback Manager offers + completed contracts (live data flows via the EventBus thereafter).
 | `hr-manager:diagnose` | CLI counterpart of the diagnostic dashboard |
 
 ### 🔧 Install

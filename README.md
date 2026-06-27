@@ -79,6 +79,7 @@ After the container restarts:
 3. **HR Manager → Recruitment Pages** → create a landing, pick a visual template, set eligibility, bind your form template, publish
 4. **HR Manager → Settings → Webhooks** → wire Discord/Slack notification channels for applications, classifier transitions, purge reminders, wallet alerts
 5. **Add an ESI refresh token from a Director character** under Seat → Settings → API → Refresh tokens. Without one the Members page falls back to a sparse roster and login signals are unavailable
+6. **Run the guided initializer** to verify prerequisites and populate the dashboards immediately instead of waiting for the nightly crons: `docker exec -it seat-docker-front-1 php artisan hr-manager:init` (add `--check` to only run the readiness pass). It builds the assessment cache, classifies the roster, marks corp-joins, and seeds buyback history; it deliberately skips the notification passes, so running it **before** wiring webhooks gives a quiet first load
 
 ---
 
@@ -231,6 +232,8 @@ HR also **subscribes** to:
 | `hr-manager:cleanup` | nightly 03:00 | Permanently delete soft-deleted applications older than N days |
 | `hr-manager:token-coverage-digest` | weekly (Mon 09:00) | Opt-in token + scope coverage summary per corp to subscribing webhooks |
 | `hr-manager:diagnose` | on-demand | Tables / bridge / event traffic / quick stats summary |
+| `hr-manager:init` | on-demand | Guided first-run: readiness check (prerequisites + setup steps) then a sequenced load that populates every dashboard. Skips the notification passes |
+| `hr-manager:backfill-buyback` | on-demand | One-time seed of historical Buyback Manager offers + completed contracts |
 
 ---
 
