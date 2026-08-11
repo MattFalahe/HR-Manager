@@ -98,6 +98,71 @@
         </div>
     </div>
 
+    {{-- Alt links: what has been claimed about who this person also is, and
+         which of their characters nobody has listed. Hidden when there is
+         neither a claim nor a gap, so a plain dossier stays plain. --}}
+    @if(($altLinks ?? collect())->isNotEmpty() || !empty($altCoverage['uncovered']))
+        @php
+            $alStyle = [
+                \HrManager\Models\SuspectedAltLink::STATE_SUSPECTED => ['bg' => 'rgba(255,193,7,0.20)', 'fg' => '#ffe08a', 'icon' => 'fa-question-circle'],
+                \HrManager\Models\SuspectedAltLink::STATE_CONFIRMED => ['bg' => 'rgba(40,167,69,0.20)', 'fg' => '#6ee7b7', 'icon' => 'fa-link'],
+                \HrManager\Models\SuspectedAltLink::STATE_REFUTED   => ['bg' => 'rgba(220,53,69,0.22)', 'fg' => '#f5a3ac', 'icon' => 'fa-unlink'],
+            ];
+        @endphp
+        <div class="card card-dark mb-3">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-user-friends"></i> {{ trans('hr-manager::watchlist.dossier_alts_section') }}
+                    @if(($altLinks ?? collect())->isNotEmpty())
+                        <span class="badge badge-hr ml-2">{{ $altLinks->count() }}</span>
+                    @endif
+                </h3>
+            </div>
+            <div class="card-body">
+                <small class="d-block mb-2" style="color: var(--hr-text-muted);">{{ trans('hr-manager::watchlist.dossier_alts_help') }}</small>
+
+                @foreach($altLinks ?? [] as $al)
+                    @php $als = $alStyle[$al->state] ?? $alStyle['suspected']; @endphp
+                    <div class="d-flex align-items-center flex-wrap mb-2" style="gap: 8px; padding: 6px 8px; background: rgba(255,255,255,0.02); border-radius: 4px;">
+                        <span class="badge" style="background: {{ $als['bg'] }}; color: {{ $als['fg'] }};"
+                              title="{{ trans('hr-manager::watchlist.alt_state_' . $al->state . '_help') }}">
+                            <i class="fas {{ $als['icon'] }}"></i> {{ trans('hr-manager::watchlist.alt_state_' . $al->state) }}
+                        </span>
+                        <a href="{{ route('hr-manager.watchlist.dossier', $al->suspected_character_id) }}" style="color: var(--hr-text-white);">
+                            <strong>{{ $al->suspected_character_name ?: ('#' . $al->suspected_character_id) }}</strong>
+                        </a>
+                        <span style="color: var(--hr-text-muted);">{{ trans('hr-manager::watchlist.dossier_alts_of') }}</span>
+                        <a href="{{ route('hr-manager.watchlist.dossier', $al->main_character_id) }}" style="color: var(--hr-text-light);">
+                            {{ $al->main_character_name ?: ('#' . $al->main_character_id) }}
+                        </a>
+                        @if($al->resolution_note)
+                            <small class="d-block w-100" style="color: var(--hr-text-muted);">{{ $al->resolution_note }}</small>
+                        @endif
+                    </div>
+                @endforeach
+
+                @if(!empty($altCoverage['uncovered']))
+                    <div class="mt-3 p-2" style="border: 1px solid rgba(220,53,69,0.35); border-radius: 6px; background: rgba(220,53,69,0.06);">
+                        <div style="color: #f5a3ac; font-weight: 600;">
+                            <i class="fas fa-user-secret"></i> {{ trans('hr-manager::players.alt_gap_title') }}
+                        </div>
+                        <small class="d-block mt-1" style="color: var(--hr-text-muted);">{{ trans('hr-manager::players.alt_gap_body') }}</small>
+                        <div class="d-flex flex-wrap mt-2" style="gap: 6px;">
+                            @foreach($altCoverage['uncovered'] as $uc)
+                                <a href="{{ route('hr-manager.watchlist.dossier', $uc['character_id']) }}"
+                                   class="badge" style="background: rgba(220,53,69,0.18); color: #f5a3ac; padding: 4px 8px;">
+                                    <img src="https://images.evetech.net/characters/{{ $uc['character_id'] }}/portrait?size=32"
+                                         style="width:16px;height:16px;border-radius:50%;margin-right:4px;vertical-align:middle;" alt="">
+                                    {{ $uc['name'] }}
+                                </a>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+            </div>
+        </div>
+    @endif
+
     {{-- Intel notes — visibility-respected by IntelService. Hidden entirely for a
          recruiter with no visible notes (nothing that's hidden for recruiters
          surfaces here); directors always see the section so they can add. --}}

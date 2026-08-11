@@ -98,6 +98,19 @@ class WatchlistService
             })
             ->delete();
 
+        // Was this character on this list before and cleared? Captured before
+        // the upsert overwrites it, so the history event can say "re-listed"
+        // and name the date the previous episode ended.
+        $priorCleared = WatchlistEntry::where('list_type', $listType)
+            ->where('character_id', $characterId)
+            ->where(function ($q) use ($scopeCorporationId) {
+                $scopeCorporationId === null
+                    ? $q->whereNull('scope_corporation_id')
+                    : $q->where('scope_corporation_id', $scopeCorporationId);
+            })
+            ->where('status', WatchlistEntry::STATUS_CLEARED)
+            ->first();
+
         $entry = WatchlistEntry::updateOrCreate(
             [
                 'list_type'            => $listType,
@@ -111,6 +124,22 @@ class WatchlistService
                 'added_by'       => $addedByUserId,
                 'added_at'       => now(),
                 'expires_at'     => $expiresAt,
+                // Re-listing a character who was previously CLEARED starts a
+                // fresh episode. The uniqueness constraint means the cleared
+                // row is the row we get back, so without resetting the status
+                // here the update landed on a cleared row that scopeActive()
+                // then filtered out — the character silently failed to appear
+                // on the list, which is what happened when a cleared main was
+                // re-added alongside a new alt: only the alt showed up.
+                //
+                // The previous episode is not lost: every add and clear writes
+                // its own history event, so the character's timeline still
+                // reads added -> cleared -> added again, with each actor and
+                // reason intact.
+                'status'         => WatchlistEntry::STATUS_ACTIVE,
+                'cleared_at'     => null,
+                'cleared_by'     => null,
+                'cleared_reason' => null,
             ]
         );
 
@@ -119,10 +148,15 @@ class WatchlistService
         // player profile even if the entry is later cleared or removed. A system
         // add (auto-flag, addedBy 0) is attributed to "automated" (null actor).
         $this->recordLifecycle('watchlist_added', $entry, $addedByUserId, [
-            'list_type' => $listType,
-            'severity'  => $severity,
-            'reason'    => $reason ? mb_substr($reason, 0, 300) : null,
-            'label'     => 'Added to ' . $listType,
+            'list_type'        => $listType,
+            'severity'         => $severity,
+            'reason'           => $reason ? mb_substr($reason, 0, 300) : null,
+            'relisted'         => $priorCleared !== null,
+            'previously_cleared_at'     => optional($priorCleared)->cleared_at?->toDateTimeString(),
+            'previously_cleared_reason' => $priorCleared ? mb_substr((string) $priorCleared->cleared_reason, 0, 300) : null,
+            'label'            => $priorCleared
+                ? 'Re-added to ' . $listType . ' (previously cleared ' . optional($priorCleared->cleared_at)->format('M d, Y') . ')'
+                : 'Added to ' . $listType,
         ]);
 
         return [

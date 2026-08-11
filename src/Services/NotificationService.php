@@ -255,6 +255,146 @@ class NotificationService
     }
 
     /**
+     * A handler wrote a public note on an application — tell the OTHER handlers.
+     *
+     * Deliberately narrow. Joining a handler list is opting in to work an
+     * applicant, not to a broadcast, so this @-mentions only the handlers on
+     * that application and **suppresses the webhook's role mention** — the
+     * channel isn't the audience, the co-handlers are.
+     *
+     * The author is excluded, which also makes it self-silencing: a lone
+     * handler talking to themselves notifies nobody, and it starts working the
+     * moment a second person joins. Private notes never reach here (see the
+     * caller) — a private note is a recruiter thinking aloud, and pinging
+     * someone about text they may not be able to read is worse than silence.
+     *
+     * @param array<int> $handlerUserIds  every handler on the application
+     * @param int        $authorUserId    who wrote it — excluded from the ping
+     */
+    public function notifyHandlerNote(
+        Application $application,
+        array $handlerUserIds,
+        int $authorUserId,
+        string $noteExcerpt
+    ): void {
+        if (!$this->typeActive('handler_note')) {
+            return;
+        }
+
+        $recipients = array_values(array_filter(
+            array_unique(array_map('intval', $handlerUserIds)),
+            fn ($uid) => $uid > 0 && $uid !== $authorUserId
+        ));
+        if (empty($recipients)) {
+            return; // sole handler: nobody left to tell
+        }
+
+        $corporationId = (int) $application->corporation_id;
+        $webhooks = WebhookConfiguration::enabled()
+            ->forCorporation($corporationId)
+            ->where('notify_handler_note', true)
+            ->get();
+        if ($webhooks->isEmpty()) {
+            return;
+        }
+
+        // Resolve each handler to a Discord mention, degrading to their name so
+        // the note still surfaces on an install without SeAT Connector.
+        $connector = app(SeatConnectorService::class);
+        $connectorUp = $connector->isAvailable();
+        $names = $this->userNamesFor($recipients);
+
+        $mentions = [];
+        foreach ($recipients as $uid) {
+            $name = $names[$uid] ?? ('User #' . $uid);
+            $mention = '**' . $name . '**';
+            if ($connectorUp) {
+                $identity = $connector->getIdentityForUser($uid);
+                if (!empty($identity['available']) && !empty($identity['connector_id'])) {
+                    $mention = '<@' . $identity['connector_id'] . '>';
+                }
+            }
+            $mentions[] = $mention;
+        }
+
+        $authorName = $this->userNamesFor([$authorUserId])[$authorUserId] ?? ('User #' . $authorUserId);
+        // hr_manager_applications has no character_name column — read it off the
+        // CharacterInfo relation, falling back to the resolver, exactly as the
+        // other application notifications do. Reading a non-existent attribute
+        // meant this always printed a bare character id.
+        $applicant = $application->character->name
+            ?? $this->characterName((int) $application->character_id);
+        $excerpt    = trim(mb_substr($noteExcerpt, 0, 500));
+        if (mb_strlen($noteExcerpt) > 500) {
+            $excerpt .= '…';
+        }
+
+        $content = implode(' ', $mentions) . "\n"
+            . '**' . $authorName . '** added a note on the application for **' . $applicant . '**:' . "\n"
+            . '> ' . str_replace("\n", "\n> ", $excerpt) . "\n"
+            . $this->applicationLink($application->id);
+
+        foreach ($webhooks as $webhook) {
+            try {
+                if ($webhook->type === 'discord') {
+                    // Content-only post: a mention inside an embed renders but
+                    // never pings, and the ping IS the feature here.
+                    app(WebhookService::class)->sendDiscordContent($webhook, $content);
+                } elseif ($webhook->type === 'slack') {
+                    app(WebhookService::class)->sendSlackWebhook($webhook, [
+                        'text' => preg_replace('/<@!?\d+>/', '', $content),
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('[HR Manager] handler-note notify failed: ' . $e->getMessage());
+            }
+        }
+    }
+
+    /**
+     * A director who IS still logging in but has no corp wallet activity
+     * attributed to them over the attribution window. Deliberately says nothing
+     * about inactivity: this used to reuse the inactive-director alert, which
+     * reported "inactive for 0 days" because days_inactive is 0 on this path by
+     * definition. Its own category (default off) so it can be routed to a
+     * finance channel and silenced independently of the real inactivity alert.
+     *
+     * @param int $months The attribution window this was measured over.
+     */
+    public function notifySilentWalletDirector(int $userId, int $corporationId, int $months = 3): void
+    {
+        if (!$this->typeActive('silent_wallet_director')) {
+            return;
+        }
+
+        $webhooks = WebhookConfiguration::enabled()
+            ->forCorporation($corporationId)
+            ->where('notify_silent_wallet_director', true)
+            ->get();
+
+        if ($webhooks->isEmpty()) {
+            return;
+        }
+
+        $mainCharId = $this->mainCharacterIdFor($userId);
+        $mainName = $mainCharId ? $this->characterName($mainCharId) : ('User #' . $userId);
+        $corpName = CorporationInfo::where('corporation_id', $corporationId)->value('name') ?? '#' . $corporationId;
+
+        foreach ($webhooks as $webhook) {
+            $this->send($webhook, 'silent_wallet_director', [
+                'link'         => $this->playerLink($userId, $corporationId),
+                'link_label'   => 'View player',
+                'character_id' => $mainCharId,
+                'description'  => "Director **{$mainName}** in **{$corpName}** is still logging in, but has no corp wallet activity attributed to them in the last {$months} months. Worth a look if they are meant to be handling corp finances.",
+                'fields'       => [
+                    ['name' => 'Director', 'value' => $mainName, 'inline' => true],
+                    ['name' => 'Window', 'value' => $months . ' months', 'inline' => true],
+                ],
+            ]);
+        }
+    }
+
+    /**
      * A member just crossed into the classifier's **dead-weight** bucket — long
      * inactive with no offsetting engagement. Fires once on the transition to
      * every webhook with notify_dead_weight enabled for the corp. A dead-weight
@@ -1348,6 +1488,26 @@ class NotificationService
         } catch (\Exception $e) {
             Log::error("[HR Manager] Notification failed: {$e->getMessage()}");
         }
+    }
+
+    /**
+     * Display names for SeAT users, via each account's main character.
+     *
+     * @param  array<int> $userIds
+     * @return array<int, string> user_id => name
+     */
+    private function userNamesFor(array $userIds): array
+    {
+        $out = [];
+        foreach (array_unique(array_map('intval', $userIds)) as $uid) {
+            if ($uid <= 0) {
+                continue;
+            }
+            $mainId = $this->mainCharacterIdFor($uid);
+            $out[$uid] = $mainId ? $this->characterName($mainId) : ('User #' . $uid);
+        }
+
+        return $out;
     }
 
     private function mainCharacterIdFor(int $userId): ?int

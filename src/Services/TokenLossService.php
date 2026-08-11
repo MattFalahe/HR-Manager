@@ -518,6 +518,7 @@ class TokenLossService
                 'noteable_type' => 'player',
                 'noteable_id'   => $userId,
                 'author_id'     => 0,
+                'system_source' => Note::SOURCE_WATCHDOG,
                 'content'       => $content,
                 'is_private'    => false,
             ]);

@@ -65,6 +65,9 @@ class SettingsController extends Controller
             'security_token_loss_squad_drop_director_immediate' => (bool) Setting::getValue('security_token_loss_squad_drop_director_immediate', false),
             'intel_recruiter_view_enabled'      => (bool) Setting::getValue(\HrManager\Services\IntelService::SETTING_RECRUITER_VIEW, false),
             'applicant_watchlist_autoflag'      => (bool) Setting::getValue(\HrManager\Services\ApplicantScreeningService::SETTING_AUTOFLAG, false),
+            // Member onboarding welcome (opt-in)
+            'onboarding_welcome_enabled'        => (bool) Setting::getValue(\HrManager\Services\OnboardingService::SETTING_ENABLED, false),
+            'onboarding_welcome_delay_minutes'  => (int) Setting::getValue(\HrManager\Services\OnboardingService::SETTING_DELAY_MINUTES, 30),
         ];
 
         $webhooks = WebhookConfiguration::orderBy('name')->get();
@@ -80,6 +83,56 @@ class SettingsController extends Controller
         // time either way (mirrors the Connector-access tab's pattern); it
         // just won't ping anyone until the framework is installed.
         $connectorAvailable = app(\HrManager\Services\SeatConnectorService::class)->isAvailable();
+
+        // Onboarding welcome: per-corp template rows (keyed by corp id so the
+        // editor pre-fills each corp's block) plus the shared casual default the
+        // blank state falls back to. Empty collection before the table exists.
+        $onboardingTemplates = \Illuminate\Support\Facades\Schema::hasTable('hr_manager_onboarding_templates')
+            ? \HrManager\Models\OnboardingTemplate::get()->keyBy('corporation_id')
+            : collect();
+        $onboardingDefaultBody = (string) trans('hr-manager::onboarding.default_body');
+
+        // Corps HR can actually onboard for — those it has member visibility
+        // into (a director token). $corporations is EVERY corporation SeAT has
+        // ever resolved, which on a real install is thousands, and the tab
+        // renders a Discord role grid per corp. Rendering that for corps HR
+        // cannot even see a join in blew the view's memory limit; a corp with
+        // no roster can never produce an onboarding welcome anyway.
+        $onboardingCorps = $corporations;
+        foreach (['corporation_members', 'corporation_member_trackings'] as $rosterTable) {
+            if (!\Illuminate\Support\Facades\Schema::hasTable($rosterTable)) {
+                continue;
+            }
+            $trackedIds = \Illuminate\Support\Facades\DB::table($rosterTable)
+                ->distinct()
+                ->pluck('corporation_id')
+                ->map(fn ($c) => (int) $c)
+                ->filter()
+                ->all();
+
+            if (!empty($trackedIds)) {
+                $onboardingCorps = $corporations->whereIn('corporation_id', $trackedIds)->values();
+                break;
+            }
+        }
+
+        // Which corps a webhook can actually deliver an onboarding welcome for.
+        // The per-corp switch and the webhook's corp scope are two different
+        // things and easy to confuse, so the tab states the delivery side
+        // outright rather than leaving "why did nothing arrive?" to guesswork.
+        $onboardingCoveredCorps = [];
+        if (\Illuminate\Support\Facades\Schema::hasColumn('hr_manager_webhook_configurations', 'notify_onboarding_welcome')) {
+            $hooks = WebhookConfiguration::where('is_enabled', true)
+                ->where('notify_onboarding_welcome', true)
+                ->get(['corporation_id']);
+
+            // A global webhook (null corp) covers every corp.
+            if ($hooks->contains(fn ($h) => $h->corporation_id === null)) {
+                $onboardingCoveredCorps = $onboardingCorps->pluck('corporation_id')->map(fn ($c) => (int) $c)->all();
+            } else {
+                $onboardingCoveredCorps = $hooks->pluck('corporation_id')->filter()->map(fn ($c) => (int) $c)->unique()->values()->all();
+            }
+        }
 
         $tierService    = app(TierService::class);
         $tierMappings   = RoleTierMapping::orderBy('tier_level', 'desc')->orderBy('corporation_id')->get();
@@ -107,12 +160,14 @@ class SettingsController extends Controller
                     ['key' => 'notify_application_rejected',  'label' => trans('hr-manager::settings.notify_application_rejected')],
                     ['key' => 'notify_status_change',         'label' => trans('hr-manager::settings.notify_status_change')],
                     ['key' => 'notify_flagged_applicant',     'label' => trans('hr-manager::settings.notify_flagged_applicant')],
+                    ['key' => 'notify_handler_note',          'label' => trans('hr-manager::settings.notify_handler_note')],
                 ],
             ],
             'retention' => [
                 'label' => trans('hr-manager::settings.routing_group_retention'),
                 'items' => [
                     ['key' => 'notify_inactive_director',     'label' => trans('hr-manager::settings.notify_inactive_director')],
+                    ['key' => 'notify_silent_wallet_director', 'label' => trans('hr-manager::settings.notify_silent_wallet_director')],
                     ['key' => 'notify_dead_weight',           'label' => trans('hr-manager::settings.notify_dead_weight')],
                     ['key' => 'notify_purge_reminder',        'label' => trans('hr-manager::settings.notify_purge_reminder')],
                     ['key' => 'notify_loa_marked',             'label' => trans('hr-manager::settings.notify_loa_marked')],
@@ -130,6 +185,7 @@ class SettingsController extends Controller
                     ['key' => 'notify_member_left',         'label' => trans('hr-manager::settings.notify_member_left')],
                     ['key' => 'notify_join_no_application', 'label' => trans('hr-manager::settings.notify_join_no_application')],
                     ['key' => 'notify_member_unregistered', 'label' => trans('hr-manager::settings.notify_member_unregistered')],
+                    ['key' => 'notify_onboarding_welcome',  'label' => trans('hr-manager::settings.notify_onboarding_welcome')],
                 ],
             ],
             'wallet' => [
@@ -259,7 +315,8 @@ class SettingsController extends Controller
             'assessmentCriteria', 'assessmentDefaults', 'standingsSettings', 'purgeSquads',
             'tokenRequiredProfile', 'tokenReqStale', 'tokenRequiredScopes',
             'buybackProgrammes', 'buybackTiers', 'walletAlertRepeatHours', 'inactiveDirectorRepeatDays',
-            'notifStates', 'connectorAvailable'
+            'notifStates', 'connectorAvailable',
+            'onboardingTemplates', 'onboardingDefaultBody', 'onboardingCoveredCorps', 'onboardingCorps'
         ));
     }
 
@@ -346,6 +403,12 @@ class SettingsController extends Controller
             // Intel database recruiter-share toggle
             'intel_recruiter_view_enabled'      => 'nullable|boolean',
             'applicant_watchlist_autoflag'      => 'nullable|boolean',
+            // Member onboarding welcome
+            'onboarding_welcome_enabled'        => 'nullable|boolean',
+            'onboarding_welcome_delay_minutes'  => 'nullable|integer|min:0|max:1440',
+            'onboarding_body'                   => 'nullable|array',
+            'onboarding_roles'                  => 'nullable|array',
+            'onboarding_corp_enabled'           => 'nullable|array',
             // Recruitment SSO scope profile (free string; self-heals to
             // default if it names a profile that no longer exists)
             'recruitment_sso_profile'           => 'nullable|string|max:255',
@@ -697,6 +760,63 @@ class SettingsController extends Controller
             }
         }
 
+        // Onboarding welcome (id=onboarding). Enable + delay are global; the
+        // Markdown welcome body and care-team @-mention roles are per corp. A
+        // corp whose body is blank (or left at the shared default) AND has no
+        // care roles drops its row, so it cleanly falls back to the default.
+        if ($request->has('onboarding_form')) {
+            Setting::setValue(
+                \HrManager\Services\OnboardingService::SETTING_ENABLED,
+                $request->boolean('onboarding_welcome_enabled') ? '1' : '0',
+                'boolean'
+            );
+            $delay = (int) $request->input('onboarding_welcome_delay_minutes', 30);
+            Setting::setValue(
+                \HrManager\Services\OnboardingService::SETTING_DELAY_MINUTES,
+                max(0, min($delay, 1440)),
+                'integer'
+            );
+
+            if (\Illuminate\Support\Facades\Schema::hasTable('hr_manager_onboarding_templates')) {
+                $defaultBody = trim((string) trans('hr-manager::onboarding.default_body'));
+                $bodies      = (array) $request->input('onboarding_body', []);
+                $roles       = (array) $request->input('onboarding_roles', []);
+                $corpEnabled = (array) $request->input('onboarding_corp_enabled', []);
+                foreach ($bodies as $corpId => $body) {
+                    $corpId = (int) $corpId;
+                    if ($corpId <= 0) {
+                        continue;
+                    }
+                    $body    = trim((string) $body);
+                    $roleIds = array_values(array_filter(array_map(
+                        fn ($r) => preg_replace('/\D/', '', (string) $r),
+                        (array) ($roles[$corpId] ?? [])
+                    )));
+                    // Unchecked boxes aren't posted, so absence means OFF.
+                    $corpOn = (bool) ($corpEnabled[$corpId] ?? false);
+
+                    // Nothing worth storing: the corp is off (the default state
+                    // anyway), the body is blank or the shared default, and
+                    // there are no care roles. Drop any row so the corp reads
+                    // as a clean never-configured. A corp that is ON keeps its
+                    // row even with a default template — that row is the only
+                    // record of the opt-in.
+                    if (!$corpOn && empty($roleIds) && ($body === '' || $body === $defaultBody)) {
+                        \HrManager\Models\OnboardingTemplate::where('corporation_id', $corpId)->delete();
+                        continue;
+                    }
+                    \HrManager\Models\OnboardingTemplate::updateOrCreate(
+                        ['corporation_id' => $corpId],
+                        [
+                            'body'             => $body,
+                            'mention_role_ids' => $roleIds,
+                            'is_enabled'       => $corpOn,
+                        ]
+                    );
+                }
+            }
+        }
+
         // Keep the operator on the tab they saved from (the hash drives the
         // tab-restore JS). Every form maps to its pane, so saving never dumps
         // you back on General and makes you navigate to where you were.
@@ -712,6 +832,7 @@ class SettingsController extends Controller
             $request->has('assessment_standings_form') => 'assessment',
             $request->has('wallet_alerts_form')        => 'webhooks',
             $request->has('notifications_form')        => 'notifications',
+            $request->has('onboarding_form')           => 'onboarding',
             default                                    => null,
         };
 
@@ -744,6 +865,8 @@ class SettingsController extends Controller
             'notify_application_rejected'  => 'nullable|boolean',
             'notify_status_change'         => 'nullable|boolean',
             'notify_inactive_director'     => 'nullable|boolean',
+            'notify_silent_wallet_director' => 'nullable|boolean',
+            'notify_handler_note'          => 'nullable|boolean',
             'notify_dead_weight'           => 'nullable|boolean',
             'notify_purge_reminder'        => 'nullable|boolean',
             'notify_loa_marked'            => 'nullable|boolean',
@@ -759,6 +882,7 @@ class SettingsController extends Controller
             'notify_member_left'           => 'nullable|boolean',
             'notify_join_no_application'   => 'nullable|boolean',
             'notify_member_unregistered'   => 'nullable|boolean',
+            'notify_onboarding_welcome'    => 'nullable|boolean',
             'notify_flagged_applicant'     => 'nullable|boolean',
         ]);
 
@@ -779,6 +903,8 @@ class SettingsController extends Controller
             'notify_application_rejected'  => (bool) $request->input('notify_application_rejected', false),
             'notify_status_change'         => (bool) $request->input('notify_status_change', false),
             'notify_inactive_director'     => (bool) $request->input('notify_inactive_director', false),
+            'notify_silent_wallet_director' => (bool) $request->input('notify_silent_wallet_director', false),
+            'notify_handler_note'          => (bool) $request->input('notify_handler_note', false),
             'notify_dead_weight'           => (bool) $request->input('notify_dead_weight', false),
             'notify_purge_reminder'        => (bool) $request->input('notify_purge_reminder', false),
             'notify_loa_marked'            => (bool) $request->input('notify_loa_marked', false),
@@ -794,6 +920,7 @@ class SettingsController extends Controller
             'notify_member_left'           => (bool) $request->input('notify_member_left', false),
             'notify_join_no_application'   => (bool) $request->input('notify_join_no_application', false),
             'notify_member_unregistered'   => (bool) $request->input('notify_member_unregistered', false),
+            'notify_onboarding_welcome'    => (bool) $request->input('notify_onboarding_welcome', false),
             'notify_flagged_applicant'     => (bool) $request->input('notify_flagged_applicant', false),
         ]);
 
@@ -817,6 +944,8 @@ class SettingsController extends Controller
             'notify_application_rejected'  => 'nullable|boolean',
             'notify_status_change'         => 'nullable|boolean',
             'notify_inactive_director'     => 'nullable|boolean',
+            'notify_silent_wallet_director' => 'nullable|boolean',
+            'notify_handler_note'          => 'nullable|boolean',
             'notify_dead_weight'           => 'nullable|boolean',
             'notify_purge_reminder'        => 'nullable|boolean',
             'notify_loa_marked'            => 'nullable|boolean',
@@ -832,6 +961,7 @@ class SettingsController extends Controller
             'notify_member_left'           => 'nullable|boolean',
             'notify_join_no_application'   => 'nullable|boolean',
             'notify_member_unregistered'   => 'nullable|boolean',
+            'notify_onboarding_welcome'    => 'nullable|boolean',
             'notify_flagged_applicant'     => 'nullable|boolean',
         ]);
 
@@ -856,6 +986,8 @@ class SettingsController extends Controller
             'notify_application_rejected'  => (bool) $request->input('notify_application_rejected', false),
             'notify_status_change'         => (bool) $request->input('notify_status_change', false),
             'notify_inactive_director'     => (bool) $request->input('notify_inactive_director', false),
+            'notify_silent_wallet_director' => (bool) $request->input('notify_silent_wallet_director', false),
+            'notify_handler_note'          => (bool) $request->input('notify_handler_note', false),
             'notify_dead_weight'           => (bool) $request->input('notify_dead_weight', false),
             'notify_purge_reminder'        => (bool) $request->input('notify_purge_reminder', false),
             'notify_loa_marked'            => (bool) $request->input('notify_loa_marked', false),
@@ -871,6 +1003,7 @@ class SettingsController extends Controller
             'notify_member_left'           => (bool) $request->input('notify_member_left', false),
             'notify_join_no_application'   => (bool) $request->input('notify_join_no_application', false),
             'notify_member_unregistered'   => (bool) $request->input('notify_member_unregistered', false),
+            'notify_onboarding_welcome'    => (bool) $request->input('notify_onboarding_welcome', false),
             'notify_flagged_applicant'     => (bool) $request->input('notify_flagged_applicant', false),
         ]);
 

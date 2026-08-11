@@ -80,7 +80,7 @@
                     <div class="row">
                         <div class="col-md-5">
                             <div class="form-group">
-                                <label>{{ trans('hr-manager::watchlist.input_label') }} <span class="text-danger">*</span></label>
+                                <label>{{ trans('hr-manager::watchlist.main_label') }} <span class="text-danger">*</span></label>
                                 <input type="text" name="input" class="form-control"
                                        placeholder="{{ trans('hr-manager::watchlist.input_placeholder') }}"
                                        value="{{ old('input') }}" required maxlength="64">
@@ -159,6 +159,29 @@
                                 <label class="form-check-label" for="watchNotifyExternal"><small>{{ trans('hr-manager::watchlist.notify_on_external_change') }}</small></label>
                             </div>
                         </div>
+                    </div>
+
+                    {{-- Possible alts. For someone never in SeAT there is no
+                         account to expand, so the director supplies the names
+                         from their own intel. Filed as CLAIMS against the main
+                         above, which the reconciler later confirms or refutes. --}}
+                    <div class="form-group mt-3">
+                        <label>{{ trans('hr-manager::watchlist.alts_label') }}</label>
+                        <textarea name="suspected_alts" class="form-control" rows="3"
+                                  placeholder="{{ trans('hr-manager::watchlist.alts_placeholder') }}"
+                                  maxlength="4000">{{ old('suspected_alts') }}</textarea>
+                        <small style="color: var(--hr-text-muted);">{{ trans('hr-manager::watchlist.alts_help') }}</small>
+                    </div>
+
+                    {{-- Whole-account add. Only ever expands to characters HR can
+                         PROVE are the same human (shared SeAT account or player
+                         identity) — never a group of different people. --}}
+                    <div class="form-check mt-3">
+                        <input type="checkbox" name="include_alts" value="1" class="form-check-input" id="watchIncludeAlts" {{ old('include_alts') ? 'checked' : '' }}>
+                        <label class="form-check-label" for="watchIncludeAlts">
+                            <strong>{{ trans('hr-manager::watchlist.include_alts') }}</strong>
+                        </label>
+                        <small class="d-block" style="color: var(--hr-text-muted);">{{ trans('hr-manager::watchlist.include_alts_help') }}</small>
                     </div>
 
                     <div class="mt-3">

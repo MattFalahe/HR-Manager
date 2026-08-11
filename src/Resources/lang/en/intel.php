@@ -16,9 +16,13 @@ return [
     // Add form
     'add_note'              => 'Add Intel Note',
     'add_note_for'          => 'Add note for :name',
-    'input_label'           => 'Character name or ID',
+    'input_label'           => 'Main character',
     'input_placeholder'     => 'e.g. "John Smith" or 90456792',
-    'input_help'            => 'Type a character name OR a numeric ID. Names resolve via SeAT cache + CCP ESI.',
+    'input_help'            => 'A character name OR a numeric ID. Names resolve via SeAT cache + CCP ESI.',
+    'alts_label'            => 'Possible alts (one per line)',
+    'alts_placeholder'      => "Suspected Alt One\nSuspected Alt Two\n90456792",
+    'alts_help'             => 'Files the same note against each of these too, annotated as a possible alt of the main above. HR cannot prove an alt link for someone who was never in SeAT (EVE\'s API has no account concept), so these are recorded as CLAIMS: if both characters later register, HR confirms the link when they share an account, or flags it as refuted when they turn out to be different people.',
+    'alt_links_added'       => 'Recorded :count possible alt link(s) against :main — HR will confirm or refute them if these characters register in SeAT.',
     'scope_label'           => 'Scope',
     'scope_global'          => 'Global (every corp you manage)',
     'scope_corp'            => 'Corp-scoped',
@@ -56,6 +60,11 @@ return [
 
     // Flash
     'note_added'             => 'Intel note added.',
+    'include_alts'           => 'Also file this note against the character\'s known alts',
+    'include_alts_help'      => 'Files the same note on every other character proven to be the SAME person — via a shared SeAT account or an HR player identity — so the intel surfaces whichever alt a recruiter looks up. Never spans different people, and does nothing when the character isn\'t linked to an account HR knows.',
+    'alts_also_added'        => 'Also filed against :count alt(s) from the same account: :names.',
+    'extra_added'            => 'Also filed against :count more from your list: :names.',
+    'extra_failed'           => 'Could not resolve (skipped): :names.',
     'note_added_with_hit'    => 'Intel note added. Heads up: this character is currently inside a corp you watch. A match alert was sent to that corp\'s webhook.',
     'note_removed'           => 'Intel note removed.',
 

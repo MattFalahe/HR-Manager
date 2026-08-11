@@ -15,9 +15,15 @@ class Note extends Model
         'noteable_type',
         'noteable_id',
         'author_id',
+        'system_source',
         'content',
         'is_private',
     ];
+
+    /** Subsystem tags for auto-authored (author_id 0) notes. */
+    public const SOURCE_WATCHDOG = 'watchdog';
+    public const SOURCE_PURGE    = 'purge';
+    public const SOURCE_ALT_LINK = 'alt_link';
 
     protected $casts = [
         'is_private' => 'boolean',

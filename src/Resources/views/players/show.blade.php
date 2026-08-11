@@ -37,6 +37,88 @@
         </div>
     @endif
 
+    {{-- ACTIVE blacklist standing, anywhere on this account. Sits above every
+         other panel because it is the one status that should stop a director
+         before they act on the rest. Blacklist only and active only: a cleared
+         entry belongs to the history timeline, not to a warning banner. --}}
+    @if(($activeBlacklist ?? collect())->isNotEmpty())
+        <div class="alert mb-3" style="background: rgba(220,53,69,0.12); border: 1px solid rgba(220,53,69,0.55); color: var(--hr-text-light);">
+            <div style="font-weight: 700; color: #f5a3ac; font-size: 1.02rem;">
+                <i class="fas fa-ban"></i>
+                {{ trans_choice('hr-manager::players.blacklisted_heading', $activeBlacklist->count(), ['count' => $activeBlacklist->count()]) }}
+            </div>
+            @foreach($activeBlacklist as $bl)
+                @php
+                    $blSev = ['high' => '#f5a3ac', 'medium' => '#ffe08a', 'low' => '#c7d2fe'][$bl->severity] ?? '#ffe08a';
+                @endphp
+                <div class="mt-2" style="padding: 8px 10px; background: rgba(0,0,0,0.18); border-radius: 4px;">
+                    <a href="{{ route('hr-manager.watchlist.dossier', $bl->character_id) }}" style="color: var(--hr-text-white);">
+                        <strong>{{ $bl->character_name ?: ('#' . $bl->character_id) }}</strong>
+                    </a>
+                    <span class="badge ml-1" style="background: rgba(255,255,255,0.10); color: {{ $blSev }}; font-size: 0.62rem;">
+                        {{ strtoupper($bl->severity) }}
+                    </span>
+                    <span class="badge ml-1" style="background: rgba(102,126,234,0.18); color: var(--hr-text-light); font-size: 0.62rem;">
+                        {{ $bl->scope_corp_name ?: trans('hr-manager::watchlist.scope_global') }}
+                    </span>
+                    @if($bl->expires_at)
+                        <small class="ml-1" style="color: var(--hr-text-muted);">{{ trans('hr-manager::watchlist.expires_col') }}: @hrDate($bl->expires_at)</small>
+                    @endif
+                    @if($bl->reason)
+                        <div class="mt-1" style="color: var(--hr-text-light); white-space: pre-wrap;">{{ $bl->reason }}</div>
+                    @endif
+                    <small class="d-block mt-1" style="color: var(--hr-text-muted);">
+                        {{ trans('hr-manager::watchlist.added_col') }}: @hrDate($bl->added_at)
+                    </small>
+                </div>
+            @endforeach
+        </div>
+    @endif
+
+    {{-- Suspected-alt claims, either direction. Shown whether or not anyone
+         here is blacklisted — a standing claim that this player is the alt of a
+         blacklisted character is precisely what a recruiter needs told before
+         they act. Deliberately amber and quiet: it is unproven information, not
+         a verdict, so it informs rather than shouts. --}}
+    @if(($altFlags ?? collect())->isNotEmpty())
+        @php
+            $afStyle = [
+                \HrManager\Models\SuspectedAltLink::STATE_SUSPECTED => ['fg' => '#ffe08a', 'icon' => 'fa-question-circle'],
+                \HrManager\Models\SuspectedAltLink::STATE_CONFIRMED => ['fg' => '#6ee7b7', 'icon' => 'fa-link'],
+                \HrManager\Models\SuspectedAltLink::STATE_REFUTED   => ['fg' => '#f5a3ac', 'icon' => 'fa-unlink'],
+            ];
+        @endphp
+        <div class="alert mb-3" style="background: rgba(255,193,7,0.08); border: 1px solid rgba(255,193,7,0.40); color: var(--hr-text-light);">
+            <div style="font-weight: 600; color: #ffe08a;">
+                <i class="fas fa-user-friends"></i> {{ trans('hr-manager::players.alt_flags_heading') }}
+            </div>
+            <small class="d-block mt-1 mb-2" style="color: var(--hr-text-muted);">{{ trans('hr-manager::players.alt_flags_intro') }}</small>
+            @foreach($altFlags as $af)
+                @php $afs = $afStyle[$af['state']] ?? $afStyle['suspected']; @endphp
+                <div style="padding: 6px 10px; background: rgba(0,0,0,0.15); border-radius: 4px; margin-bottom: 6px;">
+                    <span style="color: {{ $afs['fg'] }};"><i class="fas {{ $afs['icon'] }}"></i></span>
+                    {{ $af['this_is_suspected']
+                        ? trans('hr-manager::players.alt_flags_is_alt_of')
+                        : trans('hr-manager::players.alt_flags_has_alt') }}
+                    <a href="{{ route('hr-manager.watchlist.dossier', $af['other_character_id']) }}" style="color: var(--hr-text-white);">
+                        <strong>{{ $af['other_character_name'] }}</strong>
+                    </a>
+                    <span class="badge ml-1" style="background: rgba(255,255,255,0.08); color: {{ $afs['fg'] }}; font-size: 0.62rem;">
+                        {{ trans('hr-manager::watchlist.alt_state_' . $af['state']) }}
+                    </span>
+                    @if($af['other_blacklisted'])
+                        <span class="badge ml-1" style="background: rgba(220,53,69,0.25); color: #f5a3ac; font-size: 0.62rem;">
+                            <i class="fas fa-ban"></i> {{ trans('hr-manager::players.alt_flags_other_blacklisted') }}
+                        </span>
+                    @endif
+                    @if($af['resolution_note'])
+                        <small class="d-block mt-1" style="color: var(--hr-text-muted);">{{ $af['resolution_note'] }}</small>
+                    @endif
+                </div>
+            @endforeach
+        </div>
+    @endif
+
     {{-- Purge role-strip warning. Renders only when this player is
          marked_for_purge. Severity tiers:
            - scheduled within 24h  -> CRITICAL blinking banner
@@ -47,7 +129,10 @@
          Mentions the EVE 24h cooldown explicitly so operators don't
          miss it, and (when title data is available) lists the exact
          titles + high-impact roles to strip across all alts. --}}
-    @if($status && $status->status === 'marked_for_purge')
+    {{-- Suppressed once they've actually left: "strip roles before the kick"
+         means nothing after the kick, and the close-out sweep may not have run
+         for this corp yet. --}}
+    @if($status && $status->status === 'marked_for_purge' && empty($status->purge_left_corp_at))
         @php
             $hoursToKick = null;
             if ($status->purge_scheduled_for) {
@@ -782,9 +867,45 @@
                     <h3 class="card-title">
                         <i class="fas fa-users"></i> {{ trans('hr-manager::players.all_characters') }}
                         <small style="color: var(--hr-text-muted);">({{ count($altSummaries) }})</small>
+                        @if(!empty($altCoverage['uncovered']))
+                            <span class="badge ml-2" style="background: rgba(220,53,69,0.22); color: #f5a3ac; font-size: 0.62rem;"
+                                  title="{{ trans('hr-manager::players.alt_gap_help') }}">
+                                <i class="fas fa-user-secret"></i>
+                                {{ trans('hr-manager::players.alt_gap_badge', ['count' => count($altCoverage['uncovered'])]) }}
+                            </span>
+                        @endif
                     </h3>
+                    <div class="card-tools">
+                        @include('hr-manager::partials._copy_names', [
+                            'names' => array_values(array_filter(array_map(function ($a) {
+                                return $a['name'] ?? null;
+                            }, $altSummaries))),
+                            'cid'   => 'playeralts',
+                        ])
+                    </div>
                 </div>
                 <div class="card-body">
+                    {{-- Watchlist coverage gap. Only renders when part of this
+                         human IS listed — a clean player never sees it. --}}
+                    @if(!empty($altCoverage['uncovered']))
+                        <div class="mb-3 p-2" style="border: 1px solid rgba(220,53,69,0.35); border-radius: 6px; background: rgba(220,53,69,0.06);">
+                            <div style="color: #f5a3ac; font-weight: 600;">
+                                <i class="fas fa-user-secret"></i> {{ trans('hr-manager::players.alt_gap_title') }}
+                            </div>
+                            <small class="d-block mt-1" style="color: var(--hr-text-muted);">{{ trans('hr-manager::players.alt_gap_body') }}</small>
+                            <div class="d-flex flex-wrap mt-2" style="gap: 6px;">
+                                @foreach($altCoverage['uncovered'] as $uc)
+                                    <a href="{{ route('hr-manager.watchlist.dossier', $uc['character_id']) }}"
+                                       class="badge" style="background: rgba(220,53,69,0.18); color: #f5a3ac; padding: 4px 8px;">
+                                        <img src="https://images.evetech.net/characters/{{ $uc['character_id'] }}/portrait?size=32"
+                                             style="width:16px;height:16px;border-radius:50%;margin-right:4px;vertical-align:middle;" alt="">
+                                        {{ $uc['name'] }}
+                                    </a>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+
                     {{-- Account activity roll-up: how many of this human's
                          characters are actually used vs dormant. Mirrors the
                          classifier's "active but carrying dormant alts" flag
@@ -1114,7 +1235,16 @@
                         <div class="note-item {{ $note->is_private ? 'note-private' : 'note-public' }}">
                             <div class="note-meta">
                                 @if((int) $note->author_id === 0)
-                                    <strong><i class="fas fa-shield-alt" style="color: var(--hr-danger, #dc3545);"></i> {{ trans('hr-manager::notes.system_watchdog') }}</strong>
+                                    {{-- Auto-authored note. system_source names the subsystem;
+                                         notes written before that column existed are all
+                                         Watchdog's, so it stays the fallback. --}}
+                                    @if(($note->system_source ?? null) === \HrManager\Models\Note::SOURCE_PURGE)
+                                        <strong><i class="fas fa-user-minus" style="color: var(--hr-warning, #ffc107);"></i> {{ trans('hr-manager::notes.system_purge') }}</strong>
+                                    @elseif(($note->system_source ?? null) === \HrManager\Models\Note::SOURCE_ALT_LINK)
+                                        <strong><i class="fas fa-link" style="color: var(--hr-info, #17a2b8);"></i> {{ trans('hr-manager::notes.system_alt_link') }}</strong>
+                                    @else
+                                        <strong><i class="fas fa-shield-alt" style="color: var(--hr-danger, #dc3545);"></i> {{ trans('hr-manager::notes.system_watchdog') }}</strong>
+                                    @endif
                                 @else
                                     <strong>{{ $noteAuthorNames[$note->author_id] ?? ('User #' . $note->author_id) }}</strong>
                                 @endif
@@ -1371,6 +1501,56 @@
                     </div>
                 </div>
                 <div class="card-body">
+                    {{-- Merged shell: this identity's characters were moved to
+                         another human. Kept (not deleted) so this SeAT account
+                         still resolves somewhere that can explain itself, rather
+                         than resolving to a blank identity with no history. --}}
+                    @if($identity->isMerged())
+                        @php $mergeTarget = $identity->mergedInto; @endphp
+                        <div class="alert" style="background: rgba(155,126,213,0.12); border: 1px solid rgba(155,126,213,0.45); color: var(--hr-text-light);">
+                            <div style="font-weight: 600; color: #c9b6ee;">
+                                <i class="fas fa-compress-arrows-alt"></i>
+                                {{ trans('hr-manager::players.identity_merged_heading') }}
+                                @if($mergeTarget)
+                                    @if($mergeTarget->seat_user_id)
+                                        <a href="{{ route('hr-manager.players.show', ['id' => $mergeTarget->seat_user_id, 'corporation_id' => $corporationId]) }}" style="color: #d7c8f5;">
+                                            <strong>{{ $mergeTarget->primary_name }}</strong>
+                                        </a>
+                                    @else
+                                        <strong>{{ $mergeTarget->primary_name }}</strong>
+                                    @endif
+                                    <small style="color: var(--hr-text-muted);">(#{{ $mergeTarget->id }})</small>
+                                @endif
+                            </div>
+                            <small class="d-block mt-1" style="color: var(--hr-text-muted);">
+                                {{ trans('hr-manager::players.identity_merged_by', [
+                                    'who'  => $identityMergedByName ?? ('User #' . $identity->merged_by),
+                                    'when' => optional($identity->merged_at)->format('M d, Y H:i') ?: '—',
+                                ]) }}
+                            </small>
+                            @if($identity->merge_notes)
+                                <div class="mt-2" style="padding: 8px; background: rgba(0,0,0,0.18); border-radius: 4px; white-space: pre-wrap;">{{ $identity->merge_notes }}</div>
+                            @endif
+                            <small class="d-block mt-2" style="color: var(--hr-text-muted);">
+                                {!! trans('hr-manager::players.identity_merged_seat_note') !!}
+                            </small>
+                        </div>
+                    @endif
+
+                    {{-- Empty leftover from a merge made before merge tracking
+                         existed. Detectable, but the target was never recorded,
+                         so offer the fix rather than guess at it. --}}
+                    @if(!empty($identityOrphanHint))
+                        <div class="alert" style="background: rgba(255,193,7,0.10); border: 1px solid rgba(255,193,7,0.40); color: var(--hr-text-light);">
+                            <div style="font-weight: 600; color: #ffe08a;">
+                                <i class="fas fa-unlink"></i> {{ trans('hr-manager::players.identity_orphan_heading') }}
+                            </div>
+                            <small class="d-block mt-1" style="color: var(--hr-text-muted);">
+                                {!! trans('hr-manager::players.identity_orphan_body', ['id' => $identity->id]) !!}
+                            </small>
+                        </div>
+                    @endif
+
                     {{-- Clarify the auto-linked nature so directors don't
                          think they need to reassign correctly-linked
                          characters. Reassign is a RARE account-takeover
@@ -1477,7 +1657,7 @@
 
                     {{-- Merge identity action --}}
                     <h5 style="color: var(--hr-text-white);"><i class="fas fa-object-group"></i> {{ trans('hr-manager::identity.merge_heading') }}</h5>
-                    <p style="color: var(--hr-text-muted);">{{ trans('hr-manager::identity.merge_help') }}</p>
+                    <p style="color: var(--hr-text-muted);">{!! trans('hr-manager::identity.merge_help') !!}</p>
                     <form method="POST" action="{{ route('hr-manager.players.merge-identity', ['id' => $user->id]) }}">
                         @csrf
                         <div class="form-group">

@@ -47,6 +47,15 @@ class PurgeService
     {
         $counts = array_fill_keys(PurgeReminder::ALL_MILESTONES, 0);
 
+        // Close finished purges first, so nobody who has already left the corp
+        // gets another reminder. The purge board runs this per-corp on render;
+        // here it's the global backstop for corps nobody has opened.
+        try {
+            $this->closeCompletedPurges();
+        } catch (\Throwable $e) {
+            Log::warning('[HR Manager] purge close-completed sweep failed: ' . $e->getMessage());
+        }
+
         $rows = PlayerStatus::where('status', PlayerStatus::STATUS_MARKED_FOR_PURGE)
             ->whereNotNull('purge_scheduled_for')
             ->get();
@@ -197,6 +206,185 @@ class PurgeService
             'status_set_by' => $executorUserId,
             'status_set_at' => now(),
         ]);
+    }
+
+    /**
+     * Close a purge that completed on its own — the player was detected as
+     * having left the corp, so there is nothing left for a director to do.
+     *
+     * Without this the row sat at marked_for_purge forever: the purge board
+     * kept listing someone who was already gone, and their profile kept the
+     * "strip in-game roles NOW" banner up long after the kick. Mirrors
+     * markExecuted() (status back to active, row preserved as the historical
+     * record) but attributes it to the system rather than a director, and
+     * writes the full arc — who scheduled it, when, the date it was due versus
+     * the date it actually happened, and whatever was in the purge notes — to
+     * both the history timeline and a note on the profile.
+     *
+     * Idempotent: a row that is no longer marked_for_purge is left alone.
+     */
+    public function completeOnDeparture(PlayerStatus $status): void
+    {
+        if ($status->status !== PlayerStatus::STATUS_MARKED_FOR_PURGE) {
+            return;
+        }
+
+        $scheduledFor = $status->purge_scheduled_for?->toDateString();
+        $leftAt       = $status->purge_left_corp_at ?? now();
+        $scheduledBy  = $status->status_set_by ? (int) $status->status_set_by : null;
+
+        // Days between the date it was due and the date it actually happened.
+        // Negative = they left early (walked before the deadline).
+        $slipDays = $status->purge_scheduled_for
+            ? (int) $status->purge_scheduled_for->copy()->startOfDay()->diffInDays($leftAt->copy()->startOfDay(), false)
+            : null;
+
+        $payload = [
+            'player_status_id' => $status->id,
+            'executed_by'      => null,           // system: detected, not confirmed by hand
+            'detected'         => true,
+            'scheduled_by'     => $scheduledBy,
+            'marked_at'        => $status->status_set_at?->toDateTimeString(),
+            'scheduled_for'    => $scheduledFor,
+            'left_corp_at'     => $leftAt->toDateTimeString(),
+            'left_corp_to'     => $status->purge_left_corp_to,
+            'slip_days'        => $slipDays,
+            'roles_removed_at' => $status->purge_roles_removed_at?->toDateTimeString(),
+            'squads_removed_at'=> $status->purge_squads_removed_at?->toDateTimeString(),
+            'purge_notes'      => $status->purge_notes,
+            'origin'           => $status->purge_origin,
+            'reason'           => $status->reason,
+        ];
+
+        $this->history->record('hr.purge.executed', $payload, [
+            'user_id'        => $status->user_id,
+            'corporation_id' => $status->corporation_id,
+            'occurred_at'    => $leftAt,
+        ]);
+
+        // Stop the reminder ladder. firstOrCreate because the unique constraint
+        // on (player_status_id, milestone) would otherwise throw if a director
+        // had already hand-confirmed the same purge.
+        try {
+            PurgeReminder::firstOrCreate(
+                ['player_status_id' => $status->id, 'milestone' => PurgeReminder::MILESTONE_EXECUTED],
+                ['dispatched_at' => now()]
+            );
+        } catch (\Throwable $e) {
+            Log::warning('[HR Manager] purge executed-milestone stamp failed for status ' . $status->id . ': ' . $e->getMessage());
+        }
+
+        $this->publishToEventBus('hr.purge.executed', array_merge([
+            'source_plugin'  => 'hr-manager',
+            'schema_version' => 1,
+            'event_id'       => 'hr-evt-' . Str::uuid()->toString(),
+            'user_id'        => $status->user_id,
+            'corporation_id' => $status->corporation_id,
+        ], $payload));
+
+        $this->purgeCompletionNote($status, $scheduledBy, $leftAt, $slipDays);
+
+        $status->update([
+            'status'        => PlayerStatus::STATUS_ACTIVE,
+            'reason'        => 'Purge completed ' . $leftAt->toDateString() . ' (left corp)'
+                . ($status->reason ? ' — ' . $status->reason : ''),
+            'status_set_at' => now(),
+        ]);
+    }
+
+    /**
+     * Sweep purges that finished but were never closed: the player is stamped
+     * as having left, yet the row is still marked_for_purge. Covers rows that
+     * departed before auto-completion existed, and any run where the close
+     * failed partway. Scoped to one corp so the board can call it cheaply.
+     *
+     * @return int rows closed
+     */
+    public function closeCompletedPurges(?int $corporationId = null): int
+    {
+        if (!Schema::hasColumn('hr_manager_player_status', 'purge_left_corp_at')) {
+            return 0;
+        }
+
+        $query = PlayerStatus::where('status', PlayerStatus::STATUS_MARKED_FOR_PURGE)
+            ->whereNotNull('purge_left_corp_at');
+        if ($corporationId !== null) {
+            $query->where('corporation_id', $corporationId);
+        }
+
+        $closed = 0;
+        foreach ($query->get() as $status) {
+            try {
+                $this->completeOnDeparture($status);
+                $closed++;
+            } catch (\Throwable $e) {
+                Log::warning('[HR Manager] purge auto-close failed for status ' . $status->id . ': ' . $e->getMessage());
+            }
+        }
+
+        return $closed;
+    }
+
+    /**
+     * The human-readable summary that lands on the player's profile. Author 0 +
+     * the 'purge' source tag renders it as an HR Manager system note rather
+     * than the Watchdog's security branding.
+     */
+    private function purgeCompletionNote(PlayerStatus $status, ?int $scheduledBy, Carbon $leftAt, ?int $slipDays): void
+    {
+        $lines = ['Purge completed — player left the corp on ' . $leftAt->toDateString() . '.'];
+
+        if ($status->status_set_at) {
+            $who = $scheduledBy ? ($this->userDisplayName($scheduledBy) ?? ('User #' . $scheduledBy)) : 'HR (automated)';
+            $lines[] = 'Scheduled by ' . $who . ' on ' . $status->status_set_at->toDateString()
+                . ($status->purge_origin === PlayerStatus::ORIGIN_TOKEN_LOSS ? ' (security auto-purge: SeAT token loss).' : '.');
+        }
+
+        if ($status->purge_scheduled_for) {
+            $due = 'Due ' . $status->purge_scheduled_for->toDateString() . ', left ' . $leftAt->toDateString();
+            if ($slipDays !== null && $slipDays !== 0) {
+                $due .= $slipDays > 0
+                    ? ' (' . $slipDays . ' day' . ($slipDays === 1 ? '' : 's') . ' late).'
+                    : ' (' . abs($slipDays) . ' day' . (abs($slipDays) === 1 ? '' : 's') . ' early).';
+            } else {
+                $due .= ' (on time).';
+            }
+            $lines[] = $due;
+        }
+
+        if ($status->reason) {
+            $lines[] = 'Reason: ' . $status->reason;
+        }
+        if ($status->purge_notes) {
+            $lines[] = 'Purge notes: ' . $status->purge_notes;
+        }
+
+        try {
+            \HrManager\Models\Note::create([
+                'noteable_type' => 'player',
+                'noteable_id'   => $status->user_id,
+                'author_id'     => 0,
+                'system_source' => \HrManager\Models\Note::SOURCE_PURGE,
+                'content'       => implode("\n", $lines),
+                'is_private'    => false,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('[HR Manager] purge completion note failed for status ' . $status->id . ': ' . $e->getMessage());
+        }
+    }
+
+    /** Best-effort display name for a SeAT user (their main character). */
+    private function userDisplayName(int $userId): ?string
+    {
+        try {
+            $mainId = (int) \Illuminate\Support\Facades\DB::table('users')->where('id', $userId)->value('main_character_id');
+            if ($mainId <= 0) {
+                return null;
+            }
+            return app(NameResolutionService::class)->getCharacterName($mainId);
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     private function charactersInCorpForPlayer(int $userId, int $corporationId): array

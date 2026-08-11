@@ -47,6 +47,15 @@ class PurgeBoardService
 
         $this->detectRemovals($corporationId);
 
+        // Close any purge that finished but was never closed out — rows stamped
+        // as departed before auto-completion existed would otherwise sit on the
+        // board forever. No-op once there are none left.
+        try {
+            app(PurgeService::class)->closeCompletedPurges($corporationId);
+        } catch (\Throwable $e) {
+            Log::warning('[HR Manager] purge board close-completed sweep failed: ' . $e->getMessage());
+        }
+
         // Show EVERY marked-for-purge player, including ones flagged without a
         // scheduled date yet ("Purge flagged (no date)"). Dated purges sort
         // first (by deadline), undated ones after, departed members last.
@@ -179,6 +188,15 @@ class PurgeBoardService
             app(PurgeService::class)->maybeRemoveSquadsOnDeparture($s->fresh());
         } catch (\Throwable $e) {
             Log::warning('[HR Manager] purge squad cleanup on departure failed for status ' . $s->id . ': ' . $e->getMessage());
+        }
+
+        // The purge is finished — close it out so the board stops listing
+        // someone who has already gone and their profile drops the
+        // "strip roles now" banner. Records the full arc first.
+        try {
+            app(PurgeService::class)->completeOnDeparture($s->fresh());
+        } catch (\Throwable $e) {
+            Log::warning('[HR Manager] purge auto-close on departure failed for status ' . $s->id . ': ' . $e->getMessage());
         }
     }
 

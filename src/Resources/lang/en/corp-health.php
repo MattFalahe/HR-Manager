@@ -475,6 +475,17 @@ return [
     // so a 3-alt account doing ratting+mining+industry adds to all
     // three bars. This is the per-character lens; the Players page is
     // the per-human rollup.
+    // Active vs dormant characters (single stacked bar, composition tab).
+    'char_activity_heading'        => 'Active vs dormant characters',
+    'char_activity_active_label'   => 'flying',
+    'char_activity_dormant_label'  => 'dormant',
+    'char_activity_seg_active'      => 'Active',
+    'char_activity_seg_at_risk'     => 'At risk',
+    'char_activity_seg_inactive'    => 'Inactive',
+    'char_activity_seg_dead_weight' => 'Dead weight',
+    'char_activity_seg_unknown'     => 'No logon data',
+    'char_activity_footnote'        => 'Counts every character on the roster by its own last logon: active under :active days, at risk :active-:at_risk, inactive :at_risk-:inactive, dead weight :inactive+. Characters, not people — one person\'s dormant alt shows here even when they are active on another character. Whether a PERSON is active is judged separately by the classifier, across their whole account, and that is what drives purge and notifications.',
+
     'composition_heading'      => 'Corp composition by activity',
     'composition_roster'       => ':n characters',
     'composition_help'         => 'How many <strong>characters</strong> (not humans — each alt counted separately) engage in each activity. One character can do several (rats AND builds), so the bars overlap and won\'t sum to 100%.',
@@ -537,7 +548,8 @@ return [
     'dir_inactive'                => 'inactive',
     'not_in_seat'                 => 'NOT IN SEAT',
     'not_in_seat_hint'            => 'No registered SeAT token for this director, so their activity, wallet and assets cannot be tracked here.',
-    'inactive_directors_help'     => 'Directors dark for :days+ days (corp-survival risk). Built from the corp roster plus member-tracking logons, so it includes directors who are NOT registered in SeAT, which the classifier alone cannot see. Grouped by account — expand a row to see the person\'s director characters.',
+    'inactive_directors_help'     => 'Directors dark for :days+ days (corp-survival risk). Built from the corp roster plus member-tracking logons, so it includes directors who are NOT registered in SeAT, which the classifier alone cannot see. Grouped by account, and judged on the PERSON: someone whose account is active is not listed here even if one of their director characters is dusty. The figure shown is their most recently flown director character — expand a row to see the rest.',
+    'dir_dormant_chars_note'      => '{1}:count director character has not been flown in :days+ days, but its account is active, so it is not counted as an absent director.|[2,*]:count director characters have not been flown in :days+ days, but their accounts are active, so they are not counted as absent directors.',
     'dir_char_count'              => '{1}:count director char|[2,*]:count director chars',
     'dir_on_char'                 => 'director char: :name',
     'char_count'                  => '{1}:count character|[2,*]:count characters',

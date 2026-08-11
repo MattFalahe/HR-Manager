@@ -48,6 +48,12 @@
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a href="#" class="nav-link" data-section="onboarding">
+                                <i class="fas fa-hand-holding-heart"></i> {{ trans('hr-manager::help.onboarding_nav') }}
+                                <span class="badge ml-1" style="background: rgba(40,167,69,0.28); color: #6ee7b7; border: 1px solid rgba(40,167,69,0.55); font-size: 0.72rem; font-weight: 700; padding: 2px 7px; vertical-align: middle;">1.0.1</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a href="#" class="nav-link" data-section="tiers">
                                 <i class="fas fa-layer-group"></i> {{ trans('hr-manager::help.activity_tiers') }}
                             </a>
@@ -614,6 +620,7 @@ docker compose -f docker-compose.yml -f docker-compose.mariadb.yml -f docker-com
                         <li>{!! trans('hr-manager::help.feat_p_cap_4') !!}</li>
                         <li>{!! trans('hr-manager::help.feat_p_cap_5') !!}</li>
                         <li>{!! trans('hr-manager::help.feat_p_cap_6') !!}</li>
+                        <li>{!! trans('hr-manager::help.feat_p_cap_7') !!}</li>
                     </ul>
 
                     <div class="warning-box">
@@ -648,6 +655,12 @@ docker compose -f docker-compose.yml -f docker-compose.mariadb.yml -f docker-com
 
                     <h4>{{ trans('hr-manager::help.feat_w_clear_account_heading') }}</h4>
                     <p>{!! trans('hr-manager::help.feat_w_clear_account_body') !!}</p>
+
+                    <h4>
+                        {{ trans('hr-manager::help.feat_w_altclaims_heading') }}
+                        <span class="badge ml-1" style="background: rgba(40,167,69,0.28); color: #6ee7b7; border: 1px solid rgba(40,167,69,0.55); font-size: 0.78rem; font-weight: 700; padding: 3px 9px; vertical-align: middle;">1.0.1</span>
+                    </h4>
+                    <p>{!! trans('hr-manager::help.feat_w_altclaims_body') !!}</p>
 
                     <div class="info-box">
                         <i class="fas fa-map-marker-alt"></i>
@@ -1031,6 +1044,50 @@ docker compose -f docker-compose.yml -f docker-compose.mariadb.yml -f docker-com
             </div>
 
             {{-- ============================================================
+                 NEW-MEMBER ONBOARDING  (1.0.1)
+                 Sits right after Applications: it is the step immediately
+                 after someone is accepted and joins, and the only
+                 MEMBER-facing thing HR does — every other notification
+                 category is written for staff.
+                 ============================================================ --}}
+            <div id="onboarding" class="help-section">
+                <div class="help-card">
+                    <h3>
+                        <i class="fas fa-hand-holding-heart"></i> {{ trans('hr-manager::help.onboarding_title') }}
+                        <span class="badge ml-1" style="background: rgba(40,167,69,0.28); color: #6ee7b7; border: 1px solid rgba(40,167,69,0.55); font-size: 0.78rem; font-weight: 700; padding: 3px 9px; vertical-align: middle;">1.0.1</span>
+                    </h3>
+                    <p>{!! trans('hr-manager::help.onboarding_intro') !!}</p>
+
+                    <h4>{{ trans('hr-manager::help.onboarding_who_title') }}</h4>
+                    <p>{!! trans('hr-manager::help.onboarding_who_body') !!}</p>
+
+                    <h4>{{ trans('hr-manager::help.onboarding_when_title') }}</h4>
+                    <p>{!! trans('hr-manager::help.onboarding_when_body') !!}</p>
+
+                    <h4>{{ trans('hr-manager::help.onboarding_setup_title') }}</h4>
+                    <ol>
+                        <li>{!! trans('hr-manager::help.onboarding_setup_1') !!}</li>
+                        <li>{!! trans('hr-manager::help.onboarding_setup_2') !!}</li>
+                        <li>{!! trans('hr-manager::help.onboarding_setup_3') !!}</li>
+                        <li>{!! trans('hr-manager::help.onboarding_setup_4') !!}</li>
+                    </ol>
+
+                    <h4>{{ trans('hr-manager::help.onboarding_template_title') }}</h4>
+                    <p>{!! trans('hr-manager::help.onboarding_template_body') !!}</p>
+
+                    <div class="info-box">
+                        <i class="fas fa-info-circle"></i>
+                        {!! trans('hr-manager::help.onboarding_length_note') !!}
+                    </div>
+
+                    <div class="info-box">
+                        <i class="fas fa-question-circle"></i>
+                        {!! trans('hr-manager::help.onboarding_troubleshoot') !!}
+                    </div>
+                </div>
+            </div>
+
+            {{-- ============================================================
                  ACTIVITY TIERS
                  ============================================================ --}}
             <div id="tiers" class="help-section">
@@ -1331,15 +1388,21 @@ docker compose -f docker-compose.yml -f docker-compose.mariadb.yml -f docker-com
                         <li>{{ trans('hr-manager::help.toggle_watchlist_detection') }}</li>
                         <li>{{ trans('hr-manager::help.toggle_intel_match') }}</li>
                         <li>{{ trans('hr-manager::help.toggle_inactive_director') }}</li>
+                        <li>{{ trans('hr-manager::help.toggle_handler_note') }}</li>
+                        <li>{{ trans('hr-manager::help.toggle_silent_wallet_director') }}</li>
                         <li>{{ trans('hr-manager::help.toggle_dead_weight') }}</li>
                         <li>{{ trans('hr-manager::help.toggle_purge_reminder') }}</li>
-                        <li>{{ trans('hr-manager::help.toggle_player_status') }}</li>
+                        <li>{{ trans('hr-manager::help.toggle_loa_marked') }}</li>
+                        <li>{{ trans('hr-manager::help.toggle_marked_for_purge') }}</li>
+                        <li>{{ trans('hr-manager::help.toggle_status_cleared') }}</li>
+                        <li>{{ trans('hr-manager::help.toggle_purge_personal') }}</li>
                         <li>{{ trans('hr-manager::help.toggle_token_revoked') }}</li>
                         <li>{{ trans('hr-manager::help.toggle_token_coverage') }}</li>
                         <li>{{ trans('hr-manager::help.toggle_member_joined') }}</li>
                         <li>{{ trans('hr-manager::help.toggle_member_left') }}</li>
                         <li>{{ trans('hr-manager::help.toggle_join_no_application') }}</li>
                         <li>{{ trans('hr-manager::help.toggle_member_unregistered') }}</li>
+                        <li>{{ trans('hr-manager::help.toggle_onboarding_welcome') }}</li>
                         <li>{{ trans('hr-manager::help.toggle_wallet_stalled') }}</li>
                         <li>{{ trans('hr-manager::help.toggle_wallet_compliance') }}</li>
                         <li>{{ trans('hr-manager::help.toggle_wallet_milestone') }}</li>
@@ -1359,6 +1422,15 @@ docker compose -f docker-compose.yml -f docker-compose.mariadb.yml -f docker-com
                         <li><strong>Daily / every 3 days / weekly / every 2 weeks / monthly</strong> &mdash; re-remind on that cadence for as long as they stay dark.</li>
                     </ul>
                     <p class="text-muted"><small>The reminder clock resets when the director becomes active again, so a later relapse always alerts fresh rather than being muted by the previous episode.</small></p>
+
+                    <h4>
+                        <i class="fas fa-comments"></i> {{ trans('hr-manager::help.handler_note_title') }}
+                        <span class="badge ml-1" style="background: rgba(40,167,69,0.28); color: #6ee7b7; border: 1px solid rgba(40,167,69,0.55); font-size: 0.78rem; font-weight: 700; padding: 3px 9px; vertical-align: middle;">1.0.1</span>
+                    </h4>
+                    <p>{!! trans('hr-manager::help.handler_note_body') !!}</p>
+
+                    <h4><i class="fas fa-hand-holding-heart"></i> {{ trans('hr-manager::help.onboarding_title') }}</h4>
+                    <p>{!! trans('hr-manager::help.onboarding_notif_pointer') !!}</p>
 
                     <div class="info-box">
                         <i class="fas fa-bolt"></i>
@@ -1513,6 +1585,22 @@ docker compose -f docker-compose.yml -f docker-compose.mariadb.yml -f docker-com
                     <h4><code>hr-manager:detect-token-loss</code></h4>
                     <p>{{ trans('hr-manager::help.cmd_detect_token_loss') }}</p>
                     <p class="text-muted cmd-meta"><small><strong>Options:</strong> none &nbsp;|&nbsp; <strong>Runs:</strong> every 10 minutes (security-grade, so a higher cadence)</small></p>
+
+                    <h4><code>hr-manager:reconcile-suspected-alts</code></h4>
+                    <p>{{ trans('hr-manager::help.cmd_reconcile_suspected_alts') }}</p>
+                    <p class="text-muted cmd-meta"><small><strong>Options:</strong> none &nbsp;|&nbsp; <strong>Runs:</strong> daily 05:00 (no-op when there are no open claims)</small></p>
+
+                    <h4><code>hr-manager:sync-external-rosters</code></h4>
+                    <p>{{ trans('hr-manager::help.cmd_sync_external_rosters') }}</p>
+                    <p class="text-muted cmd-meta"><small><strong>Options:</strong> none &nbsp;|&nbsp; <strong>Runs:</strong> daily 04:30 when enabled (no-op when off)</small></p>
+
+                    <h4><code>hr-manager:warm-player-profiles</code></h4>
+                    <p>{!! trans('hr-manager::help.cmd_warm_player_profiles') !!}</p>
+                    <p class="text-muted cmd-meta"><small><strong>Options:</strong> <code>--corporation=&lt;name|ticker|id&gt;</code> warm one corp (preview + confirm) &nbsp;|&nbsp; <code>--all</code> every tracked corp &nbsp;|&nbsp; <code>--no-interaction</code> skip the prompt &nbsp;|&nbsp; <strong>Runs:</strong> every 30 minutes when enabled (no-op when off)</small></p>
+
+                    <h4><code>hr-manager:send-onboarding-welcomes</code></h4>
+                    <p>{{ trans('hr-manager::help.cmd_send_onboarding_welcomes') }}</p>
+                    <p class="text-muted cmd-meta"><small><strong>Options:</strong> none &nbsp;|&nbsp; <strong>Runs:</strong> every 5 minutes (no-op when nothing is due)</small></p>
 
                     <h4><code>hr-manager:sweep-access-grants</code></h4>
                     <p>{{ trans('hr-manager::help.cmd_sweep_access_grants') }}</p>

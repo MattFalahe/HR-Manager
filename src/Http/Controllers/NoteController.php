@@ -38,13 +38,22 @@ class NoteController extends Controller
         // Verify the user has access to the note's target (app's corp or member's corp)
         $this->assertCanAccessNoteable($request->noteable_type, (int) $request->noteable_id);
 
+        $isPrivate = $this->privateNotesEnabled() && !empty($request->is_private);
+
         Note::create([
             'noteable_type' => $request->noteable_type,
             'noteable_id'   => $request->noteable_id,
             'author_id'     => auth()->user()->id,
             'content'       => $request->content,
-            'is_private'    => $this->privateNotesEnabled() && !empty($request->is_private),
+            'is_private'    => $isPrivate,
         ]);
+
+        // Tell the application's OTHER handlers. Public application notes only:
+        // a private note is a recruiter thinking aloud, and pinging a co-handler
+        // about text they may not be permitted to read is worse than silence.
+        if (!$isPrivate && $request->noteable_type === 'application') {
+            $this->notifyHandlersOfNote((int) $request->noteable_id, (string) $request->content);
+        }
 
         return redirect()->back()->with('success', trans('hr-manager::notes.note_created'));
     }
@@ -99,6 +108,45 @@ class NoteController extends Controller
         } elseif ($type === 'member') {
             // For member notes, noteable_id is the EVE character_id
             $this->assertCanAccessCharacter($id);
+        }
+    }
+
+    /**
+     * Ping the application's handlers about a new public note. Best-effort:
+     * a notification failure must never cost the operator the note they just
+     * wrote, so everything here is wrapped and swallowed.
+     */
+    private function notifyHandlersOfNote(int $applicationId, string $content): void
+    {
+        try {
+            $application = Application::find($applicationId);
+            if (!$application) {
+                return;
+            }
+
+            $handlerIds = \HrManager\Models\ApplicationHandler::where('application_id', $applicationId)
+                ->pluck('user_id')
+                ->map(fn ($u) => (int) $u)
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+
+            // One handler (or none) means the only person to tell is the one
+            // who just wrote it — notifyHandlerNote() drops those anyway, but
+            // there's no reason to build the payload.
+            if (count($handlerIds) < 2) {
+                return;
+            }
+
+            app(\HrManager\Services\NotificationService::class)->notifyHandlerNote(
+                $application,
+                $handlerIds,
+                (int) auth()->user()->id,
+                $content
+            );
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('[HR Manager] handler-note notification failed: ' . $e->getMessage());
         }
     }
 }

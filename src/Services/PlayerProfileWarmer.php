@@ -82,10 +82,45 @@ class PlayerProfileWarmer
     public function getBundle(int $userId, int $corporationId): ?array
     {
         $cached = Cache::get($this->bundleKey($userId, $corporationId));
-        if (is_array($cached)) {
+        if (is_array($cached) && $this->characterSetUnchanged($cached, $userId)) {
             return $cached;
         }
         return $this->rebuild($userId, $corporationId);
+    }
+
+    /**
+     * Does the cached bundle still describe the account's actual characters?
+     *
+     * The cache exists so activity aggregates don't get recomputed per view,
+     * and those going a few minutes stale is the whole point. The character
+     * LIST is different: a character added or moved away (a SeAT account
+     * transfer, a fresh auth) makes the profile look plainly broken — the alt
+     * is right there in SeAT and missing from HR — and waiting out a 24-hour
+     * TTL for it is not defensible. One indexed lookup to rule that out.
+     */
+    private function characterSetUnchanged(array $bundle, int $userId): bool
+    {
+        if (!isset($bundle['characterIds']) || !is_array($bundle['characterIds'])) {
+            return false; // pre-dates the key, or malformed — rebuild
+        }
+
+        try {
+            // Must match how characterIds was built (charactersForUser =>
+            // live tokens only). Including revoked ones here would make the
+            // sets differ permanently and rebuild on every single view.
+            $live = DB::table('refresh_tokens')
+                ->where('user_id', $userId)
+                ->whereNull('deleted_at')
+                ->pluck('character_id')
+                ->map(fn ($i) => (int) $i)
+                ->sort()->values()->all();
+        } catch (\Throwable $e) {
+            return true; // can't tell — serve what we have rather than thrash
+        }
+
+        $cachedIds = collect($bundle['characterIds'])->map(fn ($i) => (int) $i)->sort()->values()->all();
+
+        return $cachedIds === $live;
     }
 
     /**

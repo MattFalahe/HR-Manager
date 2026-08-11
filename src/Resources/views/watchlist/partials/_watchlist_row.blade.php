@@ -1,5 +1,15 @@
 {{-- One watchlist entry row, shared by the flat (by-character) and grouped
-     (by-account) list views. Expects: $entry, $corpNames, $listType --}}
+     (by-account) list views. Expects: $entry, $corpNames, $listType.
+     $altLinks (optional, keyed by character_id) badges an entry that was added
+     as somebody's suspected alt. --}}
+@php
+    $wlLink = ($altLinks ?? collect())[$entry->character_id] ?? null;
+    $wlLinkStyle = [
+        \HrManager\Models\SuspectedAltLink::STATE_SUSPECTED => ['bg' => 'rgba(255,193,7,0.20)',  'fg' => '#ffe08a', 'icon' => 'fa-question-circle'],
+        \HrManager\Models\SuspectedAltLink::STATE_CONFIRMED => ['bg' => 'rgba(40,167,69,0.20)',  'fg' => '#6ee7b7', 'icon' => 'fa-link'],
+        \HrManager\Models\SuspectedAltLink::STATE_REFUTED   => ['bg' => 'rgba(220,53,69,0.22)',  'fg' => '#f5a3ac', 'icon' => 'fa-unlink'],
+    ];
+@endphp
 <tr>
     <td>
         <img src="https://images.evetech.net/characters/{{ $entry->character_id }}/portrait?size=32"
@@ -10,6 +20,16 @@
             <strong>{{ $entry->display_name }}</strong>
         </a>
         <small class="ml-2" style="color: var(--hr-text-muted);">#{{ $entry->character_id }}</small>
+        @if($wlLink)
+            @php $wls = $wlLinkStyle[$wlLink->state] ?? $wlLinkStyle['suspected']; @endphp
+            <span class="badge ml-1" style="background: {{ $wls['bg'] }}; color: {{ $wls['fg'] }}; font-size: 0.62rem;"
+                  title="{{ trans('hr-manager::watchlist.alt_state_' . $wlLink->state . '_help') }}">
+                <i class="fas {{ $wls['icon'] }}"></i> {{ trans('hr-manager::watchlist.alt_state_' . $wlLink->state) }}
+            </span>
+            <small class="d-block" style="color: var(--hr-text-muted); font-size: 0.72rem;">
+                {{ trans('hr-manager::watchlist.alt_of', ['main' => $wlLink->main_character_name ?: ('#' . $wlLink->main_character_id)]) }}
+            </small>
+        @endif
     </td>
     <td>
         @if($entry->scope_corporation_id)

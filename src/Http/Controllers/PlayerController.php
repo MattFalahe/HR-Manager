@@ -38,8 +38,29 @@ class PlayerController extends Controller
         $corporations = $this->corporationPickerOptions($allowedCorps);
         $tierAuto = app(TierService::class)->autoResolutionAvailable();
 
+        // Identities folded into another human. SeAT still sees two accounts,
+        // so both keep a row here — the badge says which one is the shell and
+        // where its characters actually live, instead of leaving a director to
+        // wonder why the person they merged is still listed twice.
+        $mergedInto = [];
+        if (\Illuminate\Support\Facades\Schema::hasColumn('hr_manager_player_identities', 'merged_into_id')) {
+            $userIds = collect($players)->pluck('id')->map(fn ($i) => (int) $i)->all();
+            if (!empty($userIds)) {
+                $mergedInto = \HrManager\Models\PlayerIdentity::whereIn('seat_user_id', $userIds)
+                    ->whereNotNull('merged_into_id')
+                    ->with('mergedInto:id,primary_name,seat_user_id')
+                    ->get()
+                    ->keyBy('seat_user_id')
+                    ->map(fn ($i) => [
+                        'name'    => $i->mergedInto->primary_name ?? null,
+                        'user_id' => $i->mergedInto->seat_user_id ?? null,
+                    ])
+                    ->all();
+            }
+        }
+
         return view('hr-manager::players.index', compact(
-            'players', 'corporationId', 'corporations', 'tierAuto'
+            'players', 'corporationId', 'corporations', 'tierAuto', 'mergedInto'
         ));
     }
 
@@ -200,7 +221,152 @@ class PlayerController extends Controller
             0, 3
         );
 
+        // ACTIVE blacklist entries anywhere on this account. The profile is the
+        // human view and it named every status a director might act on — tier,
+        // LOA, purge, wallet flags — except the one that most obviously should
+        // stop them: that the person is blacklisted. Deliberately blacklist-only
+        // and active-only; a cleared entry is history (it's on the timeline) and
+        // whitelist standing isn't a warning.
+        // Hoisted: the alt-flag block below reads the same character set, and a
+        // failure in the blacklist lookup must not leave it undefined.
+        $blCharIds = collect($summary['alt_summaries'] ?? [])
+            ->pluck('character_id')->map(fn ($c) => (int) $c)->filter()->all();
+
+        $activeBlacklist = collect();
+        try {
+            if (!empty($blCharIds) && \Illuminate\Support\Facades\Schema::hasTable('hr_manager_watchlist_entries')) {
+                $blQuery = \HrManager\Models\WatchlistEntry::whereIn('character_id', $blCharIds)
+                    ->where('list_type', \HrManager\Models\WatchlistEntry::TYPE_BLACKLIST)
+                    ->active()
+                    ->orderByDesc('added_at');
+                $this->applyWatchlistScopeVisibility($blQuery, $allowedCorps);
+                $activeBlacklist = $blQuery->get();
+
+                // Resolve scope corp names inline so the banner can name the
+                // corp instead of printing a bare id.
+                $blScopeIds = $activeBlacklist->pluck('scope_corporation_id')->filter()->unique()->all();
+                $blCorpNames = !empty($blScopeIds)
+                    ? \Seat\Eveapi\Models\Corporation\CorporationInfo::whereIn('corporation_id', $blScopeIds)
+                        ->pluck('name', 'corporation_id')->toArray()
+                    : [];
+                $activeBlacklist = $activeBlacklist->map(function ($e) use ($blCorpNames) {
+                    $e->scope_corp_name = $e->scope_corporation_id
+                        ? ($blCorpNames[$e->scope_corporation_id] ?? ('Corp #' . $e->scope_corporation_id))
+                        : null;
+                    return $e;
+                });
+            }
+        } catch (\Throwable $e) {
+            Log::warning('[HR Manager] player blacklist lookup failed: ' . $e->getMessage());
+        }
+
+        // Suspected-alt claims touching this person, either end. Shown whether
+        // or not anyone here is blacklisted: a claim that this player is the
+        // alt of a blacklisted character is exactly the thing a recruiter needs
+        // told, and it is information rather than an accusation — so it reads
+        // as a flag, not as the red blacklist banner.
+        $altFlags = collect();
+        try {
+            if (!empty($blCharIds) && \Illuminate\Support\Facades\Schema::hasTable('hr_manager_suspected_alt_links')) {
+                $links = \HrManager\Models\SuspectedAltLink::whereIn('suspected_character_id', $blCharIds)
+                    ->orWhereIn('main_character_id', $blCharIds)
+                    ->orderByDesc('asserted_at')
+                    ->get();
+
+                // Is the character on the OTHER end of each claim blacklisted?
+                // That is what turns "these might be the same person" into
+                // something worth acting on.
+                $counterparts = $links->map(fn ($l) => in_array((int) $l->suspected_character_id, $blCharIds, true)
+                    ? (int) $l->main_character_id
+                    : (int) $l->suspected_character_id)->unique()->filter()->all();
+
+                $flaggedCounterparts = [];
+                if (!empty($counterparts)) {
+                    $cpQuery = \HrManager\Models\WatchlistEntry::whereIn('character_id', $counterparts)
+                        ->where('list_type', \HrManager\Models\WatchlistEntry::TYPE_BLACKLIST)
+                        ->active();
+                    $this->applyWatchlistScopeVisibility($cpQuery, $allowedCorps);
+                    $flaggedCounterparts = $cpQuery->pluck('character_id')->map(fn ($c) => (int) $c)->all();
+                }
+
+                $altFlags = $links->map(function ($l) use ($blCharIds, $flaggedCounterparts) {
+                    $thisIsSuspected = in_array((int) $l->suspected_character_id, $blCharIds, true);
+                    $otherId   = $thisIsSuspected ? (int) $l->main_character_id : (int) $l->suspected_character_id;
+                    $otherName = $thisIsSuspected
+                        ? ($l->main_character_name ?: ('#' . $l->main_character_id))
+                        : ($l->suspected_character_name ?: ('#' . $l->suspected_character_id));
+
+                    return [
+                        'state'                 => $l->state,
+                        // Direction matters for the wording: "this player may be
+                        // an alt of X" reads very differently from "X may be an
+                        // alt of this player".
+                        'this_is_suspected'     => $thisIsSuspected,
+                        'other_character_id'    => $otherId,
+                        'other_character_name'  => $otherName,
+                        'other_blacklisted'     => in_array($otherId, $flaggedCounterparts, true),
+                        'resolution_note'       => $l->resolution_note,
+                    ];
+                });
+            }
+        } catch (\Throwable $e) {
+            Log::warning('[HR Manager] player alt-flag lookup failed: ' . $e->getMessage());
+        }
+
+        // Watchlist coverage gap: when SOME of this account's characters are on
+        // the watchlist, name the ones that aren't. A director who listed the
+        // alts they knew about can't otherwise notice the ones they missed —
+        // the account only became visible when the person authenticated.
+        $altCoverage = ['listed' => [], 'uncovered' => []];
+        try {
+            $seedCharId = (int) (auth()->user() && $summary['user']
+                ? ($summary['user']->main_character_id ?? 0)
+                : 0);
+            if ($seedCharId <= 0) {
+                $seedCharId = (int) (collect($summary['alt_summaries'] ?? [])->first()['character_id'] ?? 0);
+            }
+            if ($seedCharId > 0) {
+                $altCoverage = app(\HrManager\Services\SuspectedAltService::class)->coverageGap($seedCharId);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('[HR Manager] alt coverage gap failed: ' . $e->getMessage());
+        }
+
+        // Who performed the merge, for the shell banner. Resolved separately
+        // because merged_by is a SeAT user id, not a character.
+        // Leftover from a merge made BEFORE merge tracking existed: this
+        // identity holds no characters, and a soft-deleted identity for the
+        // same SeAT account is sitting behind it. That's the signature of the
+        // old behaviour, where the merged-away identity was deleted and the
+        // next lookup minted this empty replacement. We can spot it but not
+        // say where the characters went — the pointer was never recorded — so
+        // the profile offers the one-step fix instead of guessing.
+        $identityOrphanHint = false;
+        if ($identity
+            && !$identity->isMerged()
+            && $identity->seat_user_id
+            && empty($identity->currentCharacterIds())) {
+            try {
+                $identityOrphanHint = \HrManager\Models\PlayerIdentity::onlyTrashed()
+                    ->where('seat_user_id', $identity->seat_user_id)
+                    ->exists();
+            } catch (\Throwable $e) {
+                $identityOrphanHint = false;
+            }
+        }
+
+        $identityMergedByName = null;
+        if ($identity && $identity->merged_by) {
+            $identityMergedByName = app(\HrManager\Services\NameResolutionService::class)
+                ->getUserNames([(int) $identity->merged_by])[(int) $identity->merged_by] ?? null;
+        }
+
         return view('hr-manager::players.show', compact(
+            'activeBlacklist',
+            'altFlags',
+            'identityOrphanHint',
+            'identityMergedByName',
+            'altCoverage',
             'summary', 'notes', 'history', 'corporationId',
             'corporations', 'tierAuto', 'titleSnapshot',
             'identity', 'identityCharNames', 'roleProfiles', 'fcActivity',
@@ -332,6 +498,38 @@ class PlayerController extends Controller
      * identity (an old identity.id bookmark) 301-redirects to the
      * canonical user_id URL. Returns [identity, userId, ?redirect].
      */
+    /**
+     * Limit watchlist entries to what this viewer may see: global entries plus
+     * anything scoped to a corp (or that corp's alliance) they have access to.
+     * Mirrors WatchlistController's rule so the profile banner can never reveal
+     * an entry the Watchlist page itself would hide. Admins (null) see all.
+     */
+    private function applyWatchlistScopeVisibility($query, ?array $allowedCorps): void
+    {
+        if ($allowedCorps === null) {
+            return;
+        }
+
+        $allowedAlliances = !empty($allowedCorps) && \Illuminate\Support\Facades\Schema::hasTable('corporation_infos')
+            ? DB::table('corporation_infos')
+                ->whereIn('corporation_id', $allowedCorps)
+                ->whereNotNull('alliance_id')
+                ->pluck('alliance_id')->map(fn ($id) => (int) $id)->unique()->all()
+            : [];
+
+        $query->where(function ($q) use ($allowedCorps, $allowedAlliances) {
+            $q->where(function ($g) {
+                $g->whereNull('scope_corporation_id')->whereNull('scope_alliance_id');
+            });
+            if (!empty($allowedCorps)) {
+                $q->orWhereIn('scope_corporation_id', $allowedCorps);
+            }
+            if (!empty($allowedAlliances)) {
+                $q->orWhereIn('scope_alliance_id', $allowedAlliances);
+            }
+        });
+    }
+
     private function resolveIdentityOrRedirect(
         Request $request,
         int $id,

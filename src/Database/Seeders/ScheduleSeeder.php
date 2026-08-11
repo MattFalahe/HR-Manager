@@ -145,6 +145,33 @@ class ScheduleSeeder extends AbstractScheduleSeeder
                 'ping_after'        => null,
             ],
 
+            // Post queued onboarding welcomes whose delay has elapsed. Every 5
+            // minutes so a welcome fires close to its send_after mark (the
+            // Connector-role grace window). No-op when nothing is due.
+            [
+                'command'           => 'hr-manager:send-onboarding-welcomes',
+                'expression'        => '*/5 * * * *',
+                'allow_overlap'     => false,
+                'allow_maintenance' => false,
+                'ping_before'       => null,
+                'ping_after'        => null,
+            ],
+
+            // Settle suspected alt links - daily at 05:00. Claims are about
+            // characters HR usually can't see yet, so most passes decide
+            // nothing; the one that matters runs after a suspect finally
+            // registers and either confirms the link or refutes it. Cheap:
+            // two indexed lookups per open claim, and nothing at all when
+            // there are none.
+            [
+                'command'           => 'hr-manager:reconcile-suspected-alts',
+                'expression'        => '0 5 * * *',
+                'allow_overlap'     => false,
+                'allow_maintenance' => false,
+                'ping_before'       => null,
+                'ping_after'        => null,
+            ],
+
             // Scan watchlist for new matches - every 15 minutes. Three
             // detection passes: corp-join (blacklist char in a managed
             // corp), alliance-join (blacklist char in a corp in our

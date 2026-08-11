@@ -66,6 +66,14 @@ class ClassifierService
      */
     private const DORMANT_ALT_MIN = 2;
 
+    /**
+     * Window + ISK floor for the director wallet-attribution check. Named
+     * constants so the detection and the alert that reports it can't drift
+     * apart (the message quotes the window back to the operator).
+     */
+    private const WALLET_ATTRIBUTION_MONTHS  = 3;
+    private const WALLET_ATTRIBUTION_MIN_ISK = 50_000_000;
+
     private TierService $tier;
     private PlayerService $player;
     private HistoryEventService $history;
@@ -510,11 +518,15 @@ class ClassifierService
     }
 
     /**
-     * Fires the same critical-alert pathway as onInactiveDirectorRaised but
-     * for a director who's still logging in (so doesn't trip the days_inactive
+     * A director who's still logging in (so never trips the days_inactive
      * threshold) yet has zero attributed wallet actions. CWM's director
      * attribution surfaces this — corp survival risk shows up here as
      * "director is functionally absent from corp finances".
+     *
+     * Has its OWN notification + webhook category. It used to reuse the
+     * inactive-director alert, which reported "inactive for 0 days (threshold
+     * 14d)" — days_inactive is 0 on this path by definition, so the message was
+     * always wrong and the two couldn't be routed or silenced separately.
      */
     private function onSilentWalletDirectorRaised(int $userId, int $corporationId, PlayerClassification $now): void
     {
@@ -549,9 +561,9 @@ class ClassifierService
         $this->publishToEventBus('hr.player.silent_wallet_director', $payload);
 
         try {
-            $this->notifications->notifyInactiveDirector($userId, $corporationId, $now);
+            $this->notifications->notifySilentWalletDirector($userId, $corporationId, self::WALLET_ATTRIBUTION_MONTHS);
         } catch (\Throwable $e) {
-            Log::warning('[HR Manager] notifyInactiveDirector (silent_wallet_director) failed: ' . $e->getMessage());
+            Log::warning('[HR Manager] notifySilentWalletDirector failed: ' . $e->getMessage());
         }
     }
 
@@ -846,7 +858,11 @@ class ClassifierService
      */
     private function detectSilentWalletDirector(int $corporationId, $characters): bool
     {
-        $attribution = $this->crossPlugin->getDirectorAttribution($corporationId, 3, 50_000_000);
+        $attribution = $this->crossPlugin->getDirectorAttribution(
+            $corporationId,
+            self::WALLET_ATTRIBUTION_MONTHS,
+            self::WALLET_ATTRIBUTION_MIN_ISK
+        );
         if (!($attribution['available'] ?? false)) {
             return false;
         }
@@ -865,6 +881,15 @@ class ClassifierService
             $rows = $rows['attributions'];
         }
         if (!is_array($rows)) {
+            return false;
+        }
+
+        // No attributed rows AT ALL for the corp means we can't tell "this
+        // director did nothing" from "there's no attribution data" (CWM not
+        // synced yet, or nobody in the corp cleared the ISK floor in the
+        // window). Flagging on that fired a false alert for EVERY director at
+        // once, so an empty result set is treated as "unknown", not "silent".
+        if (empty($rows)) {
             return false;
         }
 

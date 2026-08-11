@@ -126,6 +126,18 @@
                                             @endif
                                             <strong>{{ $mainName }}</strong>
                                         </a>
+                                        @php $mergeInfo = ($mergedInto ?? [])[$user->id] ?? null; @endphp
+                                        @if($mergeInfo)
+                                            <span class="badge ml-1" style="background: rgba(155,126,213,0.20); color: #c9b6ee; font-size: 0.62rem;"
+                                                  title="{{ trans('hr-manager::players.identity_merged_seat_note_plain') }}">
+                                                <i class="fas fa-compress-arrows-alt"></i>
+                                                @if($mergeInfo['name'])
+                                                    {{ trans('hr-manager::players.identity_merged_badge', ['name' => $mergeInfo['name']]) }}
+                                                @else
+                                                    {{ trans('hr-manager::players.identity_merged_badge_bare') }}
+                                                @endif
+                                            </span>
+                                        @endif
                                     </td>
                                     <td>{{ $hr['alt_count'] }}</td>
                                     <td>

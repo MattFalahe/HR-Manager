@@ -15,11 +15,18 @@ class PlayerIdentity extends Model
     protected $fillable = [
         'primary_name',
         'seat_user_id',
+        'merged_into_id',
+        'merged_by',
+        'merged_at',
+        'merge_notes',
         'notes_summary',
     ];
 
     protected $casts = [
-        'seat_user_id' => 'integer',
+        'seat_user_id'   => 'integer',
+        'merged_into_id' => 'integer',
+        'merged_by'      => 'integer',
+        'merged_at'      => 'datetime',
     ];
 
     public function mappings()
@@ -47,9 +54,20 @@ class PlayerIdentity extends Model
      *
      * @return array<int>
      */
+    /** Folded into another identity — kept so its SeAT account still resolves. */
+    public function isMerged(): bool
+    {
+        return $this->merged_into_id !== null;
+    }
+
+    public function mergedInto()
+    {
+        return $this->belongsTo(self::class, 'merged_into_id');
+    }
+
     public function currentCharacterIds(): array
     {
-        return $this->currentMappings()->pluck('character_id')->map(fn($id) => (int) $id)->all();
+        return $this->currentMappings()->pluck('character_id')->map(fn($id) => (int) $id)->unique()->values()->all();
     }
 
     /**

@@ -123,6 +123,27 @@
                         </div>
                     </div>
 
+                    {{-- Possible alts: names the director supplies from their own
+                         intel, filed as claims against the main above and settled
+                         later by the reconciler. --}}
+                    <div class="form-group">
+                        <label>{{ trans('hr-manager::intel.alts_label') }}</label>
+                        <textarea name="suspected_alts" class="form-control" rows="3"
+                                  placeholder="{{ trans('hr-manager::intel.alts_placeholder') }}"
+                                  maxlength="4000">{{ old('suspected_alts') }}</textarea>
+                        <small style="color: var(--hr-text-muted);">{{ trans('hr-manager::intel.alts_help') }}</small>
+                    </div>
+
+                    {{-- Whole-account filing. Only expands to characters HR can
+                         PROVE are the same human — never a group of people. --}}
+                    <div class="form-check mb-3">
+                        <input type="checkbox" name="include_alts" value="1" class="form-check-input" id="intelIncludeAlts" {{ old('include_alts') ? 'checked' : '' }}>
+                        <label class="form-check-label" for="intelIncludeAlts">
+                            <strong>{{ trans('hr-manager::intel.include_alts') }}</strong>
+                        </label>
+                        <small class="d-block" style="color: var(--hr-text-muted);">{{ trans('hr-manager::intel.include_alts_help') }}</small>
+                    </div>
+
                     <button type="submit" class="btn btn-hr-primary btn-icon">
                         <i class="fas fa-save"></i> {{ trans('hr-manager::intel.save_note') }}
                     </button>

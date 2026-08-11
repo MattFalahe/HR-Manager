@@ -121,8 +121,25 @@ class WatchlistController extends Controller
         // are all listed (only prompts when the count is > 1).
         $accountActiveCounts = $this->accountActiveCounts($corpSource);
 
+        // Suspected-alt links for the characters on THIS page, so a row can
+        // badge itself "suspected / confirmed / refuted alt of X". Keyed by
+        // character id; empty before the table exists.
+        $altLinks = collect();
+        if (\Illuminate\Support\Facades\Schema::hasTable('hr_manager_suspected_alt_links')) {
+            $pageCharIds = collect($entries ?? [])->pluck('character_id')
+                ->merge(collect($accountGroups ?? [])->pluck('entries')->flatten(1)->pluck('character_id'))
+                ->filter()->map(function ($id) { return (int) $id; })->unique()->values()->all();
+
+            if (!empty($pageCharIds)) {
+                $altLinks = \HrManager\Models\SuspectedAltLink::whereIn('suspected_character_id', $pageCharIds)
+                    ->get()
+                    ->keyBy('suspected_character_id');
+            }
+        }
+
         return view('hr-manager::watchlist.index', compact(
             'entries',
+            'altLinks',
             'accountGroups',
             'groupMode',
             'listType',
@@ -318,7 +335,26 @@ class WatchlistController extends Controller
             ? $resolver->getCharacterNamesWithFallback($entryCharIds)
             : [];
 
+        // Alt links touching this human, either end: what's been claimed as
+        // their alt, and what they've been claimed as an alt OF. Plus the
+        // coverage gap — characters on this account nobody has listed.
+        $altLinks = collect();
+        $altCoverage = ['listed' => [], 'uncovered' => []];
+        if (Schema::hasTable('hr_manager_suspected_alt_links')) {
+            $altLinks = \HrManager\Models\SuspectedAltLink::whereIn('suspected_character_id', $accountCharIds)
+                ->orWhereIn('main_character_id', $accountCharIds)
+                ->orderByDesc('asserted_at')
+                ->get();
+            try {
+                $altCoverage = app(\HrManager\Services\SuspectedAltService::class)->coverageGap($characterId);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('[HR Manager] dossier coverage gap failed: ' . $e->getMessage());
+            }
+        }
+
         return view('hr-manager::watchlist.dossier', compact(
+            'altLinks',
+            'altCoverage',
             'characterId',
             'displayName',
             'entries',
@@ -335,16 +371,20 @@ class WatchlistController extends Controller
     /** Every character id on the account that owns $characterId (main + alts). */
     private function accountCharacterIds(int $characterId): array
     {
-        $ids = [(int) $characterId];
-        $userId = DB::table('refresh_tokens')
-            ->where('character_id', $characterId)
-            ->whereNull('deleted_at')->value('user_id');
-        if ($userId) {
-            $ids = array_merge($ids, DB::table('refresh_tokens')
-                ->where('user_id', $userId)->whereNull('deleted_at')->pluck('character_id')->all());
+        // Identity-aware: follows HR's player identity as well as the SeAT
+        // account, so a human who made two SeAT accounts (and had them merged
+        // by a director) reads as ONE dossier instead of the account SeAT
+        // happens to hold on whichever character was clicked.
+        $siblings = app(\HrManager\Services\AccountCharacterResolver::class)->siblingsFor($characterId);
+        if (!empty($siblings)) {
+            return array_values(array_unique(array_map(
+                fn ($s) => (int) $s['character_id'],
+                $siblings
+            )));
         }
 
-        return array_values(array_unique(array_map('intval', $ids)));
+        // Unknown to both -> just the character that was clicked.
+        return [(int) $characterId];
     }
 
     /**
@@ -387,6 +427,7 @@ class WatchlistController extends Controller
         $request->validate([
             'list_type'                  => 'required|in:blacklist,whitelist',
             'input'                      => 'required|string|min:1|max:64',
+            'suspected_alts'             => 'nullable|string|max:4000',
             'scope_corporation_id'       => 'nullable|integer',
             'scope_alliance_id'          => 'nullable|integer',
             'reason'                     => 'nullable|string|max:2000',
@@ -395,6 +436,7 @@ class WatchlistController extends Controller
             'notify_on_corp_match'       => 'nullable|boolean',
             'notify_on_alliance_match'   => 'nullable|boolean',
             'notify_on_external_change'  => 'nullable|boolean',
+            'include_alts'               => 'nullable|boolean',
         ]);
 
         $scopeCorp = $request->filled('scope_corporation_id')
@@ -407,15 +449,25 @@ class WatchlistController extends Controller
             $this->assertCanAccessCorp($scopeCorp);
         }
 
-        $result = $service->addEntry(
-            $request->list_type,
-            (int) auth()->user()->id,
-            $request->input('input'),
-            $scopeCorp,
-            $request->reason,
-            $request->input('severity', WatchlistEntry::SEVERITY_MEDIUM),
-            $request->filled('expires_at') ? \Carbon\Carbon::parse($request->expires_at) : null
-        );
+        // The main is one character; the possible-alts box is a separate list.
+        // Keeping them apart is what lets HR record each alt as a CLAIM against
+        // a named main — a claim the reconciler can later confirm or refute —
+        // rather than as an anonymous batch of unrelated entries.
+        $altTokens = $this->parseCharacterList((string) $request->input('suspected_alts', ''));
+
+        $addEntry = function (string $token) use ($service, $request, $scopeCorp) {
+            return $service->addEntry(
+                $request->list_type,
+                (int) auth()->user()->id,
+                $token,
+                $scopeCorp,
+                $request->reason,
+                $request->input('severity', WatchlistEntry::SEVERITY_MEDIUM),
+                $request->filled('expires_at') ? \Carbon\Carbon::parse($request->expires_at) : null
+            );
+        };
+
+        $result = $addEntry((string) $request->input('input'));
 
         if (!$result['success']) {
             return redirect()->back()->with('error', trans('hr-manager::watchlist.add_failed_' . ($result['reason'] ?? 'unknown')))->withInput();
@@ -424,6 +476,45 @@ class WatchlistController extends Controller
         // Patch the created entry with the alliance scope + policy
         // flags that addEntry() doesn't know about yet.
         $entry = $result['entry'];
+
+        // Each possible alt gets its own entry carrying the same settings, PLUS
+        // a suspected-alt link naming the main. Collected rather than aborted on
+        // failure — one fat-fingered name shouldn't discard the rest.
+        $extraAdded  = [];
+        $extraFailed = [];
+        $linksMade   = 0;
+        $altService  = app(\HrManager\Services\SuspectedAltService::class);
+
+        foreach ($altTokens as $token) {
+            $r = $addEntry($token);
+            if (empty($r['success']) || empty($r['entry'])) {
+                $extraFailed[] = $token;
+                continue;
+            }
+
+            $altEntry = $r['entry'];
+            $altEntry->update([
+                'scope_alliance_id'         => $scopeAlliance,
+                'notify_on_corp_match'      => (bool) $request->input('notify_on_corp_match', true),
+                'notify_on_alliance_match'  => (bool) $request->input('notify_on_alliance_match', $scopeAlliance !== null),
+                'notify_on_external_change' => (bool) $request->input('notify_on_external_change', false),
+            ]);
+
+            $link = $altService->record(
+                (int) $altEntry->character_id,
+                (int) $entry->character_id,
+                $altEntry->character_name,
+                $entry->character_name,
+                \HrManager\Models\SuspectedAltLink::SOURCE_WATCHLIST,
+                (int) $altEntry->id,
+                (int) auth()->user()->id
+            );
+            if ($link) {
+                $linksMade++;
+            }
+
+            $extraAdded[] = $altEntry->character_name ?: ('#' . $altEntry->character_id);
+        }
         $entry->update([
             'scope_alliance_id'          => $scopeAlliance,
             'notify_on_corp_match'       => (bool) $request->input('notify_on_corp_match', true),
@@ -443,6 +534,16 @@ class WatchlistController extends Controller
             \Illuminate\Support\Facades\Log::warning('[HR] watchlist immediate check failed: ' . $e->getMessage());
         }
 
+        // Optional bulk-add: extend the same entry to every OTHER character
+        // proven to be the same human (shared SeAT account or HR identity).
+        // Same reason / severity / scope / policy flags, so one spy is listed
+        // once as a person rather than once per alt the director remembered.
+        // Only ever the same human — never a group.
+        $alsoAdded = [];
+        if ($request->boolean('include_alts')) {
+            $alsoAdded = $this->addSiblingEntries($service, $entry, $request, $scopeCorp, $scopeAlliance);
+        }
+
         // Audit trail (security): who added whom to the blacklist / whitelist,
         // with the severity + reason. Names the character so the log reads
         // "Added X to blacklist" rather than an id.
@@ -452,16 +553,119 @@ class WatchlistController extends Controller
             'target_id'      => (int) $entry->character_id ?: null,
             'target_label'   => $charName,
             'corporation_id' => $scopeCorp,
-            'summary'        => 'Added ' . $charName . ' to ' . $request->list_type,
+            'summary'        => 'Added ' . $charName . ' to ' . $request->list_type
+                . (!empty($alsoAdded) ? ' (+' . count($alsoAdded) . ' alts of the same account)' : ''),
             'context'        => [
                 'list_type' => $request->list_type,
                 'severity'  => $request->input('severity', WatchlistEntry::SEVERITY_MEDIUM),
                 'reason'    => $request->reason ? mb_substr((string) $request->reason, 0, 200) : null,
+                'alts_added' => $alsoAdded ?: null,
             ],
         ]);
 
+        $flash = trans('hr-manager::watchlist.entry_added' . ($immediateHit ? '_with_hit' : ''));
+        if (!empty($extraAdded)) {
+            $flash .= ' ' . trans('hr-manager::watchlist.extra_added', [
+                'count' => count($extraAdded),
+                'names' => implode(', ', $extraAdded),
+            ]);
+        }
+        if ($linksMade > 0) {
+            $flash .= ' ' . trans('hr-manager::watchlist.alt_links_added', [
+                'count' => $linksMade,
+                'main'  => $entry->character_name ?: ('#' . $entry->character_id),
+            ]);
+        }
+        if (!empty($extraFailed)) {
+            $flash .= ' ' . trans('hr-manager::watchlist.extra_failed', [
+                'names' => implode(', ', $extraFailed),
+            ]);
+        }
+        if (!empty($alsoAdded)) {
+            // Name them so the director can see exactly what landed and remove
+            // any they didn't want, rather than trusting a bare count.
+            $flash .= ' ' . trans('hr-manager::watchlist.alts_also_added', [
+                'count' => count($alsoAdded),
+                'names' => implode(', ', $alsoAdded),
+            ]);
+        }
+
         return redirect()->route('hr-manager.watchlist.index', ['list_type' => $request->list_type])
-            ->with('success', trans('hr-manager::watchlist.entry_added' . ($immediateHit ? '_with_hit' : '')));
+            ->with('success', $flash);
+    }
+
+    /**
+     * Split a multi-line character box into individual tokens (names or IDs).
+     * Newline-separated, since EVE character names legitimately contain spaces
+     * and may contain a comma. Blanks dropped, duplicates collapsed, and the
+     * list capped so a pasted wall of text can't fire hundreds of ESI name
+     * lookups in one request.
+     *
+     * @return array<int, string>
+     */
+    private function parseCharacterList(string $raw): array
+    {
+        $tokens = preg_split('/\r\n|\r|\n/', $raw) ?: [];
+        $tokens = array_values(array_unique(array_filter(array_map('trim', $tokens), function ($t) {
+            return $t !== '';
+        })));
+
+        return array_slice($tokens, 0, 50);
+    }
+
+    /**
+     * Add the same watchlist entry for every other character on the seed
+     * character's account. Returns the names actually added (skipping the seed
+     * and anything that failed to resolve), so the caller can report them.
+     *
+     * @return array<int, string>
+     */
+    private function addSiblingEntries(
+        WatchlistService $service,
+        WatchlistEntry $seed,
+        Request $request,
+        ?int $scopeCorp,
+        ?int $scopeAlliance
+    ): array {
+        $added = [];
+
+        try {
+            $siblings = app(\HrManager\Services\AccountCharacterResolver::class)
+                ->siblingsFor((int) $seed->character_id);
+
+            foreach ($siblings as $sib) {
+                if (!empty($sib['is_seed'])) {
+                    continue;
+                }
+
+                $res = $service->addEntry(
+                    $request->list_type,
+                    (int) auth()->user()->id,
+                    (string) $sib['character_id'],
+                    $scopeCorp,
+                    $request->reason,
+                    $request->input('severity', WatchlistEntry::SEVERITY_MEDIUM),
+                    $request->filled('expires_at') ? \Carbon\Carbon::parse($request->expires_at) : null
+                );
+
+                if (empty($res['success']) || empty($res['entry'])) {
+                    continue;
+                }
+
+                $res['entry']->update([
+                    'scope_alliance_id'         => $scopeAlliance,
+                    'notify_on_corp_match'      => (bool) $request->input('notify_on_corp_match', true),
+                    'notify_on_alliance_match'  => (bool) $request->input('notify_on_alliance_match', $scopeAlliance !== null),
+                    'notify_on_external_change' => (bool) $request->input('notify_on_external_change', false),
+                ]);
+
+                $added[] = $sib['name'];
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('[HR Manager] watchlist alt bulk-add failed: ' . $e->getMessage());
+        }
+
+        return $added;
     }
 
     /**

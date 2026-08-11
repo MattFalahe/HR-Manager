@@ -29,10 +29,10 @@ class NotificationCatalog
     public static function groups(): array
     {
         return [
-            'applications' => ['application_submitted', 'status_change', 'flagged_applicant'],
+            'applications' => ['application_submitted', 'status_change', 'flagged_applicant', 'handler_note'],
             'membership'   => ['member_joined', 'member_left', 'join_no_application', 'member_unregistered'],
             'security'     => ['watchlist_detection', 'intel_match', 'token_revoked'],
-            'health'       => ['inactive_director', 'dead_weight', 'loa_marked', 'marked_for_purge', 'status_cleared'],
+            'health'       => ['inactive_director', 'silent_wallet_director', 'dead_weight', 'loa_marked', 'marked_for_purge', 'status_cleared'],
             'wallet'       => ['wallet_stalled', 'wallet_compliance_dropped', 'wallet_milestone'],
             'purge_tokens' => ['purge_reminder', 'token_coverage'],
         ];
@@ -53,6 +53,7 @@ class NotificationCatalog
             'application_submitted'     => ['label' => 'notify_application_submitted',     'desc' => 'notif_desc_application_submitted',     'cadence' => false, 'fast_poll' => false],
             'status_change'             => ['label' => 'notify_status_change',             'desc' => 'notif_desc_status_change',             'cadence' => false, 'fast_poll' => false],
             'flagged_applicant'         => ['label' => 'notify_flagged_applicant',         'desc' => 'notif_desc_flagged_applicant',         'cadence' => false, 'fast_poll' => false],
+            'handler_note'              => ['label' => 'notify_handler_note',              'desc' => 'notif_desc_handler_note',              'cadence' => false, 'fast_poll' => false],
 
             // Membership
             'member_joined'             => ['label' => 'notify_member_joined',             'desc' => 'notif_desc_member_joined',             'cadence' => false, 'fast_poll' => true],
@@ -67,6 +68,7 @@ class NotificationCatalog
 
             // Corp health
             'inactive_director'         => ['label' => 'notify_inactive_director',         'desc' => 'notif_desc_inactive_director',         'cadence' => false, 'fast_poll' => false],
+            'silent_wallet_director'    => ['label' => 'notify_silent_wallet_director',    'desc' => 'notif_desc_silent_wallet_director',    'cadence' => false, 'fast_poll' => false],
             'dead_weight'               => ['label' => 'notify_dead_weight',               'desc' => 'notif_desc_dead_weight',               'cadence' => false, 'fast_poll' => false],
             'loa_marked'                => ['label' => 'notify_loa_marked',                'desc' => 'notif_desc_loa_marked',                'cadence' => false, 'fast_poll' => false],
             'marked_for_purge'          => ['label' => 'notify_marked_for_purge',          'desc' => 'notif_desc_marked_for_purge',          'cadence' => false, 'fast_poll' => false],

@@ -108,11 +108,13 @@ class IntelController extends Controller
 
         $request->validate([
             'input'                => 'required|string|min:1|max:64',
+            'suspected_alts'       => 'nullable|string|max:4000',
             'body'                 => 'required|string|max:8000',
             'scope_corporation_id' => 'nullable|integer',
             'tags'                 => 'nullable|string|max:255',
             'recruiter_visible'    => 'nullable|boolean',
             'expires_at'           => 'nullable|date|after:today',
+            'include_alts'         => 'nullable|boolean',
         ]);
 
         $scope = $request->filled('scope_corporation_id')
@@ -122,19 +124,54 @@ class IntelController extends Controller
             $this->assertCanAccessCorp($scope);
         }
 
-        // Resolve name -> ID OR validate the ID via the shared service.
+        // One character per line. Someone who was never in SeAT has no account
+        // for HR to expand, so listing their known alts by hand is the only way
+        // to file intel against the whole group — ESI exposes no account concept
+        // that could prove the link automatically.
         $resolver = app(NameResolutionService::class);
-        $rawInput = trim((string) $request->input('input'));
-        if (ctype_digit($rawInput)) {
-            $cid = (int) $rawInput;
-            $cname = $resolver->getCharacterName($cid);
-        } else {
-            $r = $resolver->getIdFromCharacterName($rawInput);
-            $cid = $r['character_id'] ?? null;
-            $cname = $r['character_name'] ?? null;
-            if ($cid === null) {
-                return redirect()->back()->with('error', 'Could not resolve that name to a character. Try the character ID directly.')->withInput();
+        $resolveOne = function (string $token) use ($resolver) {
+            $token = trim($token);
+            if ($token === '') {
+                return null;
             }
+            if (ctype_digit($token)) {
+                $id = (int) $token;
+                return $id > 0 ? ['id' => $id, 'name' => $resolver->getCharacterName($id)] : null;
+            }
+            $r = $resolver->getIdFromCharacterName($token);
+            return isset($r['character_id']) && $r['character_id']
+                ? ['id' => (int) $r['character_id'], 'name' => $r['character_name'] ?? null]
+                : null;
+        };
+
+        $tokens = preg_split('/\r\n|\r|\n/', (string) $request->input('suspected_alts', '')) ?: [];
+        $tokens = array_slice(array_values(array_unique(array_filter(
+            array_map('trim', $tokens),
+            function ($t) { return $t !== ''; }
+        ))), 0, 50);
+
+        // The main drives the redirect and the immediate scope check. An alt
+        // line that won't resolve is reported rather than discarding the notes
+        // that did land.
+        $primary = $resolveOne((string) $request->input('input'));
+        if ($primary === null) {
+            return redirect()->back()->with('error', 'Could not resolve that name to a character. Try the character ID directly.')->withInput();
+        }
+        $cid   = $primary['id'];
+        $cname = $primary['name'];
+
+        $extraTargets = [];
+        $extraFailed  = [];
+        foreach ($tokens as $token) {
+            $res = $resolveOne($token);
+            if ($res === null) {
+                $extraFailed[] = $token;
+                continue;
+            }
+            if ((int) $res['id'] === $cid) {
+                continue; // same character listed twice
+            }
+            $extraTargets[$res['id']] = $res['name'] ?: ('Character #' . $res['id']);
         }
 
         // Parse comma-separated tags into a normalized array.
@@ -166,18 +203,114 @@ class IntelController extends Controller
             \Illuminate\Support\Facades\Log::warning('[HR] intel immediate scope check failed: ' . $e->getMessage());
         }
 
+        // Possible alts the director listed by hand: each gets the same note,
+        // plus a suspected-alt link naming the main so the claim can later be
+        // confirmed or refuted against real account data.
+        $extraAdded = [];
+        $linksMade  = 0;
+        $altService = app(\HrManager\Services\SuspectedAltService::class);
+
+        foreach ($extraTargets as $exId => $exName) {
+            try {
+                $altNote = IntelNote::create([
+                    'character_id'         => (int) $exId,
+                    'character_name'       => $exName,
+                    'scope_corporation_id' => $scope,
+                    'body'                 => $request->input('body'),
+                    'tags'                 => $tagsArr,
+                    'recruiter_visible'    => (bool) $request->input('recruiter_visible', false),
+                    'author_id'            => (int) auth()->user()->id,
+                    'expires_at'           => $request->filled('expires_at') ? \Carbon\Carbon::parse($request->expires_at) : null,
+                ]);
+
+                if ($altService->record(
+                    (int) $exId,
+                    $cid,
+                    $exName,
+                    $cname,
+                    \HrManager\Models\SuspectedAltLink::SOURCE_INTEL,
+                    (int) $altNote->id,
+                    (int) auth()->user()->id
+                )) {
+                    $linksMade++;
+                }
+
+                $extraAdded[] = $exName;
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('[HR Manager] intel multi-add failed for ' . $exId . ': ' . $e->getMessage());
+                $extraFailed[] = $exName;
+            }
+        }
+
+        // Optional: file the same note against every OTHER character proven to
+        // be the same human (shared SeAT account or HR identity), so intel on a
+        // person isn't invisible when a recruiter looks up one of their alts.
+        // Same human only — never a group.
+        $alsoAdded = [];
+        if ($request->boolean('include_alts')) {
+            try {
+                $siblings = app(\HrManager\Services\AccountCharacterResolver::class)->siblingsFor($cid);
+                foreach ($siblings as $sib) {
+                    if (!empty($sib['is_seed'])) {
+                        continue;
+                    }
+                    IntelNote::create([
+                        'character_id'         => (int) $sib['character_id'],
+                        'character_name'       => $sib['name'],
+                        'scope_corporation_id' => $scope,
+                        'body'                 => $request->input('body'),
+                        'tags'                 => $tagsArr,
+                        'recruiter_visible'    => (bool) $request->input('recruiter_visible', false),
+                        'author_id'            => (int) auth()->user()->id,
+                        'expires_at'           => $request->filled('expires_at') ? \Carbon\Carbon::parse($request->expires_at) : null,
+                    ]);
+                    $alsoAdded[] = $sib['name'];
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('[HR Manager] intel alt bulk-add failed: ' . $e->getMessage());
+            }
+        }
+
         // Audit trail (security): an intel note was recorded on a character.
         app(AuditService::class)->action('intel.add', AuditService::CAT_SECURITY, [
             'target_type'    => 'intel',
             'target_id'      => (int) $cid,
             'target_label'   => $cname ?: ('#' . $cid),
             'corporation_id' => $scope,
-            'summary'        => 'Added an intel note on ' . ($cname ?: ('#' . $cid)),
-            'context'        => ['recruiter_visible' => (bool) $request->input('recruiter_visible', false)],
+            'summary'        => 'Added an intel note on ' . ($cname ?: ('#' . $cid))
+                . (!empty($alsoAdded) ? ' (+' . count($alsoAdded) . ' alts of the same account)' : ''),
+            'context'        => [
+                'recruiter_visible' => (bool) $request->input('recruiter_visible', false),
+                'alts_added'        => $alsoAdded ?: null,
+            ],
         ]);
 
-        return redirect()->route('hr-manager.intel.show', $cid)
-            ->with('success', trans('hr-manager::intel.note_added' . ($immediateHit ? '_with_hit' : '')));
+        $flash = trans('hr-manager::intel.note_added' . ($immediateHit ? '_with_hit' : ''));
+        if (!empty($extraAdded)) {
+            $flash .= ' ' . trans('hr-manager::intel.extra_added', [
+                'count' => count($extraAdded),
+                'names' => implode(', ', $extraAdded),
+            ]);
+        }
+        if ($linksMade > 0) {
+            $flash .= ' ' . trans('hr-manager::intel.alt_links_added', [
+                'count' => $linksMade,
+                'main'  => $cname ?: ('#' . $cid),
+            ]);
+        }
+        if (!empty($extraFailed)) {
+            $flash .= ' ' . trans('hr-manager::intel.extra_failed', [
+                'names' => implode(', ', $extraFailed),
+            ]);
+        }
+        if (!empty($alsoAdded)) {
+            $flash .= ' ' . trans('hr-manager::intel.alts_also_added', [
+                'count' => count($alsoAdded),
+                'names' => implode(', ', $alsoAdded),
+            ]);
+        }
+
+        return redirect()->route('hr-manager.intel.show', $cid)->with('success', $flash);
     }
 
     public function destroy(int $id, IntelService $intel)

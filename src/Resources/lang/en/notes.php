@@ -20,4 +20,6 @@ return [
     'admin_badge'  => 'ADMIN',
     'admin_title'  => 'SeAT superuser (global admin)',
     'system_watchdog' => 'HR Watchdog',
+    'system_purge'    => 'HR Purge log',
+    'system_alt_link' => 'HR Alt link',
 ];

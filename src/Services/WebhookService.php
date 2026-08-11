@@ -36,6 +36,20 @@ class WebhookService
         return $this->sendPayload($config, $payload);
     }
 
+    /**
+     * Post a plain-content Discord message (not an embed). Used by the onboarding
+     * welcome, whose whole point is to @-mention the new member and the care team
+     * — and mentions only trigger a notification from `content`, never an embed.
+     * Discord caps content at 2000 chars.
+     */
+    public function sendDiscordContent(WebhookConfiguration $config, string $content): bool
+    {
+        return $this->sendPayload($config, [
+            'username' => $config->discord_username ?? 'HR Manager',
+            'content'  => mb_substr($content, 0, 2000),
+        ]);
+    }
+
     public function sendSlackWebhook(WebhookConfiguration $config, array $data): bool
     {
         $payload = [
@@ -83,6 +97,7 @@ class WebhookService
             'status_change' => 0xffc107,
             'status_reverted' => 0xfd7e14,
             'inactive_director' => 0xdc3545,
+            'silent_wallet_director' => 0xfd7e14,
             'dead_weight' => 0xfd7e14,
             'purge_reminder' => 0xe83e8c,
             'intel_scope_match' => 0x17a2b8,
@@ -107,6 +122,7 @@ class WebhookService
             'status_change'                  => 'Application status changed',
             'status_reverted'                => 'Application status corrected',
             'inactive_director'              => 'Inactive director',
+            'silent_wallet_director'         => 'Director with no wallet activity',
             'dead_weight'                    => 'Dead-weight member',
             'purge_reminder'                 => 'Purge reminder',
             'intel_scope_match'              => 'Watchlist match',

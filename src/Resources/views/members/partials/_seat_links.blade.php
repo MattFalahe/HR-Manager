@@ -47,6 +47,11 @@
             'is_applicant' => false,
         ]];
     $linksMulti = count($linksCharacters) > 1;
+    // Account mode = the caller handed us a character list (the application's
+    // director card). Distinct from count > 1: a one-character applicant is
+    // still an account listing and still worth a copy button, whereas the
+    // single-character member page already names its one character.
+    $linksAccountMode = isset($characters) && is_array($characters) && !empty($characters);
 
     $seatLinks = [
         ['seatcore::character.view.sheet',   '/sheet',   'fa-id-card',        trans('hr-manager::members.seat_link_sheet')],
@@ -61,6 +66,19 @@
         <h3 class="card-title">
             <i class="fas fa-external-link-alt"></i> {{ $linksHeading }}
         </h3>
+        {{-- Account mode only: the whole account is listed here, so this is the
+             natural place to grab every name at once (blacklist checks etc.).
+             The single-character member page already names its one character. --}}
+        @if($linksAccountMode)
+            <div class="card-tools">
+                @include('hr-manager::partials._copy_names', [
+                    'names' => array_values(array_filter(array_map(function ($lc) {
+                        return $lc['name'] ?? null;
+                    }, $linksCharacters))),
+                    'cid'   => 'seatlinks',
+                ])
+            </div>
+        @endif
     </div>
     <div class="card-body">
         <div style="display: flex; flex-direction: column; gap: 8px;">

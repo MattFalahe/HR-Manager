@@ -720,6 +720,12 @@
                     <p class="p-3 mb-0" style="color: var(--hr-success);">{{ trans('hr-manager::corp-health.no_inactive_directors') }}</p>
                 @else
                     <p class="px-3 pt-3 mb-2" style="color: var(--hr-text-muted); font-size: 0.85rem;">{{ trans('hr-manager::corp-health.inactive_directors_help', ['days' => $dh['threshold_days']]) }}</p>
+                    @if(($dh['dormant_char_count'] ?? 0) > 0)
+                        <p class="px-3 mb-2" style="color: var(--hr-text-muted); font-size: 0.8rem;">
+                            <i class="fas fa-info-circle"></i>
+                            {{ trans_choice('hr-manager::corp-health.dir_dormant_chars_note', $dh['dormant_char_count'], ['count' => $dh['dormant_char_count'], 'days' => $dh['threshold_days']]) }}
+                        </p>
+                    @endif
                     <div class="table-responsive">
                         <table class="table table-hover mb-0">
                             <thead>
@@ -735,7 +741,7 @@
                                     @php
                                         // Back-compat: an ungrouped flat entry is treated as its own group.
                                         $chars       = $grp['characters'] ?? [$grp];
-                                        $head        = $chars[0];                         // darkest director char = headline
+                                        $head        = $chars[0];                         // most recently flown director char = headline
                                         $isAuthed    = $grp['is_authed'] ?? $head['is_authed'];
                                         $mainId      = $grp['main_character_id'] ?? $head['character_id'];
                                         $mainName    = $grp['main_name'] ?? $head['name'];
@@ -1030,6 +1036,84 @@
                         @unless($rdist['cwm_present'])
                             <br>{{ trans('hr-manager::corp-health.composition_no_cwm') }}
                         @endunless
+                    </small>
+                </div>
+            </div>
+        @endif
+
+        {{-- Active vs dormant characters — one stacked bar over the same
+             buckets the Corp-wide activity panel prints as numbers. Reads off
+             $rosterActivity, which the page has already built and cached, so
+             this costs no extra queries however big the roster is.
+
+             CHARACTER-level on purpose: this is about how much of the character
+             base is dormant (the dormant-alt load), which is a different
+             question from "is this person active" — that one is answered by the
+             classifier, per account, and drives purge + notifications. --}}
+        @php $ca = $rosterActivity ?? ['available' => false]; @endphp
+        @if(!empty($ca['available']) && ($ca['total'] ?? 0) > 0)
+            @php
+                $caTotal   = (int) $ca['total'];
+                $caB       = $ca['buckets'];
+                // Headline split: green (flying) vs red (gone). at_risk sits
+                // between the two and is deliberately not folded into either.
+                $caActive  = (int) $caB['active'];
+                $caRisk    = (int) $caB['at_risk'];
+                $caDormant = (int) $caB['inactive'] + (int) $caB['dead_weight'];
+                $caUnknown = (int) $caB['unknown'];
+                $caPct     = fn ($n) => $caTotal > 0 ? round($n / $caTotal * 100, 1) : 0;
+
+                $caSegments = [
+                    ['key' => 'active',      'n' => $caActive,             'color' => 'var(--hr-success, #28a745)'],
+                    ['key' => 'at_risk',     'n' => $caRisk,               'color' => 'var(--hr-warning, #ffc107)'],
+                    ['key' => 'inactive',    'n' => (int) $caB['inactive'],'color' => 'var(--hr-danger, #dc3545)'],
+                    ['key' => 'dead_weight', 'n' => (int) $caB['dead_weight'], 'color' => '#495057'],
+                    ['key' => 'unknown',     'n' => $caUnknown,            'color' => 'rgba(255,255,255,0.16)'],
+                ];
+            @endphp
+            <div class="card card-dark mb-3">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-heart-pulse"></i> {{ trans('hr-manager::corp-health.char_activity_heading') }}</h3>
+                    <div class="card-tools">
+                        <small style="color: var(--hr-text-muted);">{{ trans('hr-manager::corp-health.composition_roster', ['n' => $caTotal]) }}</small>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-items-baseline flex-wrap" style="gap: 12px; margin-bottom: 10px;">
+                        <span style="font-size: 1.9rem; font-weight: 700; color: var(--hr-success, #28a745);">{{ $caPct($caActive) }}%</span>
+                        <span style="color: var(--hr-text-muted);">{{ trans('hr-manager::corp-health.char_activity_active_label') }}</span>
+                        <span style="color: var(--hr-text-muted);">&middot;</span>
+                        <span style="font-size: 1.9rem; font-weight: 700; color: var(--hr-danger, #dc3545);">{{ $caPct($caDormant) }}%</span>
+                        <span style="color: var(--hr-text-muted);">{{ trans('hr-manager::corp-health.char_activity_dormant_label') }}</span>
+                    </div>
+
+                    <div style="display: flex; width: 100%; height: 22px; border-radius: 4px; overflow: hidden; background: rgba(255,255,255,0.05);">
+                        @foreach($caSegments as $seg)
+                            @continue($seg['n'] <= 0)
+                            <div style="width: {{ $caPct($seg['n']) }}%; background: {{ $seg['color'] }}; height: 100%;"
+                                 title="{{ trans('hr-manager::corp-health.char_activity_seg_' . $seg['key']) }}: {{ $seg['n'] }} ({{ $caPct($seg['n']) }}%)"></div>
+                        @endforeach
+                    </div>
+
+                    <div class="d-flex flex-wrap mt-2" style="gap: 14px;">
+                        @foreach($caSegments as $seg)
+                            @continue($seg['n'] <= 0)
+                            <span style="color: var(--hr-text-muted); font-size: 0.82rem;">
+                                <span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:{{ $seg['color'] }};margin-right:5px;"></span>
+                                {{ trans('hr-manager::corp-health.char_activity_seg_' . $seg['key']) }}
+                                <strong style="color: var(--hr-text-white);">{{ $seg['n'] }}</strong>
+                                ({{ $caPct($seg['n']) }}%)
+                            </span>
+                        @endforeach
+                    </div>
+
+                    <small class="d-block mt-2" style="color: var(--hr-text-muted); font-size: 0.78rem;">
+                        <i class="fas fa-info-circle"></i>
+                        {{ trans('hr-manager::corp-health.char_activity_footnote', [
+                            'active'   => $ca['active_days'],
+                            'at_risk'  => $ca['at_risk_days'],
+                            'inactive' => $ca['inactive_days'],
+                        ]) }}
                     </small>
                 </div>
             </div>

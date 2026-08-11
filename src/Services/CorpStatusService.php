@@ -1721,6 +1721,8 @@ class CorpStatusService
         $unknownCount = 0;
         $unauthedInactive = 0;
 
+        $dormantCharCount = 0;
+
         foreach ($directorIds as $cid) {
             $userId = isset($userByChar[$cid]) ? (int) $userByChar[$cid] : null;
             $isAuthed = $userId !== null;
@@ -1735,7 +1737,24 @@ class CorpStatusService
                     $days = null;
                 }
             }
-            $isInactive = $days !== null && $days >= $threshold;
+
+            // A dark director CHARACTER doesn't make an absent PERSON. If the
+            // classifier says the account is active (it measures the account's
+            // most recent activity across every character, not just this one),
+            // the directorship is covered — the human is around and simply
+            // hasn't flown this particular character. Listing them here was the
+            // panel contradicting its own Status column, which read ACTIVE.
+            // Unauthed directors have no account to judge, so they keep falling
+            // back to the character's own logon — catching them is the whole
+            // reason this panel reads the roster instead of the classifier.
+            $accountActive = $isAuthed
+                && ($classByUser[$userId] ?? null) === PlayerClassification::CATEGORY_ACTIVE;
+
+            $isDarkCharacter = $days !== null && $days >= $threshold;
+            $isInactive = $isDarkCharacter && !$accountActive;
+            if ($isDarkCharacter && $accountActive) {
+                $dormantCharCount++;
+            }
 
             $entry = [
                 'character_id'     => $cid,
@@ -1744,12 +1763,13 @@ class CorpStatusService
                 'is_authed'        => $isAuthed,
                 'last_logon'       => $logon,
                 'days_since_logon' => $days,
+                'account_active'   => $accountActive,
                 'classifier'       => $isAuthed ? ($classByUser[$userId] ?? null) : null,
             ];
 
             if ($isInactive) {
                 $inactive[] = $entry;
-            } elseif ($days !== null) {
+            } elseif ($days !== null || $accountActive) {
                 $activeCount++;
             } else {
                 $unknownCount++;
@@ -1799,7 +1819,13 @@ class CorpStatusService
             : [];
         $authedGroups = [];
         foreach ($groupsByUser as $uid => $chars) {
-            usort($chars, fn ($a, $b) => ($b['days_since_logon'] ?? 0) <=> ($a['days_since_logon'] ?? 0));
+            // LOWEST days first, so the row headline is the person's most
+            // recently flown director character — the real state of the human.
+            // Sorting darkest-first meant someone whose main director char was
+            // 59 days dark got headlined with a long-retired alt's 251 days.
+            // Unknown (null) sorts last: it says nothing about presence.
+            usort($chars, fn ($a, $b) =>
+                ($a['days_since_logon'] ?? PHP_INT_MAX) <=> ($b['days_since_logon'] ?? PHP_INT_MAX));
             $mainId = isset($mainIdByUser[$uid]) ? (int) $mainIdByUser[$uid] : (int) $chars[0]['character_id'];
             $authedGroups[] = [
                 'user_id'           => (int) $uid,
@@ -1810,6 +1836,9 @@ class CorpStatusService
                 'characters'        => $chars,
             ];
         }
+        // Longest-absent PERSON first. characters[0] is now each account's
+        // lowest days, so this ranks by how long the human has actually been
+        // gone rather than by their dustiest character.
         $inactiveGrouped = array_merge($authedGroups, $unauthedGroups);
         usort($inactiveGrouped, fn ($a, $b) =>
             ($b['characters'][0]['days_since_logon'] ?? 0) <=> ($a['characters'][0]['days_since_logon'] ?? 0));
@@ -1823,6 +1852,7 @@ class CorpStatusService
             'inactive_grouped'        => $inactiveGrouped,
             'inactive_count'          => count($inactive),
             'inactive_player_count'   => count($inactiveGrouped),
+            'dormant_char_count'      => $dormantCharCount,
             'unauthed'                => $unauthed,
             'unauthed_count'          => count($unauthed),
             'unauthed_inactive_count' => $unauthedInactive,

@@ -43,7 +43,9 @@ class DiagnosticController extends Controller
         'hr_manager_character_identity_mappings', 'hr_manager_recruiter_access_grants',
         'hr_manager_fc_activity', 'hr_manager_structure_incidents',
         'hr_manager_applicant_connector_grants', 'hr_manager_wallet_alert_state',
-        'hr_manager_audit_log',
+        'hr_manager_audit_log', 'hr_manager_onboarding_welcomes',
+        'hr_manager_onboarding_templates',
+        'hr_manager_suspected_alt_links',
     ];
 
     /** Manager Core capabilities HR consumes (plugin:capability). */
@@ -127,7 +129,8 @@ class DiagnosticController extends Controller
         'hr-manager:detect-corp-joins', 'hr-manager:detect-membership-changes',
         'hr-manager:detect-token-loss', 'hr-manager:scan-watchlist',
         'hr-manager:sweep-access-grants', 'hr-manager:token-coverage-digest',
-        'hr-manager:prune-audit-log',
+        'hr-manager:prune-audit-log', 'hr-manager:send-onboarding-welcomes',
+        'hr-manager:reconcile-suspected-alts',
     ];
 
     private const VALID_TABS = ['health', 'master', 'validation', 'ecosystem', 'settings', 'integrity', 'notifications', 'trace'];

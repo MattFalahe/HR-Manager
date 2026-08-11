@@ -17,7 +17,9 @@
         'notify_application_accepted'       => true,
         'notify_application_rejected'       => false,
         'notify_status_change'              => true,
+        'notify_handler_note'               => false,
         'notify_inactive_director'          => true,
+        'notify_silent_wallet_director'     => false,
         'notify_dead_weight'                => false,
         'notify_purge_reminder'             => true,
         'notify_loa_marked'                 => true,
@@ -33,6 +35,7 @@
         'notify_member_left'                => false,
         'notify_join_no_application'        => true,
         'notify_member_unregistered'        => true,
+        'notify_onboarding_welcome'         => false,
         'notify_flagged_applicant'          => true,
     ];
     $whChecked = function ($key) use ($webhook, $whDefaults) {
@@ -45,7 +48,7 @@
         [
             'title' => trans('hr-manager::settings.webhook_box_applications'),
             'icon'  => 'fa-file-signature',
-            'keys'  => ['notify_application_submitted', 'notify_application_accepted', 'notify_application_rejected', 'notify_status_change'],
+            'keys'  => ['notify_application_submitted', 'notify_application_accepted', 'notify_application_rejected', 'notify_status_change', 'notify_handler_note'],
         ],
         [
             'title' => trans('hr-manager::settings.webhook_box_security'),
@@ -55,12 +58,12 @@
         [
             'title' => trans('hr-manager::settings.webhook_box_retention'),
             'icon'  => 'fa-user-clock',
-            'keys'  => ['notify_inactive_director', 'notify_dead_weight', 'notify_loa_marked', 'notify_marked_for_purge', 'notify_purge_personal', 'notify_status_cleared', 'notify_purge_reminder', 'notify_token_coverage'],
+            'keys'  => ['notify_inactive_director', 'notify_silent_wallet_director', 'notify_dead_weight', 'notify_loa_marked', 'notify_marked_for_purge', 'notify_purge_personal', 'notify_status_cleared', 'notify_purge_reminder', 'notify_token_coverage'],
         ],
         [
             'title' => trans('hr-manager::settings.webhook_box_membership'),
             'icon'  => 'fa-users',
-            'keys'  => ['notify_member_joined', 'notify_member_left'],
+            'keys'  => ['notify_member_joined', 'notify_member_left', 'notify_onboarding_welcome'],
         ],
         [
             'title' => trans('hr-manager::settings.webhook_box_wallet'),
@@ -71,7 +74,9 @@
 
     // Keys that render an extra help line under the checkbox.
     $whHints = [
-        'notify_purge_personal' => trans('hr-manager::settings.notify_purge_personal_help'),
+        'notify_purge_personal'         => trans('hr-manager::settings.notify_purge_personal_help'),
+        'notify_handler_note'           => trans('hr-manager::settings.notify_handler_note_help'),
+        'notify_silent_wallet_director' => trans('hr-manager::settings.notify_silent_wallet_director_help'),
     ];
 
     // Categories the MC fast-poll accelerates, and whether it's live. Marked with

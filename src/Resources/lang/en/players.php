@@ -1,6 +1,35 @@
 <?php
 
 return [
+    // Merged identity (shell kept so its SeAT account still resolves)
+    'identity_merged_heading'   => 'This identity was merged into',
+    'identity_merged_by'        => 'Merged by :who on :when. Its characters are managed under that player.',
+    'identity_merged_seat_note' => '<strong>This is an HR-internal link only — it changes nothing in SeAT.</strong> SeAT still treats these as two separate accounts, so the Players list will keep showing both. To consolidate for real, a server admin can move the characters onto one account in <strong>SeAT &rarr; Users &rarr; edit user &rarr; Transfer</strong>; HR follows automatically once they share a SeAT account.',
+    'identity_merged_badge'     => 'Merged into :name',
+    'identity_merged_badge_bare' => 'Merged',
+    'alt_flags_heading'           => 'Possible alt links',
+    'alt_flags_intro'             => 'Characters a director has claimed are the same human as this one. Unproven unless marked confirmed — shown so you know the claim exists before you act, not as a verdict.',
+    'alt_flags_is_alt_of'         => 'This player is claimed to be a possible alt of',
+    'alt_flags_has_alt'           => 'Claimed as a possible alt of this player:',
+    'alt_flags_other_blacklisted' => 'that character is blacklisted',
+
+    'blacklisted_heading' =>'{1}This player is on the BLACKLIST|[2,*]This player is on the BLACKLIST (:count characters)',
+
+    'identity_orphan_heading' => 'Leftover from an earlier merge',
+    'identity_orphan_body'    => 'This identity holds no characters, and an older identity for the same SeAT account was merged away before HR recorded where merges went. HR can tell that happened but not which player the characters moved to. <strong>To label it:</strong> open the profile of the player they were merged into and merge <strong>FROM identity #:id</strong> — that records the link properly and this notice is replaced by the merged banner. Harmless to leave as-is; nothing here is broken.',
+    'identity_merged_seat_note_plain' => 'HR has folded this identity into another player. SeAT still holds them as two separate accounts, which is why both are listed. Open the profile for details, or transfer the characters onto one account in SeAT to consolidate for real.',
+
+    // Watchlist coverage gap on the character list
+    'alt_gap_badge'   => ':count not on the watchlist',
+    'alt_gap_help'    => 'Some of this account\'s characters are on the watchlist and some are not.',
+    'alt_gap_title'   => 'Possible missing alts',
+    'alt_gap_body'    => 'Part of this account is on the watchlist, but these characters are not — neither listed themselves nor named as anyone\'s suspected alt. When the account was blacklisted its full character list may not have been visible yet; it is now.',
+
+    // Copy-character-names button (player profile + application director card)
+    'copy_names'       => 'Copy names',
+    'copy_names_title' => 'Copy all :count character names to the clipboard, one per line — handy for an alliance blacklist check',
+    'copy_names_done'  => 'Copied',
+
     // Index page
     'players'              => 'Players',
     'players_intro'        => 'Player-centric view: one row per SeAT account, aggregating every linked character.',

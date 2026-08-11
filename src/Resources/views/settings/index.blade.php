@@ -187,6 +187,11 @@
                                 <i class="fas fa-user-check"></i> {{ trans('hr-manager::settings.assess_tab') }}
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-toggle="tab" href="#onboarding">
+                                <i class="fas fa-hand-holding-heart"></i> {{ trans('hr-manager::onboarding.tab') }}
+                            </a>
+                        </li>
 
                         <li class="nav-header mt-2"><i class="fas fa-bell"></i> {{ trans('hr-manager::settings.nav_group_integrations') }}</li>
                         <li class="nav-item">
@@ -595,6 +600,178 @@
                             <i class="fas fa-save"></i> {{ trans('hr-manager::settings.save_settings') }}
                         </button>
                     </form>
+                </div>
+
+                {{-- Onboarding welcome Tab --}}
+                <div class="tab-pane" id="onboarding">
+                    <form method="POST" action="{{ route('hr-manager.settings.update') }}">
+                        @csrf
+                        {{-- Per-tab save marker (see General tab). --}}
+                        <input type="hidden" name="onboarding_form" value="1">
+
+                        <h4 style="color: var(--hr-text-white);">
+                            <i class="fas fa-hand-holding-heart" style="color: var(--hr-primary-start);"></i>
+                            {{ trans('hr-manager::onboarding.heading') }}
+                        </h4>
+                        <p style="color: var(--hr-text-muted);">{!! trans('hr-manager::onboarding.intro') !!}</p>
+
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="form-check mb-3">
+                                    <input type="checkbox" name="onboarding_welcome_enabled" value="1" class="form-check-input"
+                                           id="onboardingEnabled" {{ $settings['onboarding_welcome_enabled'] ? 'checked' : '' }}>
+                                    <label class="form-check-label" for="onboardingEnabled">
+                                        <strong>{{ trans('hr-manager::onboarding.enabled') }}</strong>
+                                    </label>
+                                    <small class="d-block" style="color: var(--hr-text-muted);">{{ trans('hr-manager::onboarding.enabled_help') }}</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group mb-3">
+                                    <label>{{ trans('hr-manager::onboarding.delay') }}</label>
+                                    <input type="number" name="onboarding_welcome_delay_minutes" class="form-control"
+                                           value="{{ $settings['onboarding_welcome_delay_minutes'] }}" min="0" max="1440">
+                                    <small style="color: var(--hr-text-muted);">{{ trans('hr-manager::onboarding.delay_help') }}</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Without seat-connector the welcome still posts, it just
+                             names the member in plain text instead of pinging. --}}
+                        @unless($connectorAvailable)
+                            <div class="alert" style="background: rgba(88,101,242,0.08); border: 1px solid rgba(88,101,242,0.3); color: var(--hr-text-light);">
+                                <i class="fas fa-info-circle"></i> {{ trans('hr-manager::onboarding.no_connector') }}
+                            </div>
+                        @endunless
+
+                        <hr style="border-color: rgba(255,255,255,0.08); margin: 20px 0;">
+                        <h5 style="color: var(--hr-text-white);">{{ trans('hr-manager::onboarding.template_label') }}</h5>
+                        <p style="color: var(--hr-text-muted);">{!! trans('hr-manager::onboarding.template_help') !!}</p>
+
+                        {{-- One editor block per tracked corp, but only ONE is
+                             visible at a time: the picker below swaps them, so an
+                             install with a dozen corps isn't a dozen textareas
+                             deep. Every block still POSTs, so switching corps
+                             mid-edit never silently discards the other one. --}}
+                        @if(count($onboardingCorps) > 1)
+                            <div class="form-group" style="max-width: 420px;">
+                                <label>{{ trans('hr-manager::onboarding.corp_picker_label') }}</label>
+                                <select id="onboardingCorpPicker" class="form-control">
+                                    @foreach($onboardingCorps as $corp)
+                                        <option value="{{ $corp->corporation_id }}">{{ $corp->name }}</option>
+                                    @endforeach
+                                </select>
+                                <small style="color: var(--hr-text-muted);">{{ trans('hr-manager::onboarding.corp_picker_help') }}</small>
+                            </div>
+                        @endif
+
+                        @forelse($onboardingCorps as $corp)
+                            @php
+                                $tpl = $onboardingTemplates[$corp->corporation_id] ?? null;
+                                $body = $tpl && trim((string) $tpl->body) !== '' ? $tpl->body : $onboardingDefaultBody;
+                                $selRoles = $tpl && is_array($tpl->mention_role_ids) ? array_map('strval', $tpl->mention_role_ids) : [];
+                                // Opt-in: no row = never turned on = off. Matches
+                                // OnboardingService::isEnabledForCorp().
+                                $corpOn = $tpl ? (bool) $tpl->is_enabled : false;
+                                $corpHasHook = in_array((int) $corp->corporation_id, $onboardingCoveredCorps ?? [], true);
+                            @endphp
+                            <div class="hr-onboarding-corp" data-corp="{{ $corp->corporation_id }}"
+                                 style="border: 1px solid var(--hr-border, #2a3f5f); border-radius: 8px; padding: 14px; margin-bottom: 16px; background: var(--hr-dark-card, rgba(255,255,255,0.02)); {{ $loop->first ? '' : 'display:none;' }}">
+                                <div style="font-weight: 600; color: var(--hr-text-light); margin-bottom: 10px;">
+                                    <i class="fas fa-building" style="opacity: 0.7;"></i>
+                                    {{ trans('hr-manager::onboarding.corp_context') }}: {{ $corp->name }}
+                                </div>
+
+                                {{-- Per-corp switch. The webhook's corp scope already
+                                     decides where a welcome can be DELIVERED, but a
+                                     corp with no subscribing webhook would otherwise
+                                     queue welcomes that wait a week and expire. This
+                                     stops them being queued at all. --}}
+                                <div class="form-check mb-2">
+                                    <input type="checkbox" name="onboarding_corp_enabled[{{ $corp->corporation_id }}]" value="1"
+                                           class="form-check-input" id="onbon_{{ $corp->corporation_id }}" {{ $corpOn ? 'checked' : '' }}>
+                                    <label class="form-check-label" for="onbon_{{ $corp->corporation_id }}">
+                                        <strong>{{ trans('hr-manager::onboarding.corp_enabled') }}</strong>
+                                    </label>
+                                    <small class="d-block" style="color: var(--hr-text-muted);">{{ trans('hr-manager::onboarding.corp_enabled_help') }}</small>
+                                </div>
+
+                                {{-- Whether a webhook actually covers this corp. The
+                                     two settings are easy to confuse, so say it here
+                                     rather than leave the operator to work out why
+                                     nothing arrives. --}}
+                                <div class="mb-3">
+                                    @if($corpHasHook)
+                                        <small style="color: var(--hr-success, #28a745);">
+                                            <i class="fas fa-check-circle"></i> {{ trans('hr-manager::onboarding.corp_hook_ok') }}
+                                        </small>
+                                    @else
+                                        <small style="color: var(--hr-warning, #ffc107);">
+                                            <i class="fas fa-exclamation-triangle"></i> {{ trans('hr-manager::onboarding.corp_hook_missing') }}
+                                        </small>
+                                    @endif
+                                </div>
+                                <div class="form-group">
+                                    <textarea name="onboarding_body[{{ $corp->corporation_id }}]" class="form-control" rows="9"
+                                              style="font-family: monospace; font-size: 0.85rem;">{{ $body }}</textarea>
+                                </div>
+
+                                <label style="color: var(--hr-text-light); margin-top: 6px;">{{ trans('hr-manager::onboarding.care_roles_label') }}</label>
+                                <small class="d-block mb-2" style="color: var(--hr-text-muted);">{!! trans('hr-manager::onboarding.care_roles_help') !!}</small>
+                                @if(empty($discordRoles))
+                                    <small class="d-block" style="color: var(--hr-text-muted);">
+                                        <i class="fas fa-info-circle"></i> {{ trans('hr-manager::settings.sensitive_discord_none') }}
+                                    </small>
+                                @else
+                                    <div class="row" style="max-height: 200px; overflow-y: auto; margin: 0; padding: 8px; background: rgba(0,0,0,0.15); border-radius: 6px;">
+                                        @foreach($discordRoles as $role)
+                                            @php $rid = (string) ($role['id'] ?? ''); @endphp
+                                            @continue($rid === '')
+                                            <div class="col-md-4 col-sm-6">
+                                                <div class="form-check mb-2">
+                                                    <input type="checkbox" name="onboarding_roles[{{ $corp->corporation_id }}][]" value="{{ $rid }}"
+                                                           class="form-check-input" id="onbrole_{{ $corp->corporation_id }}_{{ $rid }}"
+                                                           {{ in_array($rid, $selRoles, true) ? 'checked' : '' }}>
+                                                    <label class="form-check-label" for="onbrole_{{ $corp->corporation_id }}_{{ $rid }}" style="color: var(--hr-text-light);">
+                                                        @if(!empty($role['color']) && is_string($role['color']) && str_starts_with($role['color'], '#'))
+                                                            <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:{{ $role['color'] }};margin-right:4px;"></span>
+                                                        @endif
+                                                        {{ $role['name'] ?? $rid }}
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </div>
+                        @empty
+                            <div class="alert" style="background: rgba(255,193,7,0.08); border: 1px solid rgba(255,193,7,0.3); color: var(--hr-text-light);">
+                                <i class="fas fa-exclamation-triangle"></i> {{ trans('hr-manager::onboarding.no_corps') }}
+                            </div>
+                        @endforelse
+
+                        <button type="submit" class="btn btn-hr-primary btn-icon">
+                            <i class="fas fa-save"></i> {{ trans('hr-manager::settings.save_settings') }}
+                        </button>
+                    </form>
+
+                    @if(count($onboardingCorps) > 1)
+                        <script>
+                        (function () {
+                            var picker = document.getElementById('onboardingCorpPicker');
+                            if (!picker) { return; }
+                            var blocks = document.querySelectorAll('.hr-onboarding-corp');
+                            picker.addEventListener('change', function () {
+                                // Show only the picked corp. Every block stays in
+                                // the DOM and still posts, so an edit made before
+                                // switching is saved alongside the rest.
+                                blocks.forEach(function (b) {
+                                    b.style.display = (b.getAttribute('data-corp') === picker.value) ? '' : 'none';
+                                });
+                            });
+                        })();
+                        </script>
+                    @endif
                 </div>
 
                 {{-- Activity Tiers Tab --}}

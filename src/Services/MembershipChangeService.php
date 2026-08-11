@@ -343,6 +343,21 @@ class MembershipChangeService
         } catch (\Throwable $e) {
             Log::warning('[HR Manager] membership join notify failed: ' . $e->getMessage());
         }
+
+        // Queue an onboarding welcome for a genuinely NEW person: an applicant or
+        // a join-without-application, both of which are a registered account newly
+        // in the corp. Skip known_alt (an existing member's alt) and unregistered
+        // (no account to reach). The service dedups to one welcome per account.
+        if (in_array($cls['type'], ['applied', 'no_application'], true)) {
+            $userId = $this->userIdForCharacter($charId);
+            if ($userId !== null) {
+                try {
+                    app(OnboardingService::class)->enqueue($corporationId, (int) $userId, $charId);
+                } catch (\Throwable $e) {
+                    Log::warning('[HR Manager] onboarding enqueue failed: ' . $e->getMessage());
+                }
+            }
+        }
     }
 
     /**

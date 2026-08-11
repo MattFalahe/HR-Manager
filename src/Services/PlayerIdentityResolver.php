@@ -139,9 +139,37 @@ class PlayerIdentityResolver
             ]);
         }
 
-        $this->syncSeatCharacters($identity, $seatUserId);
+        // Characters land on the human, not on the shell. When this account's
+        // identity has been merged away, anything newly authed under it belongs
+        // to the identity it was merged INTO.
+        $this->syncSeatCharacters($this->resolveMergeTarget($identity), $seatUserId);
 
+        // The account's OWN identity is returned so its profile can explain
+        // that it was merged, and where to. Callers that need the effective
+        // human resolve the target themselves.
         return $identity;
+    }
+
+    /**
+     * Follow a merge chain (A merged into B, B later merged into C) to the
+     * identity that actually holds the characters. Depth-capped so a cycle
+     * introduced by hand can't spin here.
+     */
+    public function resolveMergeTarget(PlayerIdentity $identity): PlayerIdentity
+    {
+        $seen = [$identity->id => true];
+        $cursor = $identity;
+
+        for ($hops = 0; $hops < 10 && $cursor->merged_into_id !== null; $hops++) {
+            $next = PlayerIdentity::find($cursor->merged_into_id);
+            if (!$next || isset($seen[$next->id])) {
+                break;
+            }
+            $seen[$next->id] = true;
+            $cursor = $next;
+        }
+
+        return $cursor;
     }
 
     /**
@@ -241,6 +269,13 @@ class PlayerIdentityResolver
             return false;
         }
 
+        // Refuse a merge that would point the chain back at itself — A into B
+        // when B already leads to A. Resolution is depth-capped anyway, but a
+        // cycle would leave both identities unreachable in a confusing way.
+        if ($this->resolveMergeTarget($into)->id === $from->id) {
+            return false;
+        }
+
         DB::transaction(function () use ($into, $from, $byUserId, $notes) {
             $now = now();
 
@@ -264,9 +299,18 @@ class PlayerIdentityResolver
                 $into->save();
             }
 
-            // Soft-delete the from-identity. The merge is reversible
-            // via the soft-delete (an admin can restore + remap).
-            $from->delete();
+            // Point the from-identity at the winner and KEEP it. It is still
+            // the identity keyed to its own SeAT account, so deleting it meant
+            // the next lookup for that account found nothing and minted a fresh
+            // empty identity — one per merge, each with no explanation. Kept and
+            // flagged, the account resolves to a profile that can say where its
+            // characters went and who decided that.
+            $from->forceFill([
+                'merged_into_id' => $into->id,
+                'merged_by'      => $byUserId,
+                'merged_at'      => $now,
+                'merge_notes'    => $notes,
+            ])->save();
         });
 
         // Bust cache for every character that moved.
@@ -299,9 +343,19 @@ class PlayerIdentityResolver
             ->value('user_id');
 
         if ($userId !== null) {
-            $identity = $this->forSeatUser((int) $userId);
-            $this->createMapping($characterId, $identity->id, CharacterIdentityMapping::REASON_AUTO_SEAT);
-            return $identity;
+            // forSeatUser() -> syncSeatCharacters() already maps EVERY unmapped
+            // character on the account, including this one. Creating it again
+            // here gave every auto-linked character two identical current
+            // mappings, which is why identity audit trails showed each
+            // character twice.
+            $accountIdentity = $this->forSeatUser((int) $userId);
+
+            // Read back the mapping that sync just made rather than assuming:
+            // on a merged account the character belongs to the merge target,
+            // not to the shell keyed to this SeAT login.
+            $mapping = CharacterIdentityMapping::forCharacter($characterId)->current()->first();
+
+            return $mapping ? $mapping->identity : $this->resolveMergeTarget($accountIdentity);
         }
 
         // 3. No SeAT user — ghost identity. character_infos /
@@ -319,6 +373,15 @@ class PlayerIdentityResolver
     private function createMapping(int $characterId, int $identityId, string $reason): void
     {
         try {
+            // A character has at most ONE open mapping. Guarded here rather
+            // than trusting every caller to check first, because a duplicate
+            // current mapping is silent — it double-counts the character on
+            // its identity and shows it twice in the audit trail.
+            $open = CharacterIdentityMapping::forCharacter($characterId)->current()->first();
+            if ($open) {
+                return;
+            }
+
             CharacterIdentityMapping::create([
                 'character_id'       => $characterId,
                 'player_identity_id' => $identityId,

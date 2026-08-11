@@ -40,7 +40,7 @@ return [
 
     // Merge
     'merge_heading'         => 'Merge another identity into this one',
-    'merge_help'            => 'Combine two identities into one. Use when you discover that two records actually represent the same human (e.g. they re-authed under a new SeAT account after losing the old one). All mappings from the merged-from identity get re-pointed at this one and the audit trail is preserved.',
+    'merge_help'            => 'Combine two identities into one. Use when you discover that two records actually represent the same human (e.g. they re-authed under a new SeAT account after losing the old one). All mappings from the merged-from identity get re-pointed at this one and the audit trail is preserved. <strong>This is internal to HR — it changes nothing in SeAT.</strong> If the person has two live SeAT accounts, SeAT still sees two users and both keep a row on the Players list (the merged one is badged). To consolidate for real, a server admin can move the characters onto one account in <strong>SeAT &rarr; Users &rarr; edit user &rarr; Transfer</strong>; HR follows on its own once they share an account.',
     'merge_from_label'      => 'Identity to merge FROM',
     'merge_from_placeholder' => 'Identity ID (numeric)',
     'merge_from_help'       => 'The identity ID that will be merged into this profile and then soft-deleted.',
