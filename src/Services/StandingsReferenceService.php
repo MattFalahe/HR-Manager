@@ -3,20 +3,36 @@
 namespace HrManager\Services;
 
 use HrManager\Models\Setting;
+use HrManager\Models\StandingEntry;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 /**
- * Resolves the corp's "who is hostile / who is friendly" reference used by the
- * applicant assessment's standings signal. Two interchangeable sources (an
- * operator setting picks which):
+ * Resolves the corp's standings reference: a NUMERIC value per entity on EVE's
+ * own five-step scale (-10 / -5 / 0 / +5 / +10). Four modes:
  *
- *   - 'seat' : SeAT's own Standings Builder (Tools -> Standings). A profile of
- *              {entity, standing}; standing < 0 = hostile, > 0 = friendly.
- *   - 'own'  : HR-local lists of hostile / friendly alliance + corp IDs.
+ *   - 'off'    : no standings signal at all.
+ *   - 'seat'   : SeAT's Standings Builder (Tools -> Standings) alone.
+ *   - 'own'    : HR's own standings table alone.
+ *   - 'hybrid' : SeAT as the baseline, HR overriding it per entity. Overrides
+ *                work downward too, so an entity the alliance marks terrible
+ *                can be set neutral locally and stop generating flags.
  *
- * Plus a precedence toggle for the natural friction where an alliance is
- * hostile but a corp inside it is friendly (or the reverse): 'corp' = the most
- * specific entry wins, 'alliance' = the alliance-level verdict wins.
+ * The value used to be discarded: SeAT's rows were read and collapsed to two
+ * flat hostile/friendly buckets, so HR could only ever say WHETHER an entity
+ * was hostile, never HOW hostile. resolvedStandings() is the source of truth
+ * now and reference()'s buckets are derived from it, which keeps every existing
+ * caller working while new ones get the number.
+ *
+ * There are two independent precedences and they are easy to confuse:
+ *   - SOURCE precedence   : HR over SeAT, in hybrid mode.
+ *   - ENTITY precedence   : a character's corp over their alliance, or the
+ *                           reverse, when both are rated ('corp' | 'alliance').
+ *
+ * Reference entities are bucketed by category ('alliance'|'corporation'|
+ * 'character'), which matches BOTH StandingsProfileStanding.category and
+ * CharacterContact.contact_type exactly, so matching an applicant's contact is
+ * a direct set-membership test.
  *
  * Reference entities are bucketed by category ('alliance'|'corporation'|
  * 'character'), which matches BOTH StandingsProfileStanding.category and
@@ -29,6 +45,15 @@ class StandingsReferenceService
     public const SOURCE_SEAT = 'seat';
     public const SOURCE_OWN  = 'own';
 
+    /**
+     * SeAT's profile as the baseline, HR's own table overriding it per entity.
+     * The useful shape for most corps: you are not maintaining a parallel list,
+     * only the handful of entities where your corp's view differs from the
+     * alliance's — including overriding DOWNWARD, so an entity your alliance
+     * marks terrible can be set neutral locally and stop generating flags.
+     */
+    public const SOURCE_HYBRID = 'hybrid';
+
     public const PRECEDENCE_CORP     = 'corp';     // most specific entry wins
     public const PRECEDENCE_ALLIANCE = 'alliance'; // alliance-level verdict wins
 
@@ -40,13 +65,154 @@ class StandingsReferenceService
     public const SETTING_FRIENDLY_ALLIANCES = 'assess_friendly_alliances';
     public const SETTING_FRIENDLY_CORPS     = 'assess_friendly_corps';
 
-    /** Per-request memo of the resolved reference. */
+    /** Per-request memos. The resolution is read many times per page. */
     private ?array $cache = null;
+    private ?array $resolved = null;
+    private ?array $seatCache = null;
+    private ?array $hrCache = null;
 
     public function source(): string
     {
         $s = (string) Setting::getValue(self::SETTING_SOURCE, self::SOURCE_OFF);
-        return in_array($s, [self::SOURCE_SEAT, self::SOURCE_OWN], true) ? $s : self::SOURCE_OFF;
+
+        return in_array($s, [self::SOURCE_SEAT, self::SOURCE_OWN, self::SOURCE_HYBRID], true)
+            ? $s
+            : self::SOURCE_OFF;
+    }
+
+    /**
+     * Every entity's NUMERIC standing under the current source mode, keyed
+     * "type:id", each carrying where the value came from.
+     *
+     * This is the source of truth now; the older hostile/friendly arrays in
+     * reference() are derived from it, so existing callers keep working while
+     * new ones can ask how hostile rather than merely whether.
+     *
+     * @return array<string, array{standing:int, from:string, seat_standing:?int}>
+     */
+    public function resolvedStandings(): array
+    {
+        if ($this->resolved !== null) {
+            return $this->resolved;
+        }
+
+        $source = $this->source();
+        $out    = [];
+
+        if ($source === self::SOURCE_OFF) {
+            return $this->resolved = $out;
+        }
+
+        // SeAT baseline (seat + hybrid).
+        if ($source === self::SOURCE_SEAT || $source === self::SOURCE_HYBRID) {
+            foreach ($this->seatStandings() as $key => $val) {
+                $out[$key] = ['standing' => $val, 'from' => self::SOURCE_SEAT, 'seat_standing' => $val];
+            }
+        }
+
+        // HR's own table (own + hybrid). In hybrid this OVERRIDES the baseline
+        // per entity; the SeAT value is kept alongside so the UI can show what
+        // was overridden rather than leaving a director wondering why a number
+        // disagrees with their alliance's.
+        if ($source === self::SOURCE_OWN || $source === self::SOURCE_HYBRID) {
+            foreach ($this->hrStandings() as $key => $val) {
+                $seatVal = $out[$key]['seat_standing'] ?? null;
+                $out[$key] = ['standing' => $val, 'from' => self::SOURCE_OWN, 'seat_standing' => $seatVal];
+            }
+        }
+
+        return $this->resolved = $out;
+    }
+
+    /**
+     * One entity's standing, or null when nothing rates it.
+     *
+     * @return array{standing:int, from:string, seat_standing:?int}|null
+     */
+    public function standingFor(string $entityType, int $entityId): ?array
+    {
+        return $this->resolvedStandings()[$entityType . ':' . $entityId] ?? null;
+    }
+
+    /**
+     * Hybrid asked for but SeAT cannot supply a baseline (no profile chosen,
+     * profile deleted, Standings Builder not in use). It still works — HR's own
+     * entries carry it — but the operator should be told rather than left to
+     * discover that half their configuration is inert.
+     */
+    public function hybridBaselineMissing(): bool
+    {
+        if ($this->source() !== self::SOURCE_HYBRID) {
+            return false;
+        }
+
+        return empty($this->seatStandings());
+    }
+
+    /**
+     * SeAT Standings Builder rows as numeric values, keyed "type:id".
+     *
+     * @return array<string, int>
+     */
+    private function seatStandings(): array
+    {
+        if ($this->seatCache !== null) {
+            return $this->seatCache;
+        }
+
+        $out = [];
+        if (!class_exists(\Seat\Web\Models\StandingsProfileStanding::class)) {
+            return $this->seatCache = $out;
+        }
+
+        $profileId = (int) Setting::getValue(self::SETTING_SEAT_PROFILE, 0);
+        if ($profileId <= 0) {
+            return $this->seatCache = $out;
+        }
+
+        try {
+            $rows = \Seat\Web\Models\StandingsProfileStanding::where('standings_profile_id', $profileId)->get();
+        } catch (\Throwable $e) {
+            Log::debug('[HR Manager] standings profile load failed: ' . $e->getMessage());
+            return $this->seatCache = $out;
+        }
+
+        foreach ($rows as $r) {
+            $cat = (string) $r->category;
+            if (!in_array($cat, ['alliance', 'corporation', 'character'], true)) {
+                continue; // faction / unknown — nothing to match against
+            }
+            $out[$cat . ':' . (int) $r->entity_id] = (int) round((float) $r->standing);
+        }
+
+        return $this->seatCache = $out;
+    }
+
+    /**
+     * HR's own standings table, keyed "type:id".
+     *
+     * @return array<string, int>
+     */
+    private function hrStandings(): array
+    {
+        if ($this->hrCache !== null) {
+            return $this->hrCache;
+        }
+
+        $out = [];
+        if (!Schema::hasTable('hr_manager_standings')) {
+            return $this->hrCache = $out;
+        }
+
+        try {
+            foreach (StandingEntry::get(['entity_type', 'entity_id', 'standing']) as $row) {
+                $out[$row->entity_type . ':' . (int) $row->entity_id] = (int) $row->standing;
+            }
+        } catch (\Throwable $e) {
+            Log::debug('[HR Manager] HR standings load failed: ' . $e->getMessage());
+        }
+
+        return $this->hrCache = $out;
     }
 
     public function precedence(): string
@@ -101,13 +267,21 @@ class StandingsReferenceService
         $hostile  = ['alliance' => [], 'corporation' => [], 'character' => []];
         $friendly = ['alliance' => [], 'corporation' => [], 'character' => []];
 
-        if ($source === self::SOURCE_SEAT) {
-            [$hostile, $friendly] = $this->loadFromSeatProfile();
-        } elseif ($source === self::SOURCE_OWN) {
-            $hostile['alliance']     = $this->ids(self::SETTING_HOSTILE_ALLIANCES);
-            $hostile['corporation']  = $this->ids(self::SETTING_HOSTILE_CORPS);
-            $friendly['alliance']    = $this->ids(self::SETTING_FRIENDLY_ALLIANCES);
-            $friendly['corporation'] = $this->ids(self::SETTING_FRIENDLY_CORPS);
+        // Derived from the numeric map rather than loaded separately, so the
+        // binary view can never disagree with the values it is summarising.
+        // Everything below zero is hostile, everything above is friendly, and
+        // an explicit 0 is neither — which is what makes a local override to
+        // neutral able to cancel an inherited hostile verdict.
+        foreach ($this->resolvedStandings() as $key => $info) {
+            [$type, $id] = explode(':', $key, 2);
+            if (!isset($hostile[$type])) {
+                continue;
+            }
+            if ($info['standing'] < 0) {
+                $hostile[$type][] = (int) $id;
+            } elseif ($info['standing'] > 0) {
+                $friendly[$type][] = (int) $id;
+            }
         }
 
         return $this->cache = [
@@ -172,53 +346,5 @@ class StandingsReferenceService
         return null;
     }
 
-    /**
-     * @return array{0:array<string,array<int>>,1:array<string,array<int>>} [hostile, friendly]
-     */
-    private function loadFromSeatProfile(): array
-    {
-        $hostile  = ['alliance' => [], 'corporation' => [], 'character' => []];
-        $friendly = ['alliance' => [], 'corporation' => [], 'character' => []];
 
-        if (!class_exists(\Seat\Web\Models\StandingsProfileStanding::class)) {
-            return [$hostile, $friendly];
-        }
-        $profileId = (int) Setting::getValue(self::SETTING_SEAT_PROFILE, 0);
-        if ($profileId <= 0) {
-            return [$hostile, $friendly];
-        }
-
-        try {
-            $rows = \Seat\Web\Models\StandingsProfileStanding::where('standings_profile_id', $profileId)->get();
-        } catch (\Throwable $e) {
-            Log::debug('[HR Manager] standings profile load failed: ' . $e->getMessage());
-            return [$hostile, $friendly];
-        }
-
-        foreach ($rows as $r) {
-            $cat = (string) $r->category;
-            if (!isset($hostile[$cat])) {
-                continue; // faction / unknown — ignored for hostility matching
-            }
-            $val = (float) $r->standing;
-            if ($val < 0) {
-                $hostile[$cat][] = (int) $r->entity_id;
-            } elseif ($val > 0) {
-                $friendly[$cat][] = (int) $r->entity_id;
-            }
-        }
-
-        return [$hostile, $friendly];
-    }
-
-    /** Read a stored ID-list setting (JSON array) into a clean int array. */
-    private function ids(string $settingKey): array
-    {
-        $raw = Setting::getValue($settingKey, []);
-        $arr = is_array($raw) ? $raw : [];
-        return array_values(array_unique(array_filter(
-            array_map('intval', $arr),
-            fn ($v) => $v > 0
-        )));
-    }
 }
