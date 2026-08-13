@@ -648,6 +648,59 @@ class NameResolutionService
     }
 
     /**
+     * Every corporation currently in an alliance.
+     *
+     * Local tables first: corporation_infos already carries alliance_id for
+     * every corp SeAT has resolved, and for an alliance whose corps are all
+     * known that answers without a network call. ESI is asked as well and the
+     * two are merged, because SeAT only knows the corps it has had a reason to
+     * look at, which on a fresh install is a fraction of an alliance.
+     *
+     * @return array<int>
+     */
+    public function allianceCorporationIds(int $allianceId): array
+    {
+        if ($allianceId <= 0) {
+            return [];
+        }
+
+        $out = [];
+
+        if (Schema::hasTable('corporation_infos')) {
+            try {
+                foreach (DB::table('corporation_infos')
+                    ->where('alliance_id', $allianceId)
+                    ->pluck('corporation_id') as $c) {
+                    $out[(int) $c] = (int) $c;
+                }
+            } catch (\Throwable $e) {
+                Log::debug('[HR Manager] NameResolution: local alliance corp lookup failed: ' . $e->getMessage());
+            }
+        }
+
+        try {
+            $response = Http::timeout(self::HTTP_TIMEOUT)
+                ->withHeaders(['Accept' => 'application/json', 'User-Agent' => $this->userAgent()])
+                ->get('https://esi.evetech.net/latest/alliances/' . $allianceId . '/corporations/');
+
+            if ($response->successful()) {
+                foreach ((array) $response->json() as $c) {
+                    $c = (int) $c;
+                    if ($c > 0) {
+                        $out[$c] = $c;
+                    }
+                }
+            } else {
+                Log::info('[HR Manager] NameResolution: ESI alliance corporations returned ' . $response->status());
+            }
+        } catch (\Throwable $e) {
+            Log::warning('[HR Manager] NameResolution: alliance corporation lookup failed: ' . $e->getMessage());
+        }
+
+        return array_values($out);
+    }
+
+    /**
      * The alliance each corporation currently sits in.
      *
      * Same caveat as resolveAffiliations: this is today's answer, not the

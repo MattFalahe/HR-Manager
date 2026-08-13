@@ -77,6 +77,93 @@ class EveWhoRosterService
             ->all();
     }
 
+    /**
+     * Corps a currently-registered character belongs to.
+     *
+     * The same rule that scopes a non-admin director's access, so "the corps
+     * this install is actually about" means the same thing here as it does
+     * everywhere else in HR. Bounded by the size of the user base rather than
+     * by corporation_infos, which holds every corp SeAT has ever resolved and
+     * runs to thousands on a real server.
+     *
+     * @return array<int>
+     */
+    public function corporationIdsFromRegisteredCharacters(): array
+    {
+        if (!Schema::hasTable('refresh_tokens') || !Schema::hasTable('character_affiliations')) {
+            return [];
+        }
+
+        try {
+            return DB::table('refresh_tokens')
+                ->join('character_affiliations', 'refresh_tokens.character_id', '=', 'character_affiliations.character_id')
+                ->whereNull('refresh_tokens.deleted_at')
+                ->distinct()
+                ->pluck('character_affiliations.corporation_id')
+                ->map(fn ($c) => (int) $c)
+                ->filter()
+                ->values()
+                ->all();
+        } catch (\Throwable $e) {
+            Log::warning('[HR Manager] EveWho: registered-corp lookup failed: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Corps with a recruitment landing: the ones this install actively
+     * recruits for, whether or not anyone has authed for them yet.
+     *
+     * @return array<int>
+     */
+    public function corporationIdsWithLandings(): array
+    {
+        if (!Schema::hasTable('hr_manager_recruitment_landings')) {
+            return [];
+        }
+
+        try {
+            return DB::table('hr_manager_recruitment_landings')
+                ->distinct()
+                ->pluck('corporation_id')
+                ->map(fn ($c) => (int) $c)
+                ->filter()
+                ->values()
+                ->all();
+        } catch (\Throwable $e) {
+            Log::warning('[HR Manager] EveWho: landing-corp lookup failed: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Corps SeAT already holds an authoritative roster for.
+     *
+     * Worth knowing before spending an EveWho request: the Members page only
+     * falls through to the back-fill when neither roster table has the corp, so
+     * pulling one of these fetches data the page will never display.
+     *
+     * @return array<int>
+     */
+    public function corporationIdsWithSeatRoster(): array
+    {
+        $out = [];
+        foreach (['corporation_members', 'corporation_member_trackings'] as $table) {
+            if (!Schema::hasTable($table)) {
+                continue;
+            }
+            try {
+                foreach (DB::table($table)->distinct()->pluck('corporation_id') as $c) {
+                    $out[(int) $c] = (int) $c;
+                }
+            } catch (\Throwable $e) {
+                continue;
+            }
+        }
+
+        return array_values($out);
+    }
+
     /** When this corp was last pulled from EveWho, or null if never. */
     public function lastFetchedAt(int $corporationId): ?Carbon
     {

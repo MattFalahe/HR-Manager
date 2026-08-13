@@ -24,6 +24,15 @@ All notable changes to HR Manager will be documented in this file.
 - **Changing the criteria rebuilds rather than patches.** The scan never revisits a transfer it declined to flag, so raising a floor or widening which ratings count would otherwise leave one list holding findings from two different sets of rules with no way to tell them apart. Settings changes clear and re-derive automatically; after editing the standings list itself there is a **Rescan all history** button, since that edit happens on a different form.
 - **An ESI outage cannot silently bury donations.** If a counterparty cannot be resolved the scan holds its position for that character and retries next pass, rather than moving past rows it was never able to judge.
 
+### 🌐 EveWho roster refresh can reach corps nobody has opened
+
+- **`hr-manager:sync-external-rosters` takes a target now.** It only ever refreshed corps that already had a stored roster, and a corp only gets one when a director opens its Members page, so a corp nobody had visited was invisible to it and there was no way to say "do this one".
+- Four ways to pick a set, combinable: **`--corporation=`** (name, ticker or ID, repeatable and comma-separated), **`--registered`** (every corp a registered character currently belongs to, the same rule that scopes a non-admin director), **`--landings`** (every corp with a recruitment landing), and **`--alliance=`** (ID or name, merging SeAT's own corp list with ESI's). **`--all`** is the union of those plus everything already seeded.
+- **Corps SeAT already has a roster for are skipped**, with a count saying so. The Members page only falls through to EveWho when neither roster table holds the corp, so pulling one of those fetches data that would never be displayed. `--include-tracked` overrides.
+- The run **previews what it resolved and asks before spending a request**, since these selectors can reach a lot of corps and every one is a call to a third party. `--yes` skips the prompt, and a scheduled run never prompts at all.
+- A corp EveWho knows nothing about is now **reported as empty** rather than counting as a silent success.
+- **Scheduled behaviour is unchanged**: with no selector it still refreshes exactly the seeded corps.
+
 ### 🔔 Changed
 
 - The **conflict precedence** setting (corp-vs-alliance) moved to the Standings tab with the rest of it. Its meaning is unchanged, and it is now documented alongside the *source* precedence it was easy to confuse with: source precedence is HR over SeAT in hybrid mode; conflict precedence is about one entity whose corp and alliance are rated differently.
