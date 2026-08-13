@@ -235,6 +235,7 @@ class SyncExternalRostersCommand extends Command
         $totalChars = 0;
         $failed     = 0;
         $empty      = 0;
+        $short      = [];
 
         foreach ($corpIds as $corpId) {
             try {
@@ -246,6 +247,9 @@ class SyncExternalRostersCommand extends Command
                     $totalChars += $count;
                     if ($count === 0) {
                         $empty++;
+                    }
+                    if ($s = $eveWho->lastShortfall()) {
+                        $short[$corpId] = $s;
                     }
                 }
                 if ($bar) {
@@ -276,6 +280,24 @@ class SyncExternalRostersCommand extends Command
         // pull of nothing, so name it rather than let it read as a silent win.
         if ($empty > 0) {
             $this->warn($empty . ' corp(s) returned no members. EveWho only knows corps it has seen public activity for.');
+        }
+
+        // A truncated roster looks complete from the inside. Say which corps
+        // came back short and what EveWho itself claims they hold, so nobody
+        // reads a 500-member ceiling as the corp's real size.
+        if (!empty($short)) {
+            $this->newLine();
+            $this->warn(count($short) . ' corp(s) came back short of what EveWho reports they hold:');
+            foreach ($short as $corpId => $s) {
+                $this->line(sprintf(
+                    '    corp %d: stored %d of %d%s',
+                    $corpId,
+                    $s['got'],
+                    $s['reported'],
+                    $s['stalled'] ? '  (its pagination served the same page again, so the rest is unreachable)' : ''
+                ));
+            }
+            $this->line('  This is a limit of the EveWho API, not your data. A director token remains the only way to see a full roster.');
         }
 
         return 0;

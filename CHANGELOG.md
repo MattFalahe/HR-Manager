@@ -33,6 +33,12 @@ All notable changes to HR Manager will be documented in this file.
 - A corp EveWho knows nothing about is now **reported as empty** rather than counting as a silent success.
 - **Scheduled behaviour is unchanged**: with no selector it still refreshes exactly the seeded corps.
 
+### 🐛 Fixed
+
+- **EveWho rosters were silently capped at 500 members, and cost 20 requests to get there.** EveWho's corplist endpoint ignores its own pagination parameter: every page number returns a byte-identical page 1, while the response still reports `pages: 2, has_next: true`. HR followed `has_next`, so it re-fetched page 1 until it hit the 20-page safety cap and finished with the 500 rows the first request already had. Verified against a 717-member corp on 2026-08-13; `?page`, `?p`, `?offset` and `?start` all behave the same way.
+- The loop now checks whether a page **actually advanced** (by the page number it reports, and by whether it contributed any new characters) and stops when it did not. That takes the same corp from 20 requests to 2, and it keeps working unchanged if EveWho ever fixes their end.
+- **A truncated roster now says so.** `pagination.total` is EveWho's own member count, so when a pull comes back short the command names the corp and both figures rather than letting 500 read as the corp's real size. This is a limit of their API, not your data: a director token remains the only way to see a full roster.
+
 ### 🔔 Changed
 
 - The **conflict precedence** setting (corp-vs-alliance) moved to the Standings tab with the rest of it. Its meaning is unchanged, and it is now documented alongside the *source* precedence it was easy to confuse with: source precedence is HR over SeAT in hybrid mode; conflict precedence is about one entity whose corp and alliance are rated differently.

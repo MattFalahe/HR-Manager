@@ -16,9 +16,21 @@ use Illuminate\Support\Facades\Schema;
  * EveWho (zKillboard/Squizz's project) aggregates corp membership from ESI
  * affiliations + killmails and exposes it CORS-enabled at
  *   GET https://evewho.com/api/corplist/{corp_id}?page=N
- *   -> { info, characters: [{character_id, name}, ...], pagination: {has_next} }
- * 500 characters per page. We paginate, upsert into hr_manager_external_roster,
- * and let the Members page read it when SeAT has no authoritative roster.
+ *   -> { info, characters: [{character_id, name}, ...],
+ *        pagination: {page, limit, total, pages, has_next, has_previous} }
+ * 500 characters per page. We upsert into hr_manager_external_roster and let
+ * the Members page read it when SeAT has no authoritative roster.
+ *
+ * Its pagination cannot be relied on. Observed 2026-08-13 against a 717-member
+ * corp: every value of ?page (and ?p / ?offset / ?start) returned a byte-identical
+ * page 1, while pagination still reported pages: 2 and has_next: true. Following
+ * has_next alone therefore re-reads page 1 until MAX_PAGES, spending 20 requests
+ * to end up with the 500 rows the first one already had.
+ *
+ * So the loop checks whether a page ACTUALLY advanced, by the page number it
+ * reports and by whether it contributed any new character ids, and stops when it
+ * did not. pagination.total is kept as EveWho's own idea of the member count, so
+ * a truncated roster can say so instead of looking complete at 500.
  *
  * This is a SECONDARY source, deliberately:
  *   - It is an aggregator snapshot, so it can still list departed members and
@@ -41,6 +53,13 @@ class EveWhoRosterService
     private const HTTP_TIMEOUT = 8;  // per-request seconds
     private const WALL_BUDGET  = 12; // default budget — a first-view seed shouldn't hold the page long
     public const WALL_BUDGET_FULL = 150; // background (cron) budget — fetch every page
+
+    /**
+     * Set by sync() when a pull came back short of pagination.total.
+     *
+     * @var array{got:int, reported:int, stalled:bool}|null
+     */
+    private ?array $lastShortfall = null;
 
     /** Operator toggle (Settings → Features). Off by default. */
     public function isEnabled(): bool
@@ -225,6 +244,8 @@ class EveWhoRosterService
 
         try {
             $idToName = [];
+            $reported = null;   // pagination.total, EveWho's own member count
+            $stalled  = false;  // a page repeated instead of advancing
             $deadline = microtime(true) + ($maxSeconds ?? self::WALL_BUDGET);
 
             for ($page = 1; $page <= self::MAX_PAGES; $page++) {
@@ -246,12 +267,32 @@ class EveWhoRosterService
                     break;
                 }
 
+                if (isset($json['pagination']['total'])) {
+                    $reported = (int) $json['pagination']['total'];
+                }
+
+                // Did this page actually advance? Two independent checks,
+                // because the endpoint has been observed serving page 1 for
+                // every page number while still reporting has_next: true.
+                // Trusting has_next alone spends MAX_PAGES requests re-reading
+                // the same rows and silently caps the corp at one page.
+                $servedPage = isset($json['pagination']['page']) ? (int) $json['pagination']['page'] : null;
+                $before     = count($idToName);
+
                 foreach ($chars as $c) {
                     $cid = (int) ($c['character_id'] ?? 0);
                     if ($cid > 0) {
                         $name = trim((string) ($c['name'] ?? ''));
                         $idToName[$cid] = $name !== '' ? $name : null;
                     }
+                }
+
+                $wrongPage = $servedPage !== null && $servedPage !== $page;
+                $noNewRows = count($idToName) === $before;
+
+                if ($page > 1 && ($wrongPage || $noNewRows)) {
+                    $stalled = true;
+                    break;
                 }
 
                 if (!($json['pagination']['has_next'] ?? false)) {
@@ -266,12 +307,47 @@ class EveWhoRosterService
             }
 
             $this->store($corporationId, $idToName);
-            return count($idToName);
+
+            $got = count($idToName);
+
+            // Short of what EveWho itself says the corp has. Worth saying out
+            // loud: the roster looks complete from the inside, and a director
+            // comparing it to the corp's real size needs to know the ceiling is
+            // the API's, not theirs.
+            if ($reported !== null && $got < $reported) {
+                $this->lastShortfall = ['got' => $got, 'reported' => $reported, 'stalled' => $stalled];
+                Log::info(sprintf(
+                    '[HR Manager] EveWho returned %d of %d members for corp %d%s.',
+                    $got,
+                    $reported,
+                    $corporationId,
+                    $stalled ? ' (its pagination served the same page again, so the rest is unreachable)' : ''
+                ));
+            } else {
+                $this->lastShortfall = null;
+            }
+
+            return $got;
         } catch (\Throwable $e) {
             Log::warning('[HR Manager] EveWho roster sync failed for corp ' . $corporationId . ': ' . $e->getMessage());
             return null;
         }
     }
+
+    /**
+     * Detail about the most recent sync(), when it came back short.
+     *
+     * sync() returns a plain count so its existing callers keep working; this
+     * carries the bit they had no way to ask about, namely that the count is a
+     * ceiling imposed by EveWho rather than the corp's real size.
+     *
+     * @return array{got:int, reported:int, stalled:bool}|null
+     */
+    public function lastShortfall(): ?array
+    {
+        return $this->lastShortfall;
+    }
+
 
     /**
      * Replace the corp's stored roster with the freshly pulled set. Delete +
