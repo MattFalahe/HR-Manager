@@ -2,6 +2,21 @@
 
 All notable changes to HR Manager will be documented in this file.
 
+## [1.0.2] - Unreleased
+
+### 🤝 Standings are numbers now, and have their own tab
+
+- **Standings carry a real value.** SeAT's Standings Builder has always held a number per entity, -10 through +10, and HR read those rows and threw the number away, keeping only which side of zero it fell on. So the assessment could say an applicant was blue to a hostile entity, but never *how* hostile, and HR's own list could not express anything but a binary. Entities now sit on EVE's own five-step scale (**-10 terrible, -5 bad, 0 neutral, +5 good, +10 excellent**) with the colour badges to match.
+- **Its own settings tab**, under Global Settings. It was a cramped sub-form on the Assessment tab, which is where you configured it but not where it belongs: standings are a corp-wide fact, not an assessment setting. The Assessment tab now carries a pointer to the new home.
+- **A hybrid source mode.** Alongside *off* / *SeAT profile* / *HR's own list*, you can now run **SeAT as the baseline with HR overriding it per entity**, the useful shape for most corps, because you are not maintaining a parallel list, only the handful of entities where your corp's view differs from your alliance's. Overrides work **downward** too, so something your alliance rates terrible can be set neutral locally and stop generating flags. Each overridden row shows the SeAT value beside your own.
+- **Build the list by ID or by name**, mixed freely, one per line, all taking the same value at once. Type is auto-detected; if you pick one and the entity turns out to be something else it is filed under what it really is and the save message says so, because an entry filed under the wrong category silently never matches anything, which looks configured and does nothing. Adding an entity that is already listed revalues it rather than duplicating it. Rows can be revalued or removed in bulk, and a filter box narrows the table (with "select all" taking only the rows on screen).
+- **Your existing lists were carried over automatically**: hostile entries became **-10** and friendly entries became **+10**, on the reasoning that typing an entity into a list called *hostile* is a deliberate act rather than a shrug. Nothing set by hand was overwritten, and **the old settings were left in place untouched**, so a bad import can be re-run rather than reconstructed. Imported entries arrive as bare IDs; a **Resolve missing names** button fills them in.
+- Names are read from a stored snapshot rather than looked up live, so a list of a few hundred entities costs nothing to render, and still reads sensibly after an entity closes or ESI goes down.
+
+### 🔔 Changed
+
+- The **conflict precedence** setting (corp-vs-alliance) moved to the Standings tab with the rest of it. Its meaning is unchanged, and it is now documented alongside the *source* precedence it was easy to confuse with: source precedence is HR over SeAT in hybrid mode; conflict precedence is about one entity whose corp and alliance are rated differently.
+
 ## [1.0.1] - 2026-08-11
 
 ### 🐛 Fixed

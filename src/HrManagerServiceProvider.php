@@ -142,6 +142,14 @@ class HrManagerServiceProvider extends AbstractSeatPlugin
             $this->app->singleton($service);
         }
 
+        // Scoped, not a singleton. It memoises the resolved standings map,
+        // which an assessment reads repeatedly, so sharing the instance is the
+        // whole point — but a singleton in a long-lived queue worker would hold
+        // that memo across jobs and keep serving the old values until the
+        // worker restarted. Scoped bindings are reset between jobs, which is
+        // exactly the lifetime the memo should have.
+        $this->app->scoped(\HrManager\Services\StandingsReferenceService::class);
+
         $this->add_database_seeders();
     }
 

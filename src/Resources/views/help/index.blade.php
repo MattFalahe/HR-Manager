@@ -1037,9 +1037,40 @@ docker compose -f docker-compose.yml -f docker-compose.mariadb.yml -f docker-com
                         <li><strong>Skill points</strong> (skills scope) against a guideline.</li>
                         <li><strong>Implants</strong> (clones scope): an established main vs a throwaway clean clone.</li>
                         <li><strong>Current-corp roles</strong> (corp-roles scope): a Director elsewhere is flagged amber (awox / intel risk + seniority).</li>
-                        <li><strong>Standings</strong> (contacts scope): flags an applicant <strong>blue to an entity you mark hostile</strong>. The hostile / friendly reference is either SeAT's Standings Builder or your own alliance/corp lists, with a corp-vs-alliance precedence toggle. Inert until you pick a source.</li>
+                        <li><strong>Standings</strong> (contacts scope): flags an applicant <strong>blue to an entity you rate badly</strong>. Configured in <strong>Settings &rarr; Standings</strong> (see below). Inert until you pick a source.</li>
                     </ul>
-                    <p>Tune everything in <strong>Settings &rarr; Assessment</strong>: the thresholds (hopper count, NPC-park days, min tenure, age, SP, security floor) and the standings source + precedence. The optional scopes themselves are requested through your <strong>recruitment SSO profile</strong> (Settings &rarr; SSO &amp; Scopes lists which are present, alongside the optional intel-scope tier).</p>
+                    <p>Tune the thresholds in <strong>Settings &rarr; Assessment</strong> (hopper count, NPC-park days, min tenure, age, SP, security floor). The optional scopes themselves are requested through your <strong>recruitment SSO profile</strong> (Settings &rarr; SSO &amp; Scopes lists which are present, alongside the optional intel-scope tier).</p>
+                </div>
+
+                {{-- Standings — own settings tab since 1.0.2, and now numeric --}}
+                <div class="help-card">
+                    <h3>
+                        <i class="fas fa-handshake-slash"></i> Standings
+                        <span class="badge ml-1" style="background: rgba(40,167,69,0.28); color: #6ee7b7; border: 1px solid rgba(40,167,69,0.55); font-size: 0.78rem; font-weight: 700; padding: 3px 9px; vertical-align: middle;">1.0.2</span>
+                    </h3>
+                    <p><strong>Settings &rarr; Standings</strong> holds your corp's view of who is hostile <em>and how hostile</em>, on EVE's own scale: <strong>-10 terrible, -5 bad, 0 neutral, +5 good, +10 excellent</strong>. It feeds the assessment's contact check, and anything else in HR that needs to know what you think of an entity.</p>
+                    <p>Standings used to be a sub-form on the Assessment tab holding four flat lists of IDs, which could only ever answer <em>hostile: yes or no</em>. They now carry a real value, and have their own tab.</p>
+
+                    <h4>Where the values come from</h4>
+                    <ul>
+                        <li><strong>Off</strong> — nothing is rated and the standings check does not run.</li>
+                        <li><strong>SeAT</strong> — a Standings Builder profile (SeAT's own <em>Tools &rarr; Standings</em>), used exactly as it stands.</li>
+                        <li><strong>HR</strong> — the list on this tab only.</li>
+                        <li><strong>Hybrid</strong> — SeAT as the baseline with HR overriding it <em>per entity</em>. This is the useful shape for most corps: you are not maintaining a parallel list, only the handful of entities where your corp's view differs from your alliance's. Overrides work <strong>downward</strong> too, so something your alliance rates terrible can be set neutral locally and stop generating flags.</li>
+                    </ul>
+                    <p>Two precedences, and they are easy to confuse. The <strong>source</strong> precedence is HR over SeAT, and only applies in hybrid mode. The <strong>conflict</strong> precedence (also on this tab) is about one entity: when a corp and its alliance are rated differently, which verdict wins for a member of that corp.</p>
+
+                    <h4>Building the list</h4>
+                    <ul>
+                        <li>Paste entities <strong>one per line</strong>, IDs and names mixed freely, and they all take the value you pick. Names must match exactly (case does not matter) — a standings list built from fuzzy matches would be quietly wrong in exactly the way that matters.</li>
+                        <li>Type is <strong>auto-detected</strong>. Pick one manually only for IDs that cannot be looked up, for instance while ESI is unreachable. If you pick a type and the entity turns out to be something else, it is filed under what it really is and the save message tells you — an entry filed under the wrong category silently never matches anything.</li>
+                        <li>Adding an entity that is already listed <strong>changes its value</strong> rather than duplicating it.</li>
+                        <li>Select rows to <strong>revalue or remove in bulk</strong>. The filter box narrows the table, and "select all" only takes the rows currently shown.</li>
+                        <li>In hybrid mode each row shows the <strong>SeAT baseline</strong> beside your value, marked when you have overridden it.</li>
+                    </ul>
+
+                    <h4>Upgrading from the old lists</h4>
+                    <p>Your four existing lists were carried over automatically the first time HR ran after the update: <strong>hostile entries became -10</strong> and <strong>friendly entries became +10</strong>, on the reasoning that typing an entity into a list called <em>hostile</em> is a deliberate act rather than a shrug. Nothing you had set by hand was overwritten, and the old settings were left in place untouched. Entries arrive with an ID and no name; the <strong>Resolve missing names</strong> button on the tab fills them in.</p>
                 </div>
             </div>
 

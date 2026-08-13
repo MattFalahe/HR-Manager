@@ -363,6 +363,213 @@ class NameResolutionService
     }
 
     /**
+     * Resolve a mixed batch of IDs to name AND category, for any entity type.
+     *
+     * getCharacterNames() answers "what is this character called" and discards
+     * everything else. This answers "what IS this", which is what a standings
+     * list needs: the operator pastes an ID and we have to know whether they
+     * handed us an alliance, a corp or a character before we can file it.
+     *
+     * @param array<int> $ids
+     * @return array<int, array{name:string, category:string}>
+     */
+    public function resolveEntityNames(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), fn ($v) => $v > 0)));
+        if (empty($ids)) {
+            return [];
+        }
+
+        $resolved = [];
+
+        // Local tables first. Each carries its own category implicitly, which
+        // is more trustworthy than universe_names — that cache is populated by
+        // whoever got there first and its category can be stale.
+        $local = [
+            ['alliance_infos',    'alliance_id',    'alliance'],
+            ['corporation_infos', 'corporation_id', 'corporation'],
+            ['character_infos',   'character_id',   'character'],
+        ];
+        foreach ($local as [$table, $idCol, $category]) {
+            $missing = array_values(array_diff($ids, array_keys($resolved)));
+            if (empty($missing) || !Schema::hasTable($table)) {
+                continue;
+            }
+            try {
+                $rows = DB::table($table)->whereIn($idCol, $missing)->pluck('name', $idCol)->toArray();
+            } catch (\Throwable $e) {
+                continue;
+            }
+            foreach ($rows as $id => $name) {
+                if ($this->isUsableName($name)) {
+                    $resolved[(int) $id] = ['name' => (string) $name, 'category' => $category];
+                }
+            }
+        }
+
+        $missing = array_values(array_diff($ids, array_keys($resolved)));
+
+        if (!empty($missing) && Schema::hasTable('universe_names')) {
+            try {
+                $rows = DB::table('universe_names')
+                    ->whereIn('entity_id', $missing)
+                    ->get(['entity_id', 'name', 'category']);
+                foreach ($rows as $row) {
+                    if ($this->isUsableName($row->name)) {
+                        $resolved[(int) $row->entity_id] = [
+                            'name'     => (string) $row->name,
+                            'category' => (string) $row->category,
+                        ];
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::debug('[HR Manager] NameResolution: universe_names lookup failed: ' . $e->getMessage());
+            }
+            $missing = array_values(array_diff($ids, array_keys($resolved)));
+        }
+
+        // ESI, 1000 per call. An ID that resolves to nothing here does not
+        // exist (or no longer does); the caller decides what to do about it.
+        foreach (array_chunk($missing, 1000) as $chunk) {
+            try {
+                $response = Http::timeout(self::HTTP_TIMEOUT)
+                    ->withHeaders(['Accept' => 'application/json', 'User-Agent' => $this->userAgent()])
+                    ->post('https://esi.evetech.net/latest/universe/names/', array_values($chunk));
+
+                if (!$response->successful()) {
+                    Log::info('[HR Manager] NameResolution: ESI /universe/names/ returned ' . $response->status());
+                    continue;
+                }
+
+                $batch = [];
+                foreach ((array) $response->json() as $row) {
+                    if (!is_array($row)) {
+                        continue;
+                    }
+                    $id       = (int) ($row['id'] ?? 0);
+                    $name     = (string) ($row['name'] ?? '');
+                    $category = (string) ($row['category'] ?? '');
+                    if ($id <= 0 || $name === '') {
+                        continue;
+                    }
+                    $resolved[$id] = ['name' => $name, 'category' => $category];
+                    $batch[$id]    = ['name' => $name, 'category' => $category];
+                }
+
+                $this->persistBatch($batch);
+            } catch (\Throwable $e) {
+                Log::warning('[HR Manager] NameResolution: entity batch failed: ' . $e->getMessage());
+            }
+        }
+
+        return $resolved;
+    }
+
+    /**
+     * The reverse: names to IDs, for any entity type. Keyed by the LOWERCASED
+     * name the caller passed, so a caller that let someone type "goonswarm
+     * federation" can still find their result.
+     *
+     * ESI's /universe/ids/ matches exactly (bar case), which is the right
+     * behaviour here — a standings list built from fuzzy matches would be
+     * quietly wrong in exactly the way that matters.
+     *
+     * @param array<string> $names
+     * @return array<string, array{id:int, name:string, category:string}>
+     */
+    public function resolveNamesToEntities(array $names): array
+    {
+        $clean = [];
+        foreach ($names as $n) {
+            $n = trim((string) $n);
+            if ($n !== '' && mb_strlen($n) <= 100) {
+                $clean[mb_strtolower($n)] = $n;
+            }
+        }
+        if (empty($clean)) {
+            return [];
+        }
+
+        $resolved = [];
+        $needles  = array_values($clean);
+
+        $local = [
+            ['alliance_infos',    'alliance_id',    'alliance'],
+            ['corporation_infos', 'corporation_id', 'corporation'],
+            ['character_infos',   'character_id',   'character'],
+        ];
+        foreach ($local as [$table, $idCol, $category]) {
+            $pending = array_diff_key($clean, $resolved);
+            if (empty($pending) || !Schema::hasTable($table)) {
+                continue;
+            }
+            try {
+                $rows = DB::table($table)
+                    ->whereIn(DB::raw('LOWER(name)'), array_keys($pending))
+                    ->get([$idCol . ' as entity_id', 'name']);
+                foreach ($rows as $row) {
+                    $resolved[mb_strtolower((string) $row->name)] = [
+                        'id'       => (int) $row->entity_id,
+                        'name'     => (string) $row->name,
+                        'category' => $category,
+                    ];
+                }
+            } catch (\Throwable $e) {
+                continue;
+            }
+        }
+
+        $pending = array_values(array_diff_key($clean, $resolved));
+
+        // ESI caps /universe/ids/ at 500 names per call.
+        foreach (array_chunk($pending, 500) as $chunk) {
+            try {
+                $response = Http::timeout(self::HTTP_TIMEOUT)
+                    ->withHeaders(['Accept' => 'application/json', 'User-Agent' => $this->userAgent()])
+                    ->post('https://esi.evetech.net/latest/universe/ids/', array_values($chunk));
+
+                if (!$response->successful()) {
+                    Log::info('[HR Manager] NameResolution: ESI /universe/ids/ returned ' . $response->status());
+                    continue;
+                }
+
+                $data = (array) $response->json();
+                $buckets = [
+                    'alliances'    => 'alliance',
+                    'corporations' => 'corporation',
+                    'characters'   => 'character',
+                ];
+
+                $batch = [];
+                foreach ($buckets as $bucket => $category) {
+                    foreach ((array) ($data[$bucket] ?? []) as $row) {
+                        if (!is_array($row)) {
+                            continue;
+                        }
+                        $id   = (int) ($row['id'] ?? 0);
+                        $name = (string) ($row['name'] ?? '');
+                        if ($id <= 0 || $name === '') {
+                            continue;
+                        }
+                        $resolved[mb_strtolower($name)] = [
+                            'id'       => $id,
+                            'name'     => $name,
+                            'category' => $category,
+                        ];
+                        $batch[$id] = ['name' => $name, 'category' => $category];
+                    }
+                }
+
+                $this->persistBatch($batch);
+            } catch (\Throwable $e) {
+                Log::warning('[HR Manager] NameResolution: name batch failed: ' . $e->getMessage());
+            }
+        }
+
+        return $resolved;
+    }
+
+    /**
      * POST /universe/names/ — bulk ID to name resolution, up to 1000
      * mixed-category IDs per call. We filter to characters only on
      * the way out.

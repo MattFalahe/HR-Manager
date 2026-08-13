@@ -242,17 +242,17 @@ class SettingsController extends Controller
 
         // Standings reference (the "who is hostile / friendly" source the
         // assessment's standings signal compares an applicant's contacts to).
-        $standingsSvc = app(\HrManager\Services\StandingsReferenceService::class);
+        $standingsSvc   = app(\HrManager\Services\StandingsReferenceService::class);
+        $standingsAdmin = app(\HrManager\Services\StandingsAdminService::class);
         $standingsSettings = [
-            'source'             => $standingsSvc->source(),
-            'precedence'         => $standingsSvc->precedence(),
-            'seat_available'     => $standingsSvc->seatStandingsAvailable(),
-            'seat_profiles'      => $standingsSvc->seatProfiles(),
-            'seat_profile'       => (int) Setting::getValue(\HrManager\Services\StandingsReferenceService::SETTING_SEAT_PROFILE, 0),
-            'hostile_alliances'  => $this->idListText(\HrManager\Services\StandingsReferenceService::SETTING_HOSTILE_ALLIANCES),
-            'hostile_corps'      => $this->idListText(\HrManager\Services\StandingsReferenceService::SETTING_HOSTILE_CORPS),
-            'friendly_alliances' => $this->idListText(\HrManager\Services\StandingsReferenceService::SETTING_FRIENDLY_ALLIANCES),
-            'friendly_corps'     => $this->idListText(\HrManager\Services\StandingsReferenceService::SETTING_FRIENDLY_CORPS),
+            'source'          => $standingsSvc->source(),
+            'precedence'      => $standingsSvc->precedence(),
+            'seat_available'  => $standingsSvc->seatStandingsAvailable(),
+            'seat_profiles'   => $standingsSvc->seatProfiles(),
+            'seat_profile'    => (int) Setting::getValue(\HrManager\Services\StandingsReferenceService::SETTING_SEAT_PROFILE, 0),
+            'hybrid_no_base'  => $standingsSvc->hybridBaselineMissing(),
+            'rows'            => $standingsAdmin->rows(),
+            'summary'         => $standingsAdmin->summary(),
         ];
 
         $ssoService         = app(\HrManager\Services\RecruitmentSsoService::class);
@@ -421,13 +421,9 @@ class SettingsController extends Controller
             'assess_min_sp'              => 'nullable|integer|min:0|max:1000000000',
             'assess_sec_floor'           => 'nullable|numeric|min:-10|max:5',
             // Standings reference
-            'assess_standings_source'        => 'nullable|in:off,seat,own',
+            'assess_standings_source'        => 'nullable|in:off,seat,own,hybrid',
             'assess_standings_precedence'    => 'nullable|in:corp,alliance',
             'assess_standings_seat_profile'  => 'nullable|integer|min:0',
-            'assess_hostile_alliances'       => 'nullable|string|max:20000',
-            'assess_hostile_corps'           => 'nullable|string|max:20000',
-            'assess_friendly_alliances'      => 'nullable|string|max:20000',
-            'assess_friendly_corps'          => 'nullable|string|max:20000',
             // Purge squad cleanup
             'purge_auto_squad_removal'       => 'nullable|boolean',
             'purge_auto_squad_removal_hours' => 'nullable|integer|in:12,24',
@@ -583,13 +579,14 @@ class SettingsController extends Controller
             }
         }
 
-        // Standings reference (id=assessment, second form). Source + precedence
-        // + the SeAT profile pick + the four own-list ID textareas.
-        if ($request->has('assessment_standings_form')) {
+        // Standings source (id=standings). The list itself is edited through
+        // its own routes; this form is only which source feeds it and how a
+        // corp-level entry argues with its alliance's.
+        if ($request->has('standings_form')) {
             $svc = \HrManager\Services\StandingsReferenceService::class;
 
             $src = (string) $request->input('assess_standings_source', $svc::SOURCE_OFF);
-            if (!in_array($src, [$svc::SOURCE_SEAT, $svc::SOURCE_OWN], true)) {
+            if (!in_array($src, [$svc::SOURCE_SEAT, $svc::SOURCE_OWN, $svc::SOURCE_HYBRID], true)) {
                 $src = $svc::SOURCE_OFF;
             }
             Setting::setValue($svc::SETTING_SOURCE, $src, 'string');
@@ -598,16 +595,6 @@ class SettingsController extends Controller
             Setting::setValue($svc::SETTING_PRECEDENCE, $prec === $svc::PRECEDENCE_ALLIANCE ? $svc::PRECEDENCE_ALLIANCE : $svc::PRECEDENCE_CORP, 'string');
 
             Setting::setValue($svc::SETTING_SEAT_PROFILE, (int) $request->input('assess_standings_seat_profile', 0), 'integer');
-
-            $lists = [
-                'assess_hostile_alliances'  => $svc::SETTING_HOSTILE_ALLIANCES,
-                'assess_hostile_corps'      => $svc::SETTING_HOSTILE_CORPS,
-                'assess_friendly_alliances' => $svc::SETTING_FRIENDLY_ALLIANCES,
-                'assess_friendly_corps'     => $svc::SETTING_FRIENDLY_CORPS,
-            ];
-            foreach ($lists as $field => $key) {
-                Setting::setValue($key, $this->parseIdList((string) $request->input($field, '')), 'json');
-            }
         }
 
         // Purge squad cleanup (id=purge-squads). Opt-in auto-removal toggle +
@@ -828,8 +815,8 @@ class SettingsController extends Controller
             $request->has('connector_access_form')     => 'recruiter-access',
             $request->has('sso_settings_form'),
             $request->has('token_req_form')            => 'sso',
-            $request->has('assessment_criteria_form'),
-            $request->has('assessment_standings_form') => 'assessment',
+            $request->has('assessment_criteria_form')   => 'assessment',
+            $request->has('standings_form')             => 'standings',
             $request->has('wallet_alerts_form')        => 'webhooks',
             $request->has('notifications_form')        => 'notifications',
             $request->has('onboarding_form')           => 'onboarding',
@@ -1130,30 +1117,93 @@ class SettingsController extends Controller
     }
 
     /**
-     * Render a stored JSON id-list setting as newline-separated text for a
-     * <textarea> (one id per line).
+     * Add entries to HR's own standings list: a paste of IDs and/or names,
+     * one per line, all taking the same value.
      */
-    private function idListText(string $settingKey): string
+    public function storeStandings(Request $request)
     {
-        $ids = (array) (Setting::getValue($settingKey, []) ?: []);
-        return implode("\n", array_map('intval', array_filter($ids, fn ($v) => (int) $v > 0)));
+        $request->validate([
+            'standings_entities' => 'required|string|max:60000',
+            'standings_type'     => 'required|in:auto,alliance,corporation,character',
+            'standings_value'    => 'required|integer|in:' . implode(',', \HrManager\Models\StandingEntry::VALUES),
+            'standings_notes'    => 'nullable|string|max:500',
+        ]);
+
+        $result = app(\HrManager\Services\StandingsAdminService::class)->addBulk(
+            (string) $request->input('standings_entities'),
+            (string) $request->input('standings_type'),
+            (int) $request->input('standings_value'),
+            auth()->id(),
+            $request->filled('standings_notes') ? (string) $request->input('standings_notes') : null
+        );
+
+        $redirect = $this->backToSettingsTab('standings');
+
+        if ($result['added'] === 0 && $result['updated'] === 0 && $result['unchanged'] === 0) {
+            return $redirect->with('error', trans('hr-manager::settings.std_none_resolved'));
+        }
+
+        $msg = trans('hr-manager::settings.std_added', [
+            'added'   => $result['added'],
+            'updated' => $result['updated'],
+        ]);
+
+        // Both of these are things the operator would otherwise only discover
+        // by scanning the table afterwards and noticing something is off.
+        if (!empty($result['retyped'])) {
+            $msg .= ' ' . trans('hr-manager::settings.std_retyped', [
+                'list' => implode(', ', array_slice($result['retyped'], 0, 5)),
+            ]);
+        }
+        if (!empty($result['unresolved'])) {
+            $msg .= ' ' . trans_choice('hr-manager::settings.std_unresolved', count($result['unresolved']), [
+                'count' => count($result['unresolved']),
+                'list'  => implode(', ', array_slice($result['unresolved'], 0, 5)),
+            ]);
+        }
+
+        return $redirect->with('success', $msg);
     }
 
     /**
-     * Parse a free-text id list (newlines / commas / spaces) into a clean,
-     * unique, positive-int array for storage.
-     *
-     * @return array<int>
+     * Revalue or remove checked rows in one go.
      */
-    private function parseIdList(string $raw): array
+    public function bulkStandings(Request $request)
     {
-        $ids = [];
-        foreach (preg_split('/[\s,]+/', $raw) as $tok) {
-            $tok = trim($tok);
-            if ($tok !== '' && ctype_digit($tok)) {
-                $ids[] = (int) $tok;
-            }
+        $request->validate([
+            'standing_ids'   => 'required|array|min:1',
+            'standing_ids.*' => 'integer',
+            'bulk_action'    => 'required|in:set,delete',
+            'bulk_value'     => 'nullable|integer|in:' . implode(',', \HrManager\Models\StandingEntry::VALUES),
+        ]);
+
+        $svc  = app(\HrManager\Services\StandingsAdminService::class);
+        $ids  = (array) $request->input('standing_ids', []);
+        $back = $this->backToSettingsTab('standings');
+
+        if ((string) $request->input('bulk_action') === 'delete') {
+            $n = $svc->delete($ids);
+            return $back->with('success', trans_choice('hr-manager::settings.std_deleted', $n, ['count' => $n]));
         }
-        return array_values(array_unique($ids));
+
+        if (!$request->filled('bulk_value')) {
+            return $back->with('error', trans('hr-manager::settings.std_bulk_no_value'));
+        }
+
+        $n = $svc->setValue($ids, (int) $request->input('bulk_value'), auth()->id());
+
+        return $back->with('success', trans_choice('hr-manager::settings.std_revalued', $n, ['count' => $n]));
+    }
+
+    /**
+     * Fill in the names of entries that only have an ID — the legacy imports,
+     * and anything added while ESI was unreachable.
+     */
+    public function resolveStandingNames()
+    {
+        $n = app(\HrManager\Services\StandingsAdminService::class)->backfillNames();
+
+        return $this->backToSettingsTab('standings')
+            ->with('success', trans_choice('hr-manager::settings.std_names_resolved', $n, ['count' => $n]));
     }
 }

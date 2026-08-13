@@ -289,6 +289,12 @@ Route::group([
         Route::delete('/tiers/{id}',   ['as' => 'hr-manager.settings.tiers.destroy',   'uses' => 'SettingsController@deleteTierMapping']);
         Route::post('/tiers/defaults', ['as' => 'hr-manager.settings.tiers.defaults',  'uses' => 'SettingsController@updateTierDefaults']);
 
+        // Standings list (HR's own entries; the source mode itself saves
+        // through the main settings form like every other tab)
+        Route::post('/standings',        ['as' => 'hr-manager.settings.standings.store',    'uses' => 'SettingsController@storeStandings']);
+        Route::post('/standings/bulk',   ['as' => 'hr-manager.settings.standings.bulk',     'uses' => 'SettingsController@bulkStandings']);
+        Route::post('/standings/resolve', ['as' => 'hr-manager.settings.standings.resolve', 'uses' => 'SettingsController@resolveStandingNames']);
+
         // Buyback contribution per-corp policy
         Route::post('/buyback-policy', ['as' => 'hr-manager.settings.buyback.policy', 'uses' => 'SettingsController@updateBuybackPolicy']);
     });

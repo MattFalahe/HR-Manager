@@ -166,6 +166,11 @@
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link" data-toggle="tab" href="#standings">
+                                <i class="fas fa-handshake-slash"></i> {{ trans('hr-manager::settings.std_tab') }}
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link" data-toggle="tab" href="#purge-squads">
                                 <i class="fas fa-user-minus"></i> {{ trans('hr-manager::settings.purge_squads_tab') }}
                             </a>
@@ -1047,6 +1052,360 @@
                 </div>
 
                 {{-- Webhooks Tab --}}
+                {{-- Standings — the corp's view of who is hostile and how
+                     hostile, feeding the applicant assessment's contact
+                     check. Its own tab since 1.0.2; it used to be a cramped
+                     sub-form on Assessment. --}}
+                <div class="tab-pane" id="standings">
+
+                    <h4 class="mb-1">{{ trans('hr-manager::settings.std_tab') }}</h4>
+                    <p class="text-muted" style="font-size: 0.85rem;">{{ trans('hr-manager::settings.std_intro') }}</p>
+
+                    @php
+                        $stdSource  = $standingsSettings['source'];
+                        $stdUsesHr  = in_array($stdSource, ['own', 'hybrid'], true);
+                        $stdSummary = $standingsSettings['summary'];
+                    @endphp
+
+                    {{-- ==== Source mode ==== --}}
+                    <div class="card mb-3" style="background: var(--hr-dark-card); border: 1px solid var(--hr-border);">
+                        <div class="card-header">
+                            <h5 class="mb-0" style="color: var(--hr-text-white);">
+                                <i class="fas fa-code-branch"></i> {{ trans('hr-manager::settings.std_source_heading') }}
+                            </h5>
+                            <small style="color: var(--hr-text-muted);">{{ trans('hr-manager::settings.std_source_intro') }}</small>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" action="{{ route('hr-manager.settings.update') }}">
+                                @csrf
+                                <input type="hidden" name="standings_form" value="1">
+
+                                <div class="row">
+                                    <div class="col-md-6 form-group">
+                                        <label>{{ trans('hr-manager::settings.assess_std_source') }}</label>
+                                        <select name="assess_standings_source" class="form-control" id="std-source">
+                                            <option value="off"  {{ $stdSource === 'off' ? 'selected' : '' }}>{{ trans('hr-manager::settings.assess_std_source_off') }}</option>
+                                            <option value="seat" {{ $stdSource === 'seat' ? 'selected' : '' }} {{ $standingsSettings['seat_available'] ? '' : 'disabled' }}>{{ trans('hr-manager::settings.assess_std_source_seat') }}@unless($standingsSettings['seat_available']) ({{ trans('hr-manager::settings.assess_std_seat_unavailable') }})@endunless</option>
+                                            <option value="own"  {{ $stdSource === 'own' ? 'selected' : '' }}>{{ trans('hr-manager::settings.assess_std_source_own') }}</option>
+                                            <option value="hybrid" {{ $stdSource === 'hybrid' ? 'selected' : '' }} {{ $standingsSettings['seat_available'] ? '' : 'disabled' }}>{{ trans('hr-manager::settings.assess_std_source_hybrid') }}@unless($standingsSettings['seat_available']) ({{ trans('hr-manager::settings.assess_std_seat_unavailable') }})@endunless</option>
+                                        </select>
+                                        <small class="form-text" style="color: var(--hr-text-muted);" data-std-mode="off">{{ trans('hr-manager::settings.std_mode_help_off') }}</small>
+                                        <small class="form-text" style="color: var(--hr-text-muted);" data-std-mode="seat">{{ trans('hr-manager::settings.std_mode_help_seat') }}</small>
+                                        <small class="form-text" style="color: var(--hr-text-muted);" data-std-mode="own">{{ trans('hr-manager::settings.std_mode_help_own') }}</small>
+                                        <small class="form-text" style="color: var(--hr-text-muted);" data-std-mode="hybrid">{{ trans('hr-manager::settings.std_mode_help_hybrid') }}</small>
+                                    </div>
+
+                                    <div class="col-md-6 form-group" data-std-mode="seat hybrid">
+                                        <label>{{ trans('hr-manager::settings.assess_std_seat_profile') }}</label>
+                                        <select name="assess_standings_seat_profile" class="form-control">
+                                            <option value="0">{{ trans('hr-manager::settings.assess_std_seat_profile_none') }}</option>
+                                            @foreach($standingsSettings['seat_profiles'] as $p)
+                                                <option value="{{ $p->id }}" {{ (int) $standingsSettings['seat_profile'] === (int) $p->id ? 'selected' : '' }}>{{ $p->name }}</option>
+                                            @endforeach
+                                        </select>
+                                        <small class="form-text" style="color: var(--hr-text-muted);">{{ trans('hr-manager::settings.assess_std_seat_profile_help') }}</small>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>{{ trans('hr-manager::settings.assess_std_precedence') }}</label>
+                                    <select name="assess_standings_precedence" class="form-control">
+                                        <option value="corp"     {{ $standingsSettings['precedence'] === 'corp' ? 'selected' : '' }}>{{ trans('hr-manager::settings.assess_std_precedence_corp') }}</option>
+                                        <option value="alliance" {{ $standingsSettings['precedence'] === 'alliance' ? 'selected' : '' }}>{{ trans('hr-manager::settings.assess_std_precedence_alliance') }}</option>
+                                    </select>
+                                    <small class="form-text" style="color: var(--hr-text-muted);">{{ trans('hr-manager::settings.assess_std_precedence_help') }}</small>
+                                </div>
+
+                                <button type="submit" class="btn btn-hr-primary btn-icon">
+                                    <i class="fas fa-save"></i> {{ trans('hr-manager::settings.save_settings') }}
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    {{-- Hybrid was chosen but SeAT has no baseline to layer
+                         under it: it still works, it is just doing nothing
+                         the plain HR mode would not. --}}
+                    @if($standingsSettings['hybrid_no_base'])
+                        <div class="alert" style="background: rgba(255,193,7,0.08); border: 1px solid rgba(255,193,7,0.3); color: var(--hr-text-light);">
+                            <i class="fas fa-exclamation-triangle text-warning"></i>
+                            {{ trans('hr-manager::settings.std_hybrid_no_baseline') }}
+                        </div>
+                    @endif
+
+                    {{-- ==== What the current mode actually resolves to ==== --}}
+                    <div class="card mb-3" style="background: var(--hr-dark-card); border: 1px solid var(--hr-border);">
+                        <div class="card-body py-2">
+                            <div class="d-flex flex-wrap align-items-center" style="gap: 18px;">
+                                <span style="color: var(--hr-text-muted); font-size: 0.85rem;">
+                                    <i class="fas fa-list-ol"></i> {{ trans('hr-manager::settings.std_sum_total') }}
+                                    <strong style="color: var(--hr-text-white);">{{ number_format($stdSummary['total']) }}</strong>
+                                </span>
+                                <span style="color: var(--hr-text-muted); font-size: 0.85rem;">
+                                    {{ trans('hr-manager::settings.std_sum_hostile') }}
+                                    <strong style="color: #f5a3ac;">{{ number_format($stdSummary['hostile']) }}</strong>
+                                </span>
+                                <span style="color: var(--hr-text-muted); font-size: 0.85rem;">
+                                    {{ trans('hr-manager::settings.std_sum_neutral') }}
+                                    <strong style="color: #c5cdd8;">{{ number_format($stdSummary['neutral']) }}</strong>
+                                </span>
+                                <span style="color: var(--hr-text-muted); font-size: 0.85rem;">
+                                    {{ trans('hr-manager::settings.std_sum_friendly') }}
+                                    <strong style="color: #9ec5fe;">{{ number_format($stdSummary['friendly']) }}</strong>
+                                </span>
+                                @if($stdSource === 'hybrid')
+                                    <span style="color: var(--hr-text-muted); font-size: 0.85rem;">
+                                        <i class="fas fa-pen"></i> {{ trans('hr-manager::settings.std_sum_from_hr') }}
+                                        <strong style="color: var(--hr-text-white);">{{ number_format($stdSummary['from_hr']) }}</strong>
+                                    </span>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- ==== HR's own entries ==== --}}
+                    <div class="card mb-3" style="background: var(--hr-dark-card); border: 1px solid var(--hr-border);">
+                        <div class="card-header d-flex justify-content-between align-items-center flex-wrap">
+                            <div>
+                                <h5 class="mb-0" style="color: var(--hr-text-white);">
+                                    <i class="fas fa-clipboard-list"></i> {{ trans('hr-manager::settings.std_list_heading') }}
+                                </h5>
+                                <small style="color: var(--hr-text-muted);">{{ trans('hr-manager::settings.std_list_intro') }}</small>
+                            </div>
+                            @if($stdSummary['unnamed'] > 0)
+                                <form method="POST" action="{{ route('hr-manager.settings.standings.resolve') }}" class="mb-0">
+                                    @csrf
+                                    <button type="submit" class="btn btn-sm btn-hr-secondary btn-icon">
+                                        <i class="fas fa-search"></i>
+                                        {{ trans_choice('hr-manager::settings.std_resolve_names', $stdSummary['unnamed'], ['count' => $stdSummary['unnamed']]) }}
+                                    </button>
+                                </form>
+                            @endif
+                        </div>
+                        <div class="card-body">
+
+                            {{-- The list is still editable in modes that do not
+                                 read it, so a corp can build it before switching
+                                 over. Say so rather than let it look broken. --}}
+                            @unless($stdUsesHr)
+                                <div class="alert" style="background: rgba(255,255,255,0.04); border: 1px solid var(--hr-border); color: var(--hr-text-muted);">
+                                    <i class="fas fa-info-circle"></i> {{ trans('hr-manager::settings.std_list_inactive') }}
+                                </div>
+                            @endunless
+
+                            {{-- Add entities --}}
+                            <form method="POST" action="{{ route('hr-manager.settings.standings.store') }}">
+                                @csrf
+                                <div class="row">
+                                    <div class="col-md-6 form-group">
+                                        <label>{{ trans('hr-manager::settings.std_add_entities') }}</label>
+                                        <textarea name="standings_entities" class="form-control" rows="5"
+                                                  placeholder="{{ trans('hr-manager::settings.std_add_placeholder') }}"></textarea>
+                                        <small class="form-text" style="color: var(--hr-text-muted);">{{ trans('hr-manager::settings.std_add_help') }}</small>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label>{{ trans('hr-manager::settings.std_add_value') }}</label>
+                                            <select name="standings_value" class="form-control">
+                                                @foreach(\HrManager\Models\StandingEntry::VALUES as $v)
+                                                    @php $pal = \HrManager\Models\StandingEntry::palette($v); @endphp
+                                                    <option value="{{ $v }}" {{ $v === -10 ? 'selected' : '' }}>{{ $pal['label'] }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>{{ trans('hr-manager::settings.std_add_type') }}</label>
+                                            <select name="standings_type" class="form-control">
+                                                <option value="auto">{{ trans('hr-manager::settings.std_type_auto') }}</option>
+                                                <option value="alliance">{{ trans('hr-manager::settings.std_type_alliance') }}</option>
+                                                <option value="corporation">{{ trans('hr-manager::settings.std_type_corporation') }}</option>
+                                                <option value="character">{{ trans('hr-manager::settings.std_type_character') }}</option>
+                                            </select>
+                                            <small class="form-text" style="color: var(--hr-text-muted);">{{ trans('hr-manager::settings.std_add_type_help') }}</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>{{ trans('hr-manager::settings.std_add_notes') }}</label>
+                                            <input type="text" name="standings_notes" class="form-control" maxlength="500"
+                                                   placeholder="{{ trans('hr-manager::settings.std_add_notes_ph') }}">
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-hr-primary btn-icon">
+                                    <i class="fas fa-plus"></i> {{ trans('hr-manager::settings.std_add_submit') }}
+                                </button>
+                            </form>
+
+                            <hr style="border-color: rgba(255,255,255,0.08); margin: 22px 0;">
+
+                            @if(empty($standingsSettings['rows']))
+                                <p style="color: var(--hr-text-muted);" class="mb-0">
+                                    <i class="fas fa-inbox"></i> {{ trans('hr-manager::settings.std_list_empty') }}
+                                </p>
+                            @else
+                                <form method="POST" action="{{ route('hr-manager.settings.standings.bulk') }}" id="std-bulk-form">
+                                    @csrf
+
+                                    <div class="d-flex flex-wrap align-items-end mb-2" style="gap: 10px;">
+                                        <div class="form-group mb-0">
+                                            <label style="font-size: 0.8rem;">{{ trans('hr-manager::settings.std_bulk_action') }}</label>
+                                            <select name="bulk_action" class="form-control form-control-sm" id="std-bulk-action">
+                                                <option value="set">{{ trans('hr-manager::settings.std_bulk_set') }}</option>
+                                                <option value="delete">{{ trans('hr-manager::settings.std_bulk_delete') }}</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group mb-0" id="std-bulk-value-wrap">
+                                            <label style="font-size: 0.8rem;">{{ trans('hr-manager::settings.std_bulk_value') }}</label>
+                                            <select name="bulk_value" class="form-control form-control-sm">
+                                                @foreach(\HrManager\Models\StandingEntry::VALUES as $v)
+                                                    @php $pal = \HrManager\Models\StandingEntry::palette($v); @endphp
+                                                    <option value="{{ $v }}">{{ $pal['label'] }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <button type="submit" class="btn btn-sm btn-hr-secondary btn-icon">
+                                            <i class="fas fa-check"></i> {{ trans('hr-manager::settings.std_bulk_apply') }}
+                                        </button>
+                                        <input type="text" class="form-control form-control-sm ml-auto" id="std-filter"
+                                               style="max-width: 240px;" placeholder="{{ trans('hr-manager::settings.std_filter_ph') }}">
+                                    </div>
+
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover" style="color: var(--hr-text-light);">
+                                            <thead>
+                                                <tr style="color: var(--hr-text-muted);">
+                                                    <th style="width: 32px;">
+                                                        <input type="checkbox" id="std-check-all" title="{{ trans('hr-manager::settings.std_select_all') }}">
+                                                    </th>
+                                                    <th>{{ trans('hr-manager::settings.std_col_entity') }}</th>
+                                                    <th style="width: 140px;">{{ trans('hr-manager::settings.std_col_type') }}</th>
+                                                    <th style="width: 150px;">{{ trans('hr-manager::settings.std_col_standing') }}</th>
+                                                    @if($stdSource === 'hybrid')
+                                                        <th style="width: 150px;">{{ trans('hr-manager::settings.std_col_seat') }}</th>
+                                                    @endif
+                                                    <th>{{ trans('hr-manager::settings.std_col_notes') }}</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                            @foreach($standingsSettings['rows'] as $row)
+                                                <tr data-std-row data-std-search="{{ mb_strtolower(($row['entity_name'] ?? '') . ' ' . $row['entity_id'] . ' ' . $row['entity_type']) }}">
+                                                    <td>
+                                                        <input type="checkbox" name="standing_ids[]" value="{{ $row['id'] }}" class="std-row-check">
+                                                    </td>
+                                                    <td>
+                                                        @if($row['entity_name'])
+                                                            <span style="color: var(--hr-text-white);">{{ $row['entity_name'] }}</span>
+                                                            <br><small style="color: var(--hr-text-muted);">{{ $row['entity_id'] }}</small>
+                                                        @else
+                                                            <span style="color: var(--hr-text-muted);">#{{ $row['entity_id'] }}</span>
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        <span style="color: var(--hr-text-muted); font-size: 0.85rem;">
+                                                            {{ trans('hr-manager::settings.std_type_' . $row['entity_type']) }}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge" style="background: {{ $row['palette']['bg'] }}; color: {{ $row['palette']['fg'] }};">
+                                                            {{ $row['palette']['label'] }}
+                                                        </span>
+                                                    </td>
+                                                    @if($stdSource === 'hybrid')
+                                                        <td>
+                                                            @if($row['seat_standing'] === null)
+                                                                <small style="color: var(--hr-text-muted);">{{ trans('hr-manager::settings.std_seat_none') }}</small>
+                                                            @else
+                                                                @php $seatPal = \HrManager\Models\StandingEntry::palette($row['seat_standing']); @endphp
+                                                                <span class="badge" style="background: {{ $seatPal['bg'] }}; color: {{ $seatPal['fg'] }}; opacity: 0.7;">
+                                                                    {{ $seatPal['label'] }}
+                                                                </span>
+                                                                @if($row['overrides'])
+                                                                    <br><small style="color: #ffc08a;">
+                                                                        <i class="fas fa-pen"></i> {{ trans('hr-manager::settings.std_overridden') }}
+                                                                    </small>
+                                                                @endif
+                                                            @endif
+                                                        </td>
+                                                    @endif
+                                                    <td><small style="color: var(--hr-text-muted);">{{ $row['notes'] }}</small></td>
+                                                </tr>
+                                            @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </form>
+                            @endif
+                        </div>
+                    </div>
+
+                    <script>
+                    (function () {
+                        // Mode-dependent fields. data-std-mode holds a
+                        // space-separated list of the modes it belongs to.
+                        var src = document.getElementById('std-source');
+                        if (src) {
+                            var syncMode = function () {
+                                var v = src.value;
+                                document.querySelectorAll('[data-std-mode]').forEach(function (el) {
+                                    var modes = el.getAttribute('data-std-mode').split(' ');
+                                    el.style.display = (modes.indexOf(v) !== -1) ? '' : 'none';
+                                });
+                            };
+                            src.addEventListener('change', syncMode);
+                            syncMode();
+                        }
+
+                        var act = document.getElementById('std-bulk-action');
+                        var valWrap = document.getElementById('std-bulk-value-wrap');
+                        if (act && valWrap) {
+                            var syncAct = function () {
+                                valWrap.style.display = (act.value === 'set') ? '' : 'none';
+                            };
+                            act.addEventListener('change', syncAct);
+                            syncAct();
+                        }
+
+                        var all = document.getElementById('std-check-all');
+                        if (all) {
+                            all.addEventListener('change', function () {
+                                document.querySelectorAll('.std-row-check').forEach(function (cb) {
+                                    // Only the rows the filter is currently
+                                    // showing, so "select all" cannot quietly
+                                    // catch entries that are scrolled out of
+                                    // existence by a search term.
+                                    var tr = cb.closest('tr');
+                                    if (tr && tr.style.display !== 'none') { cb.checked = all.checked; }
+                                });
+                            });
+                        }
+
+                        var filter = document.getElementById('std-filter');
+                        if (filter) {
+                            filter.addEventListener('input', function () {
+                                var q = filter.value.trim().toLowerCase();
+                                document.querySelectorAll('[data-std-row]').forEach(function (tr) {
+                                    var hay = tr.getAttribute('data-std-search') || '';
+                                    tr.style.display = (q === '' || hay.indexOf(q) !== -1) ? '' : 'none';
+                                });
+                            });
+                        }
+
+                        var bulk = document.getElementById('std-bulk-form');
+                        if (bulk) {
+                            bulk.addEventListener('submit', function (e) {
+                                if (!bulk.querySelector('.std-row-check:checked')) {
+                                    e.preventDefault();
+                                    alert(@json(trans('hr-manager::settings.std_bulk_none_selected')));
+                                    return;
+                                }
+                                if (act && act.value === 'delete'
+                                    && !confirm(@json(trans('hr-manager::settings.std_bulk_delete_confirm')))) {
+                                    e.preventDefault();
+                                }
+                            });
+                        }
+                    })();
+                    </script>
+                </div>
                 <div class="tab-pane" id="purge-squads">
                     @php $excludableSquads = array_values(array_filter($purgeSquads['all_squads'], fn ($s) => in_array($s['type'], ['manual', 'hidden'], true))); @endphp
                     <div class="alert" style="background: rgba(102,126,234,0.12); border-left: 4px solid #667eea; color: var(--hr-text-light);">
@@ -1815,85 +2174,18 @@
                         </button>
                     </form>
 
-                    {{-- Standings reference (spy / opsec) ------------------- --}}
+                    {{-- Standings moved out to its own tab ---------------- --}}
                     <hr style="border-color: rgba(255,255,255,0.08); margin: 26px 0;">
-                    <h5 style="color: var(--hr-text-white);"><i class="fas fa-handshake-slash"></i> {{ trans('hr-manager::settings.assess_std_heading') }}</h5>
-                    <p style="color: var(--hr-text-muted); font-size: 0.9rem;">{{ trans('hr-manager::settings.assess_std_intro') }}</p>
-
-                    <form method="POST" action="{{ route('hr-manager.settings.update') }}">
-                        @csrf
-                        <input type="hidden" name="assessment_standings_form" value="1">
-
-                        <div class="form-group">
-                            <label>{{ trans('hr-manager::settings.assess_std_source') }}</label>
-                            <select name="assess_standings_source" class="form-control" id="assess-std-source">
-                                <option value="off"  {{ $standingsSettings['source'] === 'off' ? 'selected' : '' }}>{{ trans('hr-manager::settings.assess_std_source_off') }}</option>
-                                <option value="seat" {{ $standingsSettings['source'] === 'seat' ? 'selected' : '' }} {{ $standingsSettings['seat_available'] ? '' : 'disabled' }}>{{ trans('hr-manager::settings.assess_std_source_seat') }}@unless($standingsSettings['seat_available']) ({{ trans('hr-manager::settings.assess_std_seat_unavailable') }})@endunless</option>
-                                <option value="own"  {{ $standingsSettings['source'] === 'own' ? 'selected' : '' }}>{{ trans('hr-manager::settings.assess_std_source_own') }}</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group" data-std-source="seat">
-                            <label>{{ trans('hr-manager::settings.assess_std_seat_profile') }}</label>
-                            <select name="assess_standings_seat_profile" class="form-control">
-                                <option value="0">{{ trans('hr-manager::settings.assess_std_seat_profile_none') }}</option>
-                                @foreach($standingsSettings['seat_profiles'] as $p)
-                                    <option value="{{ $p->id }}" {{ (int) $standingsSettings['seat_profile'] === (int) $p->id ? 'selected' : '' }}>{{ $p->name }}</option>
-                                @endforeach
-                            </select>
-                            <small class="form-text" style="color: var(--hr-text-muted);">{{ trans('hr-manager::settings.assess_std_seat_profile_help') }}</small>
-                        </div>
-
-                        <div data-std-source="own">
-                            <div class="row">
-                                <div class="col-md-6 form-group">
-                                    <label>{{ trans('hr-manager::settings.assess_std_hostile_alliances') }}</label>
-                                    <textarea name="assess_hostile_alliances" class="form-control" rows="3" placeholder="99000001&#10;99000002">{{ $standingsSettings['hostile_alliances'] }}</textarea>
-                                </div>
-                                <div class="col-md-6 form-group">
-                                    <label>{{ trans('hr-manager::settings.assess_std_hostile_corps') }}</label>
-                                    <textarea name="assess_hostile_corps" class="form-control" rows="3" placeholder="98000001">{{ $standingsSettings['hostile_corps'] }}</textarea>
-                                </div>
-                                <div class="col-md-6 form-group">
-                                    <label>{{ trans('hr-manager::settings.assess_std_friendly_alliances') }}</label>
-                                    <textarea name="assess_friendly_alliances" class="form-control" rows="3">{{ $standingsSettings['friendly_alliances'] }}</textarea>
-                                </div>
-                                <div class="col-md-6 form-group">
-                                    <label>{{ trans('hr-manager::settings.assess_std_friendly_corps') }}</label>
-                                    <textarea name="assess_friendly_corps" class="form-control" rows="3">{{ $standingsSettings['friendly_corps'] }}</textarea>
-                                </div>
-                            </div>
-                            <small class="form-text" style="color: var(--hr-text-muted);">{{ trans('hr-manager::settings.assess_std_ids_help') }}</small>
-                        </div>
-
-                        <div class="form-group mt-3">
-                            <label>{{ trans('hr-manager::settings.assess_std_precedence') }}</label>
-                            <select name="assess_standings_precedence" class="form-control">
-                                <option value="corp"     {{ $standingsSettings['precedence'] === 'corp' ? 'selected' : '' }}>{{ trans('hr-manager::settings.assess_std_precedence_corp') }}</option>
-                                <option value="alliance" {{ $standingsSettings['precedence'] === 'alliance' ? 'selected' : '' }}>{{ trans('hr-manager::settings.assess_std_precedence_alliance') }}</option>
-                            </select>
-                            <small class="form-text" style="color: var(--hr-text-muted);">{{ trans('hr-manager::settings.assess_std_precedence_help') }}</small>
-                        </div>
-
-                        <button type="submit" class="btn btn-hr-primary btn-icon">
-                            <i class="fas fa-save"></i> {{ trans('hr-manager::settings.save_settings') }}
-                        </button>
-                    </form>
-
-                    <script>
-                    (function () {
-                        var sel = document.getElementById('assess-std-source');
-                        if (!sel) return;
-                        function sync() {
-                            var v = sel.value;
-                            document.querySelectorAll('[data-std-source]').forEach(function (el) {
-                                el.style.display = (el.getAttribute('data-std-source') === v) ? '' : 'none';
-                            });
-                        }
-                        sel.addEventListener('change', sync);
-                        sync();
-                    })();
-                    </script>
+                    <div class="alert" style="background: rgba(102,126,234,0.08); border: 1px solid rgba(102,126,234,0.3); color: var(--hr-text-light);">
+                        <i class="fas fa-handshake-slash" style="color: #667eea;"></i>
+                        <strong>{{ trans('hr-manager::settings.assess_std_heading') }}</strong>
+                        <p class="mb-2 mt-1" style="color: var(--hr-text-muted); font-size: 0.9rem;">
+                            {{ trans('hr-manager::settings.std_moved_notice') }}
+                        </p>
+                        <a href="#standings" class="btn btn-sm btn-hr-primary btn-icon" data-goto-tab="standings">
+                            <i class="fas fa-arrow-right"></i> {{ trans('hr-manager::settings.std_moved_link') }}
+                        </a>
+                    </div>
                 </div>
 
                 {{-- Buyback Contribution — per-corp valuation policy. Only
@@ -2003,6 +2295,20 @@ window.addEventListener('load', function () {
     if (window.location.hash && window.jQuery) {
         var link = document.querySelector('.nav-link[href="' + window.location.hash + '"]');
         if (link) { window.jQuery(link).tab('show'); }
+    }
+});
+
+// Cross-links between tabs (the Assessment page's pointer to Standings, for
+// one). A plain #hash anchor would only move the scroll position, since the
+// target pane is hidden until its nav pill is activated.
+document.addEventListener('click', function (e) {
+    var a = e.target.closest ? e.target.closest('[data-goto-tab]') : null;
+    if (!a || !window.jQuery) { return; }
+    var pill = document.querySelector('.nav-link[href="#' + a.getAttribute('data-goto-tab') + '"]');
+    if (pill) {
+        e.preventDefault();
+        window.jQuery(pill).tab('show');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 });
 
