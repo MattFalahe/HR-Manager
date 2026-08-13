@@ -135,6 +135,72 @@ class StandingsReferenceService
     }
 
     /**
+     * The numeric counterpart to verdict(): what do we think of this entity,
+     * taking into account what it belongs to.
+     *
+     * verdict() answers hostile / friendly / no-opinion, which is enough to
+     * flag an applicant's contact but not enough to record WHY, or to rank one
+     * finding against another. This returns the value, plus which rated entity
+     * actually supplied it — usually not the entity itself. A character is
+     * rarely on a standings list by name; they inherit their corp's rating, or
+     * their corp's alliance's. A caller that shows "hostile" without saying it
+     * was inherited is making a claim about a person on the strength of who
+     * their employer is.
+     *
+     * The corp / alliance argument order matches verdict()'s precedence rule,
+     * so the two can never disagree about the same entity.
+     *
+     * @return array{standing:int, from:string, via_type:string, via_id:int}|null
+     */
+    public function standingForEntity(
+        string $entityType,
+        int $entityId,
+        ?int $corporationId = null,
+        ?int $allianceId = null
+    ): ?array {
+        $hit = function (string $type, ?int $id) {
+            if (!$id) {
+                return null;
+            }
+            $found = $this->standingFor($type, $id);
+            if ($found === null) {
+                return null;
+            }
+            return [
+                'standing' => (int) $found['standing'],
+                'from'     => (string) $found['from'],
+                'via_type' => $type,
+                'via_id'   => $id,
+            ];
+        };
+
+        // Named directly: nothing about their employer can override someone
+        // the corp has an opinion about by name.
+        $own = $hit($entityType, $entityId);
+        if ($own !== null) {
+            return $own;
+        }
+
+        if ($entityType === 'alliance') {
+            return null; // an alliance belongs to nothing further up
+        }
+
+        // A corporation's own entry is its "corp level"; a character borrows
+        // the corp they are in.
+        $corpLevel = $entityType === 'corporation'
+            ? null                                   // already checked above as $own
+            : $hit('corporation', $corporationId);
+
+        $allianceLevel = $hit('alliance', $allianceId);
+
+        if ($corpLevel !== null && $allianceLevel !== null) {
+            return $this->precedence() === self::PRECEDENCE_ALLIANCE ? $allianceLevel : $corpLevel;
+        }
+
+        return $corpLevel ?? $allianceLevel;
+    }
+
+    /**
      * Hybrid asked for but SeAT cannot supply a baseline (no profile chosen,
      * profile deleted, Standings Builder not in use). It still works — HR's own
      * entries carry it — but the operator should be told rather than left to

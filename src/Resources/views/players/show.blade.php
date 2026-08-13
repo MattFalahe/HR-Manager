@@ -119,6 +119,98 @@
         </div>
     @endif
 
+    {{-- Direct ISK transfers to entities the corp rates badly. Deliberately
+         not a red banner: a flag is an observation, and people trade with
+         people their corp dislikes for ordinary reasons. Amber only when
+         something is dated after this human was already in the corp. --}}
+    @if(($donationFlags['available'] ?? false) && ($donationFlags['total'] ?? 0) > 0)
+        @php
+            $dfSuspect = (int) ($donationFlags['suspect'] ?? 0);
+            $dfTint    = $dfSuspect > 0 ? 'rgba(255,193,7,0.08)' : 'rgba(255,255,255,0.04)';
+            $dfBorder  = $dfSuspect > 0 ? 'rgba(255,193,7,0.40)' : 'var(--hr-border)';
+            $dfHead    = $dfSuspect > 0 ? '#ffe08a' : 'var(--hr-text-white)';
+        @endphp
+        <div class="alert mb-3" style="background: {{ $dfTint }}; border: 1px solid {{ $dfBorder }}; color: var(--hr-text-light);">
+            <div style="font-weight: 600; color: {{ $dfHead }};">
+                <i class="fas fa-user-secret"></i> {{ trans('hr-manager::players.donation_heading') }}
+                @if($dfSuspect > 0)
+                    <span class="badge ml-1" style="background: rgba(255,193,7,0.25); color: #ffe08a; font-size: 0.62rem;">
+                        {{ trans_choice('hr-manager::players.donation_suspect_badge', $dfSuspect, ['count' => $dfSuspect]) }}
+                    </span>
+                @endif
+            </div>
+            <small class="d-block mt-1 mb-2" style="color: var(--hr-text-muted);">
+                {{ $dfSuspect > 0
+                    ? trans('hr-manager::players.donation_intro_suspect')
+                    : trans('hr-manager::players.donation_intro_neutral') }}
+            </small>
+
+            @foreach($donationFlags['rows'] as $df)
+                @php
+                    $dfPal    = $df->palette();
+                    $isSusp   = $df->tier === \HrManager\Models\DonationFlag::TIER_SUSPECT;
+                    $viaLabel = $df->viaLabel();
+                @endphp
+                <div style="padding: 6px 10px; background: rgba(0,0,0,0.15); border-radius: 4px; margin-bottom: 6px;">
+                    <span style="color: {{ $isSusp ? '#ffe08a' : 'var(--hr-text-muted)' }};">
+                        <i class="fas {{ $df->direction === \HrManager\Models\DonationFlag::DIRECTION_OUT ? 'fa-arrow-right' : 'fa-arrow-left' }}"></i>
+                    </span>
+                    {{ $df->direction === \HrManager\Models\DonationFlag::DIRECTION_OUT
+                        ? trans('hr-manager::players.donation_sent')
+                        : trans('hr-manager::players.donation_received') }}
+                    <strong style="color: var(--hr-text-white);">{{ number_format((float) $df->amount) }} ISK</strong>
+                    {{ $df->direction === \HrManager\Models\DonationFlag::DIRECTION_OUT
+                        ? trans('hr-manager::players.donation_to')
+                        : trans('hr-manager::players.donation_from') }}
+                    <strong style="color: var(--hr-text-white);">{{ $df->counterparty_name ?: '#' . $df->counterparty_id }}</strong>
+
+                    <span class="badge ml-1" style="background: {{ $dfPal['bg'] }}; color: {{ $dfPal['fg'] }}; font-size: 0.62rem;">
+                        {{ $dfPal['label'] }}
+                    </span>
+
+                    {{-- A character is rarely rated by name; say when the
+                         rating was inherited, or the badge reads as a claim
+                         about the person rather than about their employer. --}}
+                    @if($viaLabel)
+                        <span class="badge ml-1" style="background: rgba(255,255,255,0.08); color: var(--hr-text-muted); font-size: 0.62rem;">
+                            {{ trans('hr-manager::players.donation_via_' . $viaLabel) }}
+                        </span>
+                    @endif
+
+                    @if($isSusp)
+                        <span class="badge ml-1" style="background: rgba(255,193,7,0.25); color: #ffe08a; font-size: 0.62rem;">
+                            {{ trans('hr-manager::players.donation_tier_suspect') }}
+                        </span>
+                    @else
+                        <span class="badge ml-1" style="background: rgba(255,255,255,0.08); color: var(--hr-text-muted); font-size: 0.62rem;">
+                            {{ trans('hr-manager::players.donation_tier_neutral') }}
+                        </span>
+                    @endif
+
+                    <small class="d-block mt-1" style="color: var(--hr-text-muted);">
+                        @hrDate($df->occurred_at)
+                        @if($df->reason)
+                            &middot; {{ $df->reason }}
+                        @endif
+                    </small>
+                </div>
+            @endforeach
+
+            @if($donationFlags['total'] > count($donationFlags['rows']))
+                <small style="color: var(--hr-text-muted);">
+                    {{ trans('hr-manager::players.donation_more', [
+                        'shown' => count($donationFlags['rows']),
+                        'total' => $donationFlags['total'],
+                    ]) }}
+                </small>
+            @endif
+
+            <small class="d-block mt-2" style="color: var(--hr-text-muted);">
+                <i class="fas fa-info-circle"></i> {{ trans('hr-manager::players.donation_footnote') }}
+            </small>
+        </div>
+    @endif
+
     {{-- Purge role-strip warning. Renders only when this player is
          marked_for_purge. Severity tiers:
            - scheduled within 24h  -> CRITICAL blinking banner

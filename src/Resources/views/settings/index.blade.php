@@ -1337,6 +1337,124 @@
                         </div>
                     </div>
 
+                    {{-- ==== Donation flags ==== --}}
+                    {{-- Lives here rather than under Features because it is
+                         meaningless without standings: the whole check is
+                         "did money move to somebody we rate badly". --}}
+                    <div class="card mb-3" style="background: var(--hr-dark-card); border: 1px solid var(--hr-border);">
+                        <div class="card-header">
+                            <h5 class="mb-0" style="color: var(--hr-text-white);">
+                                <i class="fas fa-user-secret"></i> {{ trans('hr-manager::settings.don_heading') }}
+                            </h5>
+                            <small style="color: var(--hr-text-muted);">{{ trans('hr-manager::settings.don_intro') }}</small>
+                        </div>
+                        <div class="card-body">
+
+                            @if($donationSettings['enabled'] && $stdSource === 'off')
+                                <div class="alert" style="background: rgba(255,193,7,0.08); border: 1px solid rgba(255,193,7,0.3); color: var(--hr-text-light);">
+                                    <i class="fas fa-exclamation-triangle text-warning"></i>
+                                    {{ trans('hr-manager::settings.don_no_standings') }}
+                                </div>
+                            @endif
+
+                            <form method="POST" action="{{ route('hr-manager.settings.update') }}">
+                                @csrf
+                                <input type="hidden" name="donation_flags_form" value="1">
+
+                                <div class="form-group">
+                                    <div class="custom-control custom-switch">
+                                        <input type="checkbox" class="custom-control-input" id="don-enabled"
+                                               name="donation_flags_enabled" value="1"
+                                               {{ $donationSettings['enabled'] ? 'checked' : '' }}>
+                                        <label class="custom-control-label" for="don-enabled">
+                                            {{ trans('hr-manager::settings.don_enabled') }}
+                                        </label>
+                                    </div>
+                                    <small class="form-text" style="color: var(--hr-text-muted);">{{ trans('hr-manager::settings.don_enabled_help') }}</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>{{ trans('hr-manager::settings.don_max_standing') }}</label>
+                                    <select name="donation_flags_max_standing" class="form-control">
+                                        @foreach([\HrManager\Models\StandingEntry::TERRIBLE, \HrManager\Models\StandingEntry::BAD] as $v)
+                                            @php $pal = \HrManager\Models\StandingEntry::palette($v); @endphp
+                                            <option value="{{ $v }}" {{ (int) $donationSettings['max_standing'] === $v ? 'selected' : '' }}>
+                                                {{ $pal['label'] }}{{ $v === \HrManager\Models\StandingEntry::BAD ? ' ' . trans('hr-manager::settings.don_and_worse') : '' }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    <small class="form-text" style="color: var(--hr-text-muted);">{{ trans('hr-manager::settings.don_max_standing_help') }}</small>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6 form-group">
+                                        <label>{{ trans('hr-manager::settings.don_floor_suspect') }}</label>
+                                        <input type="number" name="donation_flags_floor_suspect" class="form-control"
+                                               min="0" step="1000000" value="{{ (int) $donationSettings['floor_suspect'] }}">
+                                        <small class="form-text" style="color: var(--hr-text-muted);">{{ trans('hr-manager::settings.don_floor_suspect_help') }}</small>
+                                    </div>
+                                    <div class="col-md-6 form-group">
+                                        <label>{{ trans('hr-manager::settings.don_floor_neutral') }}</label>
+                                        <input type="number" name="donation_flags_floor_neutral" class="form-control"
+                                               min="0" step="1000000" value="{{ (int) $donationSettings['floor_neutral'] }}">
+                                        <small class="form-text" style="color: var(--hr-text-muted);">{{ trans('hr-manager::settings.don_floor_neutral_help') }}</small>
+                                    </div>
+                                </div>
+
+                                <button type="submit" class="btn btn-hr-primary btn-icon">
+                                    <i class="fas fa-save"></i> {{ trans('hr-manager::settings.save_settings') }}
+                                </button>
+                            </form>
+
+                            @if($donationSettings['enabled'])
+                                <hr style="border-color: rgba(255,255,255,0.08); margin: 20px 0;">
+                                <div class="d-flex flex-wrap align-items-center" style="gap: 18px;">
+                                    <span style="color: var(--hr-text-muted); font-size: 0.85rem;">
+                                        <i class="fas fa-flag"></i> {{ trans('hr-manager::settings.don_stat_suspect') }}
+                                        <strong style="color: #ffc08a;">{{ number_format($donationSettings['suspect']) }}</strong>
+                                    </span>
+                                    <span style="color: var(--hr-text-muted); font-size: 0.85rem;">
+                                        {{ trans('hr-manager::settings.don_stat_neutral') }}
+                                        <strong style="color: var(--hr-text-white);">{{ number_format($donationSettings['neutral']) }}</strong>
+                                    </span>
+                                    <span style="color: var(--hr-text-muted); font-size: 0.85rem;">
+                                        <i class="fas fa-clock"></i> {{ trans('hr-manager::settings.don_stat_scanned') }}
+                                        <strong style="color: var(--hr-text-white);">
+                                            @if($donationSettings['last_scan'])
+                                                @hrDate($donationSettings['last_scan'])
+                                            @else
+                                                {{ trans('hr-manager::settings.don_stat_never') }}
+                                            @endif
+                                        </strong>
+                                    </span>
+                                    @if($donationSettings['pending'] > 0)
+                                        <span style="color: var(--hr-text-muted); font-size: 0.85rem;">
+                                            <i class="fas fa-hourglass-half"></i>
+                                            {{ trans_choice('hr-manager::settings.don_stat_pending', $donationSettings['pending'], ['count' => number_format($donationSettings['pending'])]) }}
+                                        </span>
+                                    @endif
+                                </div>
+                                <small class="form-text mt-2 mb-2" style="color: var(--hr-text-muted);">
+                                    {!! trans('hr-manager::settings.don_schedule_note') !!}
+                                </small>
+
+                                {{-- The scan never revisits a row it declined
+                                     to flag, so edits to the standings list
+                                     above only affect transfers scanned after
+                                     the edit. Settings changes rebuild on their
+                                     own; a standings edit has to be asked for. --}}
+                                <form method="POST" action="{{ route('hr-manager.settings.donations.rescan') }}"
+                                      onsubmit="return confirm(@json(trans('hr-manager::settings.don_rescan_confirm')));">
+                                    @csrf
+                                    <button type="submit" class="btn btn-sm btn-hr-secondary btn-icon">
+                                        <i class="fas fa-sync-alt"></i> {{ trans('hr-manager::settings.don_rescan') }}
+                                    </button>
+                                    <small class="form-text" style="color: var(--hr-text-muted);">{{ trans('hr-manager::settings.don_rescan_help') }}</small>
+                                </form>
+                            @endif
+                        </div>
+                    </div>
+
                     <script>
                     (function () {
                         // Mode-dependent fields. data-std-mode holds a

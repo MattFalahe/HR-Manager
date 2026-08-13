@@ -172,6 +172,22 @@ class ScheduleSeeder extends AbstractScheduleSeeder
                 'ping_after'        => null,
             ],
 
+            // Flag member ISK transfers to badly-rated entities - daily at
+            // 05:40. Incremental: reads only journal rows newer than the last
+            // pass, so a nightly run is a handful of indexed queries per
+            // character with a wallet token. The exception is the first run
+            // after enabling, which reads each journal from the beginning once
+            // (--limit can spread that over several nights). Does nothing at
+            // all while the feature is off or no standings are configured.
+            [
+                'command'           => 'hr-manager:scan-donations',
+                'expression'        => '40 5 * * *',
+                'allow_overlap'     => false,
+                'allow_maintenance' => false,
+                'ping_before'       => null,
+                'ping_after'        => null,
+            ],
+
             // Scan watchlist for new matches - every 15 minutes. Three
             // detection passes: corp-join (blacklist char in a managed
             // corp), alliance-join (blacklist char in a corp in our

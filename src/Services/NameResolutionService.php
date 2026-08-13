@@ -570,6 +570,144 @@ class NameResolutionService
     }
 
     /**
+     * Who these characters belong to right now: corporation, and alliance when
+     * their corp is in one.
+     *
+     * CURRENT affiliation is all EVE exposes. There is no endpoint that answers
+     * "who did this character fly for in 2024", so any caller reasoning about a
+     * past event has to treat this as what is true today and record when it
+     * asked. Callers that care must freeze the answer rather than re-deriving
+     * it later and quietly rewriting history.
+     *
+     * @param array<int> $characterIds
+     * @return array<int, array{corporation_id:?int, alliance_id:?int}>
+     */
+    public function resolveAffiliations(array $characterIds): array
+    {
+        $characterIds = array_values(array_unique(array_filter(
+            array_map('intval', $characterIds), fn ($v) => $v > 0
+        )));
+        if (empty($characterIds)) {
+            return [];
+        }
+
+        $out = [];
+
+        // SeAT's own affiliation table first: it is synced far more often than
+        // character_infos and costs nothing.
+        if (Schema::hasTable('character_affiliations')) {
+            try {
+                $rows = DB::table('character_affiliations')
+                    ->whereIn('character_id', $characterIds)
+                    ->get(['character_id', 'corporation_id', 'alliance_id']);
+                foreach ($rows as $r) {
+                    $out[(int) $r->character_id] = [
+                        'corporation_id' => $r->corporation_id ? (int) $r->corporation_id : null,
+                        'alliance_id'    => $r->alliance_id ? (int) $r->alliance_id : null,
+                    ];
+                }
+            } catch (\Throwable $e) {
+                Log::debug('[HR Manager] NameResolution: affiliation table read failed: ' . $e->getMessage());
+            }
+        }
+
+        $missing = array_values(array_diff($characterIds, array_keys($out)));
+
+        // ESI, 1000 per call. Anyone outside SeAT lands here, which for this
+        // caller is most of them.
+        foreach (array_chunk($missing, 1000) as $chunk) {
+            try {
+                $response = Http::timeout(self::HTTP_TIMEOUT)
+                    ->withHeaders(['Accept' => 'application/json', 'User-Agent' => $this->userAgent()])
+                    ->post('https://esi.evetech.net/latest/characters/affiliation/', array_values($chunk));
+
+                if (!$response->successful()) {
+                    Log::info('[HR Manager] NameResolution: ESI /characters/affiliation/ returned ' . $response->status());
+                    continue;
+                }
+
+                foreach ((array) $response->json() as $row) {
+                    if (!is_array($row)) {
+                        continue;
+                    }
+                    $cid = (int) ($row['character_id'] ?? 0);
+                    if ($cid <= 0) {
+                        continue;
+                    }
+                    $out[$cid] = [
+                        'corporation_id' => isset($row['corporation_id']) ? (int) $row['corporation_id'] : null,
+                        'alliance_id'    => isset($row['alliance_id']) ? (int) $row['alliance_id'] : null,
+                    ];
+                }
+            } catch (\Throwable $e) {
+                Log::warning('[HR Manager] NameResolution: affiliation batch failed: ' . $e->getMessage());
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * The alliance each corporation currently sits in.
+     *
+     * Same caveat as resolveAffiliations: this is today's answer, not the
+     * answer on the date of whatever the caller is looking at.
+     *
+     * @param array<int> $corporationIds
+     * @return array<int, ?int> corporation_id => alliance_id (null when unallied)
+     */
+    public function resolveCorporationAlliances(array $corporationIds): array
+    {
+        $corporationIds = array_values(array_unique(array_filter(
+            array_map('intval', $corporationIds), fn ($v) => $v > 0
+        )));
+        if (empty($corporationIds)) {
+            return [];
+        }
+
+        $out = [];
+
+        if (Schema::hasTable('corporation_infos')) {
+            try {
+                $rows = DB::table('corporation_infos')
+                    ->whereIn('corporation_id', $corporationIds)
+                    ->get(['corporation_id', 'alliance_id']);
+                foreach ($rows as $r) {
+                    $out[(int) $r->corporation_id] = $r->alliance_id ? (int) $r->alliance_id : null;
+                }
+            } catch (\Throwable $e) {
+                Log::debug('[HR Manager] NameResolution: corporation_infos read failed: ' . $e->getMessage());
+            }
+        }
+
+        // One call each for the rest; ESI has no batch corporation endpoint.
+        // Cached for a day, and the set is small in practice because a scan's
+        // counterparties cluster into a handful of corps.
+        foreach (array_diff($corporationIds, array_keys($out)) as $corpId) {
+            $out[$corpId] = Cache::remember(
+                'hr-corp-alliance-' . $corpId,
+                self::CACHE_TTL,
+                function () use ($corpId) {
+                    try {
+                        $response = Http::timeout(self::HTTP_TIMEOUT)
+                            ->withHeaders(['User-Agent' => $this->userAgent()])
+                            ->get('https://esi.evetech.net/latest/corporations/' . $corpId . '/');
+                        if ($response->successful()) {
+                            $alliance = $response->json()['alliance_id'] ?? null;
+                            return $alliance ? (int) $alliance : null;
+                        }
+                    } catch (\Throwable $e) {
+                        Log::debug('[HR Manager] NameResolution: corp alliance lookup failed: ' . $e->getMessage());
+                    }
+                    return null;
+                }
+            );
+        }
+
+        return $out;
+    }
+
+    /**
      * POST /universe/names/ — bulk ID to name resolution, up to 1000
      * mixed-category IDs per call. We filter to characters only on
      * the way out.

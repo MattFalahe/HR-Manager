@@ -75,6 +75,86 @@ class AccountCharacterResolver
         return $out;
     }
 
+    /**
+     * Group many characters by the human they belong to, in a fixed number of
+     * queries regardless of how many characters are passed.
+     *
+     * siblingsFor() answers the same question one character at a time and
+     * resolves display names while it is at it, which is right for a form and
+     * ruinous for a roster-wide pass: a 500-character corp would mean 500 round
+     * trips plus name lookups nobody asked for. This returns bare grouping keys
+     * and nothing else.
+     *
+     * The key is opaque and only meaningful within one call. Characters with no
+     * account and no identity are their own group, which is the correct answer
+     * for an unregistered member rather than a special case.
+     *
+     * @param array<int> $characterIds
+     * @return array<int, string> character_id => account key
+     */
+    public function accountKeysFor(array $characterIds): array
+    {
+        $characterIds = array_values(array_unique(array_filter(
+            array_map('intval', $characterIds), fn ($v) => $v > 0
+        )));
+        if (empty($characterIds)) {
+            return [];
+        }
+
+        // Start everyone in their own group, then merge.
+        $keys = [];
+        foreach ($characterIds as $cid) {
+            $keys[$cid] = 'char:' . $cid;
+        }
+
+        // SeAT accounts. Revoked tokens still count: someone who delinked an
+        // alt is still the same human.
+        if (Schema::hasTable('refresh_tokens')) {
+            try {
+                foreach (array_chunk($characterIds, 1000) as $chunk) {
+                    $rows = DB::table('refresh_tokens')
+                        ->whereIn('character_id', $chunk)
+                        ->get(['character_id', 'user_id']);
+                    foreach ($rows as $r) {
+                        if ($r->user_id !== null) {
+                            $keys[(int) $r->character_id] = 'user:' . (int) $r->user_id;
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::warning('[HR Manager] AccountCharacterResolver batch account lookup failed: ' . $e->getMessage());
+            }
+        }
+
+        // HR identities outrank the SeAT account: a director who has merged two
+        // accounts into one human has stated that they are one human, and that
+        // judgement is the whole point of the identity layer.
+        if (Schema::hasTable('hr_manager_character_identity_mappings')) {
+            try {
+                foreach (array_chunk($characterIds, 1000) as $chunk) {
+                    // effective_to IS NULL is what CharacterIdentityMapping's
+                    // current() scope means: a mapping that has not been
+                    // superseded. Historical rows would drag in characters
+                    // reassigned away in an account takeover, who are now a
+                    // different human.
+                    $rows = DB::table('hr_manager_character_identity_mappings')
+                        ->whereIn('character_id', $chunk)
+                        ->whereNull('effective_to')
+                        ->get(['character_id', 'player_identity_id']);
+                    foreach ($rows as $r) {
+                        if ($r->player_identity_id !== null) {
+                            $keys[(int) $r->character_id] = 'identity:' . (int) $r->player_identity_id;
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::warning('[HR Manager] AccountCharacterResolver batch identity lookup failed: ' . $e->getMessage());
+            }
+        }
+
+        return $keys;
+    }
+
     /** Characters sharing this character's SeAT account. */
     private function viaSeatAccount(int $characterId): array
     {

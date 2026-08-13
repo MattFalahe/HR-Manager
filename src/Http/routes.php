@@ -294,6 +294,7 @@ Route::group([
         Route::post('/standings',        ['as' => 'hr-manager.settings.standings.store',    'uses' => 'SettingsController@storeStandings']);
         Route::post('/standings/bulk',   ['as' => 'hr-manager.settings.standings.bulk',     'uses' => 'SettingsController@bulkStandings']);
         Route::post('/standings/resolve', ['as' => 'hr-manager.settings.standings.resolve', 'uses' => 'SettingsController@resolveStandingNames']);
+        Route::post('/standings/rescan-donations', ['as' => 'hr-manager.settings.donations.rescan', 'uses' => 'SettingsController@rescanDonations']);
 
         // Buyback contribution per-corp policy
         Route::post('/buyback-policy', ['as' => 'hr-manager.settings.buyback.policy', 'uses' => 'SettingsController@updateBuybackPolicy']);

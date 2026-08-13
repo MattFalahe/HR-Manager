@@ -1072,6 +1072,39 @@ docker compose -f docker-compose.yml -f docker-compose.mariadb.yml -f docker-com
                     <h4>Upgrading from the old lists</h4>
                     <p>Your four existing lists were carried over automatically the first time HR ran after the update: <strong>hostile entries became -10</strong> and <strong>friendly entries became +10</strong>, on the reasoning that typing an entity into a list called <em>hostile</em> is a deliberate act rather than a shrug. Nothing you had set by hand was overwritten, and the old settings were left in place untouched. Entries arrive with an ID and no name; the <strong>Resolve missing names</strong> button on the tab fills them in.</p>
                 </div>
+
+                {{-- Donation flags --}}
+                <div class="help-card">
+                    <h3>
+                        <i class="fas fa-user-secret"></i> Donation flags
+                        <span class="badge ml-1" style="background: rgba(40,167,69,0.28); color: #6ee7b7; border: 1px solid rgba(40,167,69,0.55); font-size: 0.78rem; font-weight: 700; padding: 3px 9px; vertical-align: middle;">1.0.2</span>
+                    </h3>
+                    <p>Once standings are set up, HR can watch for <strong>direct ISK transfers</strong> between your members and entities you rate badly. Off by default; the switch is on the <strong>Standings</strong> tab, because the check is meaningless without a standings source.</p>
+
+                    <h4>What counts</h4>
+                    <p>Only <code>player_donation</code>: a wallet-to-wallet transfer with nothing given back. Contracts and market trades are deliberately excluded, because trading with a hostile entity is ordinary commerce and would bury the signal in noise. Someone handing ISK to an entity you rate terrible is a small, specific thing worth a look.</p>
+                    <p>You set the <strong>ISK floor</strong> for each tier and <strong>which ratings count</strong> (terrible only, or bad and worse). Only the hostile steps are offered: flagging transfers to entities you rate neutral or better would flag ordinary trade.</p>
+
+                    <h4>The two tiers</h4>
+                    <ul>
+                        <li><strong>Before they joined</strong> &mdash; a fact on the record, not something they did to you. Shown plainly, and usually worth a higher ISK floor to keep old noise out.</li>
+                        <li><strong>Since they joined</strong> &mdash; highlighted in amber. This is the one that means something.</li>
+                    </ul>
+                    <p>The join date is <strong>account-level</strong>, taken the same way the profile takes tenure: the longest current stint across the whole account. Someone who joined on their main a year ago and brings an alt in today has been inside for a year, and grading that alt's transfers as though they were a fresh recruit would read the timeline backwards. A transfer with no known join date stays in the lower tier, because guessing the accusing tier from missing data is the wrong way to be wrong.</p>
+
+                    <h4>Reading a flag</h4>
+                    <p>Flags appear on the <strong>player profile</strong>, and they are an <strong>observation, not an accusation</strong>. Members trade with people the corp dislikes for entirely ordinary reasons; the value is in seeing a pattern, not in any single row. A character is rarely on a standings list by name, so where the rating was inherited the badge says whether it came from their <em>corp</em> or their <em>alliance</em>.</p>
+                    <p>Each row also freezes <strong>what HR knew when it looked</strong>. EVE's API exposes who someone is affiliated with <em>now</em> and never who they flew for on the day of a transfer, so a standing resolved today cannot honestly be re-applied to a two-year-old donation. Rather than silently rewriting its own history every time an alliance changes hands, a flag records the value it was judged against and when that judgement was made.</p>
+
+                    <h4>Cost, and the first run</h4>
+                    <p>A nightly scan writes the findings and every surface reads them. Nothing touches the wallet journal on a page render, which on a real corp is one of the largest tables SeAT holds. Each pass reads only journal rows newer than the last one, so the steady state is a handful of indexed queries per member with a wallet token.</p>
+                    <p>The exception is the <strong>first pass after switching it on</strong>, which reads each member's journal from the beginning once. On a large corp that takes a while. Run <code>hr-manager:scan-donations</code> by hand to start it, and pass <code>--limit</code> to spread it over several nights. The tab shows how many members are still on their first pass, so a half-built list is never mistaken for a finished one.</p>
+
+                    <h4>When you change the rules</h4>
+                    <p>The scan never revisits a transfer it has already declined to flag, which is what keeps it cheap. So changing what counts <strong>rebuilds</strong> rather than patches: raise a floor or widen which ratings count, and the existing findings are cleared so the next scan re-derives everything under the new rules. Otherwise one list would hold findings from two different sets of criteria with no way to tell which row followed which.</p>
+                    <p>Editing the <strong>standings list itself</strong> has the same effect but happens on a different form, so HR cannot detect it. Use <strong>Rescan all history</strong> on the Standings tab after adding entities you want applied to past transfers.</p>
+                    <p>If ESI is unreachable mid-scan and a counterparty cannot be identified, the scan <strong>holds its position</strong> for that member and retries on the next pass, rather than moving past transfers it was never able to judge.</p>
+                </div>
             </div>
 
             {{-- ============================================================

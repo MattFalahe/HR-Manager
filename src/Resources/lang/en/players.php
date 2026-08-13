@@ -13,6 +13,23 @@ return [
     'alt_flags_has_alt'           => 'Claimed as a possible alt of this player:',
     'alt_flags_other_blacklisted' => 'that character is blacklisted',
 
+    // Donation flags (direct ISK transfers with badly-rated entities)
+    'donation_heading'        => 'ISK transfers with rated entities',
+    'donation_suspect_badge'  => '{1}:count since joining|[2,*]:count since joining',
+    'donation_intro_suspect'  => 'Direct wallet transfers between this player and entities your standings rate badly. The highlighted ones happened while they were already in the corp.',
+    'donation_intro_neutral'  => 'Direct wallet transfers between this player and entities your standings rate badly. All of these predate their joining the corp, so they are a matter of record rather than something that happened on your watch.',
+    'donation_sent'           => 'Sent',
+    'donation_received'       => 'Received',
+    'donation_to'             => 'to',
+    'donation_from'           => 'from',
+    'donation_tier_suspect'   => 'since joining',
+    'donation_tier_neutral'   => 'before joining',
+    'donation_via_corporation' => 'rated via their corp',
+    'donation_via_alliance'   => 'rated via their alliance',
+    'donation_via_character'  => 'rated by name',
+    'donation_more'           => 'Showing :shown of :total. Older entries are on the record but not listed here.',
+    'donation_footnote'       => 'A transfer is an observation, not an accusation: members trade with people the corp dislikes for ordinary reasons. Standings were resolved when the scan ran, and reflect who the counterparty belonged to at that moment.',
+
     'blacklisted_heading' =>'{1}This player is on the BLACKLIST|[2,*]This player is on the BLACKLIST (:count characters)',
 
     'identity_orphan_heading' => 'Leftover from an earlier merge',

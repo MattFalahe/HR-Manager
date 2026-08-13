@@ -361,8 +361,15 @@ class PlayerController extends Controller
                 ->getUserNames([(int) $identity->merged_by])[(int) $identity->merged_by] ?? null;
         }
 
+        // Direct ISK transfers between this human and entities the corp rates
+        // badly. Read straight from the flags table the nightly scan writes;
+        // nothing here touches the wallet journal.
+        $donationFlags = app(\HrManager\Services\DonationScanService::class)
+            ->flagsForCharacters($blCharIds, $allowedCorps);
+
         return view('hr-manager::players.show', compact(
             'activeBlacklist',
+            'donationFlags',
             'altFlags',
             'identityOrphanHint',
             'identityMergedByName',

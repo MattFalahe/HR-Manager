@@ -422,6 +422,36 @@ return [
     'std_deleted'         => 'Removed :count entry from the list.|Removed :count entries from the list.',
     'std_revalued'        => 'Updated :count entry.|Updated :count entries.',
 
+    // Donation flags (same tab: this is what standings are used for)
+    'don_heading' => 'Donation flags',
+    'don_intro'   => 'Watch for direct ISK transfers between your members and entities you rate badly.',
+
+    'don_enabled'      => 'Flag donations to and from badly-rated entities',
+    'don_enabled_help' => "Off by default. A nightly scan reads only what is new, so it costs little once running. The first pass after switching it on reads each member's wallet history from the beginning once, which on a large corp takes a while.",
+
+    'don_no_standings' => 'Donation flags are on but no standings source is selected above, so there is nothing to compare transfers against and the scan will find nothing.',
+
+    'don_max_standing'      => 'Flag transfers with entities rated',
+    'don_max_standing_help' => 'Only hostile ratings are offered. Flagging transfers to entities you rate neutral or better would flag ordinary trade.',
+    'don_and_worse'         => 'or worse',
+
+    'don_floor_suspect'      => 'Minimum ISK (since they joined)',
+    'don_floor_suspect_help' => 'Transfers dated after the member was already in your corp. This is the one that matters, so it is usually the lower figure.',
+    'don_floor_neutral'      => 'Minimum ISK (before they joined)',
+    'don_floor_neutral_help' => 'Transfers predating their membership. History rather than something they did to you, so set this higher to keep old noise out.',
+
+    'don_stat_suspect' => 'Flagged since joining:',
+    'don_stat_neutral' => 'Historical:',
+    'don_stat_scanned' => 'Last scan:',
+    'don_stat_never'   => 'never run',
+    'don_stat_pending' => ':count character still on its first pass|:count characters still on their first pass',
+    'don_rebuilt'        => 'Existing findings were cleared: the criteria changed, so the next scan re-reads all history under the new rules.',
+    'don_rebuild_failed' => 'Could not clear the existing findings. Check the SeAT logs.',
+    'don_rescan'         => 'Rescan all history',
+    'don_rescan_help'    => 'The scan does not revisit transfers it has already decided about, so entities added to the standings list above are only matched against transfers scanned after the edit. Rescan after editing the list to apply it to everything.',
+    'don_rescan_confirm' => 'Clear every finding and re-read all wallet history on the next scan? On a large corp this takes a while.',
+    'don_schedule_note' => 'Scans run nightly. To run one now, or to spread a first pass over several nights, use <code>hr-manager:scan-donations</code> (it takes <code>--limit</code>).',
+
     // Notification types
     'notify_application_submitted' => 'Application Submitted',
     'notify_application_accepted'  => 'Application Accepted',

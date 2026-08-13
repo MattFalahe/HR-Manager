@@ -70,6 +70,7 @@ class HrManagerServiceProvider extends AbstractSeatPlugin
                 Console\Commands\SyncExternalRostersCommand::class,
                 Console\Commands\SendOnboardingWelcomesCommand::class,
                 Console\Commands\ReconcileSuspectedAltsCommand::class,
+                Console\Commands\ScanDonationsCommand::class,
                 Console\Commands\InitCommand::class,
             ]);
         }

@@ -255,6 +255,36 @@ class SettingsController extends Controller
             'summary'         => $standingsAdmin->summary(),
         ];
 
+        // Donation flags: member ISK transfers to entities the standings rate
+        // badly. Counts read from the flags table rather than recomputed.
+        $donationSvc = app(\HrManager\Services\DonationScanService::class);
+        $donationSettings = [
+            'enabled'      => $donationSvc->isEnabled(),
+            'floor_neutral' => $donationSvc->floorNeutral(),
+            'floor_suspect' => $donationSvc->floorSuspect(),
+            'max_standing' => $donationSvc->maxStanding(),
+            'suspect'      => 0,
+            'neutral'      => 0,
+            'last_scan'    => null,
+            'pending'      => 0,
+        ];
+
+        if (\Illuminate\Support\Facades\Schema::hasTable('hr_manager_donation_flags')) {
+            $tierCounts = \HrManager\Models\DonationFlag::selectRaw('tier, COUNT(*) as c')
+                ->groupBy('tier')->pluck('c', 'tier')->toArray();
+            $donationSettings['suspect'] = (int) ($tierCounts[\HrManager\Models\DonationFlag::TIER_SUSPECT] ?? 0);
+            $donationSettings['neutral'] = (int) ($tierCounts[\HrManager\Models\DonationFlag::TIER_NEUTRAL] ?? 0);
+        }
+
+        if (\Illuminate\Support\Facades\Schema::hasTable('hr_manager_donation_scan_state')) {
+            $donationSettings['last_scan'] = \Illuminate\Support\Facades\DB::table('hr_manager_donation_scan_state')
+                ->max('scanned_at');
+            // Characters whose first full pass has not finished yet, so a
+            // half-populated list does not read as a complete one.
+            $donationSettings['pending'] = (int) \Illuminate\Support\Facades\DB::table('hr_manager_donation_scan_state')
+                ->where('backfilled', false)->count();
+        }
+
         $ssoService         = app(\HrManager\Services\RecruitmentSsoService::class);
         $ssoProfiles        = $ssoService->availableProfiles();
         $ssoSelectedProfile = $ssoService->selectedProfileName();
@@ -312,7 +342,7 @@ class SettingsController extends Controller
             'accessSettings', 'connectorAccessSettings',
             'ssoProfiles', 'ssoSelectedProfile', 'ssoAnalysis', 'ssoScopesLost',
             'allianceTaxExemptText', 'allianceTaxExemptNames',
-            'assessmentCriteria', 'assessmentDefaults', 'standingsSettings', 'purgeSquads',
+            'assessmentCriteria', 'assessmentDefaults', 'standingsSettings', 'donationSettings', 'purgeSquads',
             'tokenRequiredProfile', 'tokenReqStale', 'tokenRequiredScopes',
             'buybackProgrammes', 'buybackTiers', 'walletAlertRepeatHours', 'inactiveDirectorRepeatDays',
             'notifStates', 'connectorAvailable',
@@ -375,6 +405,9 @@ class SettingsController extends Controller
 
     public function update(Request $request)
     {
+        // Set when a save invalidates already-scanned donation results.
+        $rebuilt = false;
+
         $request->validate([
             'stale_days'              => 'nullable|integer|min:1|max:365',
             'max_pending'             => 'nullable|integer|min:1|max:10',
@@ -424,6 +457,11 @@ class SettingsController extends Controller
             'assess_standings_source'        => 'nullable|in:off,seat,own,hybrid',
             'assess_standings_precedence'    => 'nullable|in:corp,alliance',
             'assess_standings_seat_profile'  => 'nullable|integer|min:0',
+
+            // Donation flags
+            'donation_flags_max_standing'    => 'nullable|integer|in:-10,-5',
+            'donation_flags_floor_neutral'   => 'nullable|numeric|min:0',
+            'donation_flags_floor_suspect'   => 'nullable|numeric|min:0',
             // Purge squad cleanup
             'purge_auto_squad_removal'       => 'nullable|boolean',
             'purge_auto_squad_removal_hours' => 'nullable|integer|in:12,24',
@@ -595,6 +633,40 @@ class SettingsController extends Controller
             Setting::setValue($svc::SETTING_PRECEDENCE, $prec === $svc::PRECEDENCE_ALLIANCE ? $svc::PRECEDENCE_ALLIANCE : $svc::PRECEDENCE_CORP, 'string');
 
             Setting::setValue($svc::SETTING_SEAT_PROFILE, (int) $request->input('assess_standings_seat_profile', 0), 'integer');
+        }
+
+        // Donation flags (id=standings, second form).
+        if ($request->has('donation_flags_form')) {
+            $donSvc = app(\HrManager\Services\DonationScanService::class);
+            $don    = \HrManager\Services\DonationScanService::class;
+
+            // What the results were produced under, before this save.
+            $before = [$donSvc->maxStanding(), $donSvc->floorNeutral(), $donSvc->floorSuspect()];
+
+            Setting::setValue($don::SETTING_ENABLED, $request->boolean('donation_flags_enabled') ? '1' : '0', 'boolean');
+
+            // Only the two hostile steps make sense: flagging transfers to
+            // entities you rate neutral or better would flag ordinary trade.
+            $max = (int) $request->input('donation_flags_max_standing', $don::DEFAULT_MAX_STANDING);
+            Setting::setValue($don::SETTING_MAX_STANDING, in_array($max, [-10, -5], true) ? $max : $don::DEFAULT_MAX_STANDING, 'integer');
+
+            foreach ([
+                'donation_flags_floor_neutral' => [$don::SETTING_FLOOR_NEUTRAL, $don::DEFAULT_FLOOR_NEUTRAL],
+                'donation_flags_floor_suspect' => [$don::SETTING_FLOOR_SUSPECT, $don::DEFAULT_FLOOR_SUSPECT],
+            ] as $field => [$key, $default]) {
+                $val = $request->filled($field) ? max(0, (float) $request->input($field)) : (float) $default;
+                Setting::setValue($key, (string) $val, 'string');
+            }
+
+            // Changing what counts invalidates what has already been counted.
+            // The scan never revisits a row it declined to flag, so without
+            // this the list would mix findings from the old criteria with
+            // findings from the new and give no way to tell them apart.
+            $after = [$donSvc->maxStanding(), $donSvc->floorNeutral(), $donSvc->floorSuspect()];
+            if ($before !== $after && $donSvc->hasScanned()) {
+                $donSvc->rebuild();
+                $rebuilt = true;
+            }
         }
 
         // Purge squad cleanup (id=purge-squads). Opt-in auto-removal toggle +
@@ -816,7 +888,8 @@ class SettingsController extends Controller
             $request->has('sso_settings_form'),
             $request->has('token_req_form')            => 'sso',
             $request->has('assessment_criteria_form')   => 'assessment',
-            $request->has('standings_form')             => 'standings',
+            $request->has('standings_form'),
+            $request->has('donation_flags_form')       => 'standings',
             $request->has('wallet_alerts_form')        => 'webhooks',
             $request->has('notifications_form')        => 'notifications',
             $request->has('onboarding_form')           => 'onboarding',
@@ -824,7 +897,8 @@ class SettingsController extends Controller
         };
 
         return $this->backToSettingsTab($tab)
-            ->with('success', trans('hr-manager::settings.settings_saved'));
+            ->with('success', trans('hr-manager::settings.settings_saved')
+                . ($rebuilt ? ' ' . trans('hr-manager::settings.don_rebuilt') : ''));
     }
 
     /**
@@ -1193,6 +1267,25 @@ class SettingsController extends Controller
         $n = $svc->setValue($ids, (int) $request->input('bulk_value'), auth()->id());
 
         return $back->with('success', trans_choice('hr-manager::settings.std_revalued', $n, ['count' => $n]));
+    }
+
+    /**
+     * Throw away every donation flag and every scan watermark so the next pass
+     * re-reads all history.
+     *
+     * Editing the standings list changes which transfers should have been
+     * flagged, but the scan cannot know that: it has already moved past those
+     * journal rows. Settings changes rebuild on their own; a standings edit
+     * happens on a different form and needs asking for.
+     */
+    public function rescanDonations()
+    {
+        $ok = app(\HrManager\Services\DonationScanService::class)->rebuild();
+
+        return $this->backToSettingsTab('standings')->with(
+            $ok ? 'success' : 'error',
+            trans($ok ? 'hr-manager::settings.don_rebuilt' : 'hr-manager::settings.don_rebuild_failed')
+        );
     }
 
     /**

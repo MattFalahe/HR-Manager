@@ -169,6 +169,9 @@ class DiagnoseCommand extends Command
             'hr_manager_wallet_alert_state',
             'hr_manager_fc_activity',
             'hr_manager_audit_log',
+            'hr_manager_standings',
+            'hr_manager_donation_flags',
+            'hr_manager_donation_scan_state',
         ];
 
         foreach ($tables as $table) {
