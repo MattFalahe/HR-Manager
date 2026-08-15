@@ -83,7 +83,7 @@ class SyncExternalRostersCommand extends Command
                 return 0;
             }
 
-            return $this->run($eveWho, $corpIds);
+            return $this->pullRosters($eveWho, $corpIds);
         } finally {
             optional($lock)->release();
         }
@@ -222,7 +222,15 @@ class SyncExternalRostersCommand extends Command
         return $this->confirm('Continue?', $count < self::LARGE_RUN);
     }
 
-    private function run(EveWhoRosterService $eveWho, array $corpIds): int
+    /**
+     * Pull each corp in turn and summarise what came back.
+     *
+     * NOT named run(): Illuminate\Console\Command inherits a public run() from
+     * Symfony, and redeclaring it private is a fatal at class-load time, which
+     * takes down every artisan invocation including the ones composer fires
+     * during install.
+     */
+    private function pullRosters(EveWhoRosterService $eveWho, array $corpIds): int
     {
         $bar = null;
         if ($this->output->isDecorated()) {
