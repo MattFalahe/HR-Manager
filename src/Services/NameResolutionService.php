@@ -737,27 +737,63 @@ class NameResolutionService
         // Cached for a day, and the set is small in practice because a scan's
         // counterparties cluster into a handful of corps.
         foreach (array_diff($corporationIds, array_keys($out)) as $corpId) {
-            $out[$corpId] = Cache::remember(
-                'hr-corp-alliance-' . $corpId,
-                self::CACHE_TTL,
-                function () use ($corpId) {
-                    try {
-                        $response = Http::timeout(self::HTTP_TIMEOUT)
-                            ->withHeaders(['User-Agent' => $this->userAgent()])
-                            ->get('https://esi.evetech.net/latest/corporations/' . $corpId . '/');
-                        if ($response->successful()) {
-                            $alliance = $response->json()['alliance_id'] ?? null;
-                            return $alliance ? (int) $alliance : null;
-                        }
-                    } catch (\Throwable $e) {
-                        Log::debug('[HR Manager] NameResolution: corp alliance lookup failed: ' . $e->getMessage());
-                    }
-                    return null;
-                }
-            );
+            $sheet = $this->corporationSheet($corpId);
+            $out[$corpId] = isset($sheet['alliance_id']) ? (int) $sheet['alliance_id'] : null;
         }
 
         return $out;
+    }
+
+    /**
+     * How many members a corporation has, straight from CCP.
+     *
+     * Public and unauthenticated: the member LIST needs a director token, but
+     * the COUNT does not. That makes it the honest yardstick for any roster
+     * assembled from third-party sources, which can only ever infer membership
+     * from public activity and are consequently always a little wrong. On one
+     * corp checked while writing this, ESI said 719, EveWho 717 and zKillboard
+     * 702; only the first is reading CCP's own figure.
+     */
+    public function corporationMemberCount(int $corporationId): ?int
+    {
+        $sheet = $this->corporationSheet($corporationId);
+
+        return isset($sheet['member_count']) ? (int) $sheet['member_count'] : null;
+    }
+
+    /**
+     * ESI's public corporation sheet, cached for a day.
+     *
+     * One call answers both alliance and member count, so the two callers share
+     * a cache entry rather than each spending their own request.
+     *
+     * @return array<string, mixed> empty when unavailable
+     */
+    private function corporationSheet(int $corporationId): array
+    {
+        if ($corporationId <= 0) {
+            return [];
+        }
+
+        return Cache::remember(
+            'hr-corp-sheet-' . $corporationId,
+            self::CACHE_TTL,
+            function () use ($corporationId) {
+                try {
+                    $response = Http::timeout(self::HTTP_TIMEOUT)
+                        ->withHeaders(['Accept' => 'application/json', 'User-Agent' => $this->userAgent()])
+                        ->get('https://esi.evetech.net/latest/corporations/' . $corporationId . '/');
+                    if ($response->successful()) {
+                        $json = $response->json();
+                        return is_array($json) ? $json : [];
+                    }
+                } catch (\Throwable $e) {
+                    Log::debug('[HR Manager] NameResolution: corporation sheet lookup failed: ' . $e->getMessage());
+                }
+
+                return [];
+            }
+        );
     }
 
     /**

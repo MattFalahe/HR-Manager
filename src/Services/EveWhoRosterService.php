@@ -55,11 +55,11 @@ class EveWhoRosterService
     public const WALL_BUDGET_FULL = 150; // background (cron) budget — fetch every page
 
     /**
-     * Set by sync() when a pull came back short of pagination.total.
+     * What the most recent sync() actually assembled, and from where.
      *
-     * @var array{got:int, reported:int, stalled:bool}|null
+     * @var array{evewho:int, seat_added:int, stored:int, expected:?int, expected_from:?string, stalled:bool}|null
      */
-    private ?array $lastShortfall = null;
+    private ?array $lastSyncStats = null;
 
     /** Operator toggle (Settings → Features). Off by default. */
     public function isEnabled(): bool
@@ -306,28 +306,45 @@ class EveWhoRosterService
                 return $this->count($corporationId);
             }
 
-            $this->store($corporationId, $idToName);
+            $fromEveWho = count($idToName);
+            $seatAdded  = $this->store($corporationId, $idToName);
+            $stored     = $fromEveWho + $seatAdded;
 
-            $got = count($idToName);
-
-            // Short of what EveWho itself says the corp has. Worth saying out
-            // loud: the roster looks complete from the inside, and a director
-            // comparing it to the corp's real size needs to know the ceiling is
-            // the API's, not theirs.
-            if ($reported !== null && $got < $reported) {
-                $this->lastShortfall = ['got' => $got, 'reported' => $reported, 'stalled' => $stalled];
-                Log::info(sprintf(
-                    '[HR Manager] EveWho returned %d of %d members for corp %d%s.',
-                    $got,
-                    $reported,
-                    $corporationId,
-                    $stalled ? ' (its pagination served the same page again, so the rest is unreachable)' : ''
-                ));
-            } else {
-                $this->lastShortfall = null;
+            // CCP's own member count, public and unauthenticated. Preferred
+            // over EveWho's pagination.total as the yardstick: the list needs a
+            // director token but the COUNT does not, so this is the one figure
+            // in play that is not an aggregator's estimate.
+            $expected     = app(NameResolutionService::class)->corporationMemberCount($corporationId);
+            $expectedFrom = $expected !== null ? 'esi' : null;
+            if ($expected === null && $reported !== null) {
+                $expected     = $reported;
+                $expectedFrom = 'evewho';
             }
 
-            return $got;
+            $this->lastSyncStats = [
+                'evewho'        => $fromEveWho,
+                'seat_added'    => $seatAdded,
+                'stored'        => $stored,
+                'expected'      => $expected,
+                'expected_from' => $expectedFrom,
+                'stalled'       => $stalled,
+            ];
+
+            // A truncated roster looks complete from the inside, so say it.
+            if ($expected !== null && $stored < $expected) {
+                Log::info(sprintf(
+                    '[HR Manager] corp %d roster stored %d of %d (%s): %d from EveWho, %d from SeAT%s.',
+                    $corporationId,
+                    $stored,
+                    $expected,
+                    $expectedFrom,
+                    $fromEveWho,
+                    $seatAdded,
+                    $stalled ? '; EveWho pagination served the same page again, so the rest is unreachable' : ''
+                ));
+            }
+
+            return $stored;
         } catch (\Throwable $e) {
             Log::warning('[HR Manager] EveWho roster sync failed for corp ' . $corporationId . ': ' . $e->getMessage());
             return null;
@@ -335,17 +352,26 @@ class EveWhoRosterService
     }
 
     /**
-     * Detail about the most recent sync(), when it came back short.
+     * What the most recent sync() assembled, and from where.
      *
-     * sync() returns a plain count so its existing callers keep working; this
-     * carries the bit they had no way to ask about, namely that the count is a
-     * ceiling imposed by EveWho rather than the corp's real size.
+     * sync() returns a plain total so its existing callers keep working; this
+     * carries what they had no way to ask about: how much came from each
+     * source, what the corp actually holds, and whether the count is a ceiling
+     * imposed by EveWho rather than the corp's real size.
      *
-     * @return array{got:int, reported:int, stalled:bool}|null
+     * @return array{evewho:int, seat_added:int, stored:int, expected:?int, expected_from:?string, stalled:bool}|null
      */
-    public function lastShortfall(): ?array
+    public function lastSyncStats(): ?array
     {
-        return $this->lastShortfall;
+        return $this->lastSyncStats;
+    }
+
+    /** True when the last sync stored fewer members than the corp really has. */
+    public function lastRunWasShort(): bool
+    {
+        $s = $this->lastSyncStats;
+
+        return $s !== null && $s['expected'] !== null && $s['stored'] < $s['expected'];
     }
 
 
@@ -356,7 +382,21 @@ class EveWhoRosterService
      *
      * @param  array<int,?string>  $idToName
      */
-    private function store(int $corporationId, array $idToName): void
+    /**
+     * Replace the corp's stored roster with the EveWho pull, plus anyone SeAT
+     * already knows to be in that corp.
+     *
+     * The second half matters more than its size suggests. EveWho infers
+     * membership from public activity, so the members it misses are the quiet
+     * ones, and a character SeAT has resolved into this corp is usually
+     * REGISTERED — the very people a director most needs on the page. Before
+     * this, switching to the EveWho roster dropped them, because the two
+     * sources were alternatives rather than a union.
+     *
+     * @param array<int, ?string> $idToName EveWho's pull
+     * @return int characters contributed by SeAT that EveWho did not have
+     */
+    private function store(int $corporationId, array $idToName): int
     {
         $now  = now();
         $rows = [];
@@ -372,12 +412,83 @@ class EveWhoRosterService
             ];
         }
 
+        $seatOnly = 0;
+        foreach ($this->seatKnownCharacters($corporationId) as $cid => $name) {
+            // array_key_exists, NOT isset: a character EveWho listed without a
+            // name is stored with a null value, and isset() reports those as
+            // absent. That would insert them a second time and break the
+            // unique (corporation_id, character_id) constraint, failing the
+            // whole transaction and losing the roster.
+            if (array_key_exists($cid, $idToName)) {
+                continue; // EveWho already has them
+            }
+            $seatOnly++;
+            $rows[] = [
+                'corporation_id' => $corporationId,
+                'character_id'   => (int) $cid,
+                'name'           => $name,
+                'source'         => 'seat',
+                'fetched_at'     => $now,
+                'created_at'     => $now,
+                'updated_at'     => $now,
+            ];
+        }
+
         DB::transaction(function () use ($corporationId, $rows) {
             DB::table(self::TABLE)->where('corporation_id', $corporationId)->delete();
             foreach (array_chunk($rows, 500) as $chunk) {
                 DB::table(self::TABLE)->insert($chunk);
             }
         });
+
+        return $seatOnly;
+    }
+
+    /**
+     * Characters SeAT itself places in this corp, from its affiliation table.
+     *
+     * This is the sparse source the Members page falls back to when it has
+     * nothing better, so it is free, local, and already trusted for exactly
+     * this purpose. Names come along where character_infos has them.
+     *
+     * @return array<int, ?string>
+     */
+    private function seatKnownCharacters(int $corporationId): array
+    {
+        if (!Schema::hasTable('character_affiliations')) {
+            return [];
+        }
+
+        try {
+            $rows = DB::table('character_affiliations as ca')
+                ->leftJoin('character_infos as ci', 'ci.character_id', '=', 'ca.character_id')
+                ->where('ca.corporation_id', $corporationId)
+                ->get(['ca.character_id', 'ci.name']);
+        } catch (\Throwable $e) {
+            Log::debug('[HR Manager] EveWho: SeAT affiliation merge failed: ' . $e->getMessage());
+            return [];
+        }
+
+        $out = [];
+        foreach ($rows as $r) {
+            $cid = (int) $r->character_id;
+            if ($cid > 0) {
+                $out[$cid] = $this->isUsableName($r->name ?? null) ? (string) $r->name : null;
+            }
+        }
+
+        return $out;
+    }
+
+    /** Same "Unknown is not a name" rule NameResolutionService applies. */
+    private function isUsableName($name): bool
+    {
+        if ($name === null) {
+            return false;
+        }
+        $t = trim((string) $name);
+
+        return $t !== '' && strtolower($t) !== 'unknown';
     }
 
     /**

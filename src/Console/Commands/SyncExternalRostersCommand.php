@@ -235,6 +235,7 @@ class SyncExternalRostersCommand extends Command
         $totalChars = 0;
         $failed     = 0;
         $empty      = 0;
+        $seatAdded  = 0;
         $short      = [];
 
         foreach ($corpIds as $corpId) {
@@ -248,9 +249,11 @@ class SyncExternalRostersCommand extends Command
                     if ($count === 0) {
                         $empty++;
                     }
-                    if ($s = $eveWho->lastShortfall()) {
-                        $short[$corpId] = $s;
+                    if ($eveWho->lastRunWasShort()) {
+                        $short[$corpId] = $eveWho->lastSyncStats();
                     }
+                    $st = $eveWho->lastSyncStats();
+                    $seatAdded += $st['seat_added'] ?? 0;
                 }
                 if ($bar) {
                     $bar->setMessage(sprintf('corp %d · %s chars', $corpId, $count === null ? 'failed' : (string) $count));
@@ -276,6 +279,12 @@ class SyncExternalRostersCommand extends Command
             $failed > 0 ? ", {$failed} failed (kept previous copy)" : ''
         ));
 
+        // Worth calling out separately: these are members EveWho did not know
+        // about, and they are disproportionately the registered ones.
+        if ($seatAdded > 0) {
+            $this->line('  ' . $seatAdded . ' of those came from SeAT\'s own affiliation data rather than EveWho.');
+        }
+
         // A corp EveWho knows nothing about looks identical to a successful
         // pull of nothing, so name it rather than let it read as a silent win.
         if ($empty > 0) {
@@ -290,14 +299,18 @@ class SyncExternalRostersCommand extends Command
             $this->warn(count($short) . ' corp(s) came back short of what EveWho reports they hold:');
             foreach ($short as $corpId => $s) {
                 $this->line(sprintf(
-                    '    corp %d: stored %d of %d%s',
+                    '    corp %d: stored %d of %d (%s)  [%d EveWho + %d SeAT]%s',
                     $corpId,
-                    $s['got'],
-                    $s['reported'],
-                    $s['stalled'] ? '  (its pagination served the same page again, so the rest is unreachable)' : ''
+                    $s['stored'],
+                    $s['expected'],
+                    $s['expected_from'] === 'esi' ? 'ESI member_count' : 'EveWho total',
+                    $s['evewho'],
+                    $s['seat_added'],
+                    $s['stalled'] ? '  (EveWho served the same page again, so the rest is unreachable)' : ''
                 ));
             }
-            $this->line('  This is a limit of the EveWho API, not your data. A director token remains the only way to see a full roster.');
+            $this->line('  A public source can only infer membership from public activity, so it is always a little short.');
+            $this->line('  A director token with read_corporation_membership remains the only way to see a full roster.');
         }
 
         return 0;
