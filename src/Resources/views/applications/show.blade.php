@@ -168,7 +168,8 @@
                         @if($intelNotes->count() > 3)
                             <div>
                                 <a href="{{ route('hr-manager.intel.show', $application->character_id) }}" style="color: var(--hr-primary-start);">
-                                    <i class="fas fa-external-link-alt"></i> {{ trans('hr-manager::intel.back_to_index') }} — view all {{ $intelNotes->count() }}
+                                    <i class="fas fa-folder-open"></i>
+                                    {{ trans('hr-manager::intel.app_view_all', ['count' => $intelNotes->count()]) }}
                                 </a>
                             </div>
                         @endif

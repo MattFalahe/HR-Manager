@@ -190,13 +190,14 @@
                                 <th>{{ trans('hr-manager::intel.body_col') }}</th>
                                 <th>{{ trans('hr-manager::intel.tags_col') }}</th>
                                 <th>{{ trans('hr-manager::intel.added_col') }}</th>
+                                <th style="width: 1%;"></th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach($notes as $note)
                                 <tr>
                                     <td>
-                                        <a href="{{ route('hr-manager.intel.show', $note->character_id) }}" style="color: inherit; text-decoration: none;">
+                                        <a href="{{ route('hr-manager.intel.show', $note->character_id) }}" style="color: var(--hr-text-white); text-decoration: none;">
                                             <img src="https://images.evetech.net/characters/{{ $note->character_id }}/portrait?size=32" class="rounded-circle mr-2" width="32" height="32" alt="" onerror="this.style.display='none'">
                                             <strong>{{ $note->character_name ?? ('Character #' . $note->character_id) }}</strong>
                                             <small class="ml-2" style="color: var(--hr-text-muted);">#{{ $note->character_id }}</small>
@@ -211,6 +212,9 @@
                                     </td>
                                     <td>
                                         <small style="color: var(--hr-text-light);">{{ Str::limit($note->body, 140) }}</small>
+                                        @if(mb_strlen($note->body) > 140)
+                                            <a href="{{ route('hr-manager.intel.show', $note->character_id) }}" style="color: #9ec5fe; font-size: 0.78rem; white-space: nowrap;">{{ trans('hr-manager::intel.read_full') }}</a>
+                                        @endif
                                         @if($note->recruiter_visible)
                                             <span class="badge ml-1" title="{{ trans('hr-manager::intel.shared_with_recruiters') }}" style="background: rgba(40,167,69,0.2); color: var(--hr-text-light); border: 1px solid rgba(40,167,69,0.5);"><i class="fas fa-eye"></i></span>
                                         @endif
@@ -223,6 +227,13 @@
                                     <td>
                                         @hrDate($note->created_at)<br>
                                         <small style="color: var(--hr-text-muted);">{{ $note->author->name ?? 'User #' . $note->author_id }}</small>
+                                    </td>
+                                    <td class="text-right">
+                                        <a href="{{ route('hr-manager.intel.show', $note->character_id) }}"
+                                           class="btn btn-sm btn-hr-secondary btn-icon" style="white-space: nowrap;"
+                                           title="{{ trans('hr-manager::intel.open_dossier_title') }}">
+                                            <i class="fas fa-folder-open"></i> {{ trans('hr-manager::intel.open_dossier') }}
+                                        </a>
                                     </td>
                                 </tr>
                             @endforeach

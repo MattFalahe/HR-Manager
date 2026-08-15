@@ -117,6 +117,67 @@
         </div>
     @endcan
 
+    {{-- Everyone proven to be the same human, plus anyone a director has
+         CLAIMED is. The two are shown apart on purpose: one is account data,
+         the other is somebody's assertion. --}}
+    @if(count($accountIds) > 1 || $altLinks->isNotEmpty())
+        <div class="card card-dark mb-3">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-user-friends"></i> {{ trans('hr-manager::intel.same_human_heading') }}
+                </h3>
+            </div>
+            <div class="card-body">
+                @if(count($accountIds) > 1)
+                    <div class="mb-2">
+                        <small class="d-block mb-1" style="color: var(--hr-text-muted);">{{ trans('hr-manager::intel.same_account_intro') }}</small>
+                        @foreach($accountIds as $accId)
+                            @if($accId !== $characterId)
+                                <a href="{{ route('hr-manager.intel.show', $accId) }}" class="badge mr-1 mb-1"
+                                   style="background: rgba(102,126,234,0.18); color: var(--hr-text-light); border: 1px solid rgba(102,126,234,0.4); text-decoration: none;">
+                                    <i class="fas fa-link"></i> {{ $charNames[$accId] ?? ('#' . $accId) }}
+                                    @if(isset($altNotes[$accId]))
+                                        <span style="opacity: 0.75;">({{ $altNotes[$accId]->count() }})</span>
+                                    @endif
+                                </a>
+                            @endif
+                        @endforeach
+                    </div>
+                @endif
+
+                @if($altLinks->isNotEmpty())
+                    <div>
+                        <small class="d-block mb-1" style="color: var(--hr-text-muted);">{{ trans('hr-manager::intel.claimed_alts_intro') }}</small>
+                        @foreach($altLinks as $link)
+                            @php
+                                $lstate = [
+                                    'suspected' => ['fg' => '#ffe08a', 'icon' => 'fa-question-circle'],
+                                    'confirmed' => ['fg' => '#6ee7b7', 'icon' => 'fa-link'],
+                                    'refuted'   => ['fg' => '#f5a3ac', 'icon' => 'fa-unlink'],
+                                ][$link['state']] ?? ['fg' => '#ffe08a', 'icon' => 'fa-question-circle'];
+                            @endphp
+                            <div class="mb-1" style="padding: 5px 9px; background: rgba(0,0,0,0.15); border-radius: 4px;">
+                                <span style="color: {{ $lstate['fg'] }};"><i class="fas {{ $lstate['icon'] }}"></i></span>
+                                {{ $link['this_is_suspected']
+                                    ? trans('hr-manager::intel.claim_is_alt_of')
+                                    : trans('hr-manager::intel.claim_has_alt') }}
+                                <a href="{{ route('hr-manager.intel.show', $link['other_character_id']) }}" style="color: var(--hr-text-white);">
+                                    <strong>{{ $link['other_character_name'] }}</strong>
+                                </a>
+                                <span class="badge ml-1" style="background: rgba(255,255,255,0.08); color: {{ $lstate['fg'] }}; font-size: 0.62rem;">
+                                    {{ trans('hr-manager::watchlist.alt_state_' . $link['state']) }}
+                                </span>
+                                @if($link['resolution_note'])
+                                    <small class="d-block mt-1" style="color: var(--hr-text-muted);">{{ $link['resolution_note'] }}</small>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
+        </div>
+    @endif
+
     {{-- Notes list --}}
     <div class="card card-dark">
         <div class="card-header">
@@ -161,6 +222,40 @@
             @empty
                 <p class="text-muted mb-0">{{ trans('hr-manager::intel.no_notes_for_character') }}</p>
             @endforelse
+
+            {{-- Notes filed against this person's OTHER characters. Kept in
+                 this card rather than a separate one: it is the same dossier
+                 about the same human, just filed elsewhere. Each is labelled
+                 so it never reads as a note about the character on screen. --}}
+            @if($altNotes->isNotEmpty())
+                <hr style="border-color: rgba(255,255,255,0.10); margin: 20px 0;">
+                <h6 style="color: var(--hr-text-white);">
+                    <i class="fas fa-users"></i> {{ trans('hr-manager::intel.account_notes_heading') }}
+                </h6>
+                <small class="d-block mb-3" style="color: var(--hr-text-muted);">{{ trans('hr-manager::intel.account_notes_intro') }}</small>
+
+                @foreach($altNotes as $altCharId => $group)
+                    <div class="mb-3" style="padding: 10px 12px; background: rgba(255,255,255,0.03); border-left: 2px solid rgba(102,126,234,0.5); border-radius: 3px;">
+                        <div class="mb-2">
+                            <a href="{{ route('hr-manager.intel.show', $altCharId) }}" style="color: var(--hr-text-white);">
+                                <strong>{{ $charNames[$altCharId] ?? ('#' . $altCharId) }}</strong>
+                            </a>
+                            <span class="badge ml-1" style="background: rgba(255,255,255,0.06); color: var(--hr-text-muted); font-size: 0.62rem;">
+                                {{ trans_choice('hr-manager::intel.account_note_count', $group->count(), ['count' => $group->count()]) }}
+                            </span>
+                        </div>
+                        @foreach($group as $an)
+                            <div class="mb-2">
+                                <div style="color: var(--hr-text-light); white-space: pre-wrap; line-height: 1.5; font-size: 0.9rem;">{{ $an->body }}</div>
+                                <small style="color: var(--hr-text-muted);">
+                                    {{ trans('hr-manager::intel.added_by') }} <strong>{{ $an->author->name ?? 'User #' . $an->author_id }}</strong>
+                                    @hrDate($an->created_at)
+                                </small>
+                            </div>
+                        @endforeach
+                    </div>
+                @endforeach
+            @endif
         </div>
     </div>
 </div>

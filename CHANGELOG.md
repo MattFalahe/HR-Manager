@@ -33,6 +33,14 @@ All notable changes to HR Manager will be documented in this file.
 - A corp EveWho knows nothing about is now **reported as empty** rather than counting as a silent success.
 - **Scheduled behaviour is unchanged**: with no selector it still refreshes exactly the seeded corps.
 
+### 🕵️ Intel notes: one dossier per human
+
+- **Adding intel filed the note twice against some characters.** The add form writes to the possible-alts list you type by hand AND, when the include-alts toggle is on, to every character on the same SeAT account. Those two overlap constantly (a hand-listed alt is usually registered too) and each ran its own write loop, so an overlapping character got the identical note twice. A main with five alts produced eleven rows where six were meant. There is one de-duplicated target set now, and a repair migration clears the copies already on disk: same character, author, scope, body and minute, keeping the earliest, with any suspected-alt claim re-pointed at the survivor.
+- **A dossier now covers the whole person, not one character.** Notes are filed per character, so opening an alt used to show only that alt's note while the rest of what you know about the human sat on pages you had no reason to visit. Opening any character now shows its own notes first, then the notes on every other character proven to be the same human, each labelled with whose page it came from and linking through.
+- **Claimed alt links are shown on the dossier.** Adding intel with a possible-alts list already recorded those claims, but nothing on the intel side displayed them. They appear with their state badge (suspected / confirmed / refuted) and are kept visually separate from the account list, because one is proven and the other is somebody's assertion. Claims never widen which notes are loaded.
+- **The intel index has an Open button.** The character name was already a link but styled to look like plain text, so nothing on a row invited a click and a trimmed note was as far as you could get. Rows now carry an explicit action, the name reads as a link, and a note longer than the trim says so.
+- Scope visibility is unchanged throughout: widening the character set does not widen what a viewer is permitted to read, because the filtering happens inside the query.
+
 ### 🐛 Fixed
 
 - **EveWho rosters were silently capped at 500 members, and cost 20 requests to get there.** EveWho's corplist endpoint ignores its own pagination parameter: every page number returns a byte-identical page 1, while the response still reports `pages: 2, has_next: true`. HR followed `has_next`, so it re-fetched page 1 until it hit the 20-page safety cap and finished with the 500 rows the first request already had. Verified against a 717-member corp on 2026-08-13; `?page`, `?p`, `?offset` and `?start` all behave the same way.

@@ -67,16 +67,51 @@ class IntelController extends Controller
         $viewerUserId = (int) auth()->user()->id;
         $viewerTier   = $this->viewerTier();
 
-        $notes = $intel->notesForCharacter($characterId, $viewerUserId, $allowedCorps, $viewerTier);
+        $resolver = app(NameResolutionService::class);
 
-        if ($notes->isEmpty() && !$intel->canContribute()) {
+        // Every character proven to be the same human. Notes are filed per
+        // character, so a dossier that showed only this one would hide the rest
+        // of what is known about the person -- which is the thing a director
+        // actually opened the page to find out.
+        $accountIds = [$characterId];
+        try {
+            foreach (app(\HrManager\Services\AccountCharacterResolver::class)->siblingsFor($characterId) as $sib) {
+                $accountIds[] = (int) $sib['character_id'];
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('[HR Manager] intel dossier account lookup failed: ' . $e->getMessage());
+        }
+        $accountIds = array_values(array_unique(array_filter(array_map('intval', $accountIds), fn ($v) => $v > 0)));
+
+        // Claims are NOT proof, so they never widen the note set. They are
+        // shown as claims, and the director decides what to make of them.
+        $altLinks = $this->altLinksFor($accountIds);
+
+        // Visibility filtering happens inside the service, so widening the id
+        // set cannot widen what this viewer is allowed to read.
+        $allNotes = $intel->notesForCharacters($accountIds, $viewerUserId, $allowedCorps, $viewerTier);
+
+        $notes     = $allNotes->where('character_id', $characterId)->values();
+        $altNotes  = $allNotes->where('character_id', '!=', $characterId)
+            ->groupBy('character_id');
+
+        if ($allNotes->isEmpty() && !$intel->canContribute()) {
             abort(404, 'No intel for that character that you can see.');
         }
 
-        // Try to resolve the name even if there are zero notes (so the
-        // contributing director sees the character on a fresh add).
-        $resolver = app(NameResolutionService::class);
+        // Names for every character on the page: the subject, the account's
+        // other characters, and both ends of any claim.
+        $nameIds = array_merge(
+            $accountIds,
+            $allNotes->pluck('character_id')->map(fn ($c) => (int) $c)->all(),
+            $altLinks->pluck('other_character_id')->map(fn ($c) => (int) $c)->all()
+        );
+        $charNames = $resolver->getCharacterNamesWithFallback($nameIds);
+
+        // Resolve even with zero notes, so a director who has just added one
+        // sees the character rather than a bare id.
         $displayName = $notes->first()?->character_name
+            ?? ($charNames[$characterId] ?? null)
             ?? $resolver->getCharacterName($characterId)
             ?? ('Character #' . $characterId);
 
@@ -91,10 +126,61 @@ class IntelController extends Controller
             'characterId',
             'displayName',
             'notes',
+            'altNotes',
+            'altLinks',
+            'charNames',
+            'accountIds',
             'watchlistMatch',
             'corporations',
             'suggestedTags'
         ));
+    }
+
+    /**
+     * Suspected-alt claims touching any character on this account, from either
+     * end of the claim.
+     *
+     * A claim says a director once asserted two characters are the same human.
+     * It is deliberately kept apart from the account set above: that one is
+     * proven (shared SeAT account or an HR identity a director merged), this
+     * one is somebody's assertion, and the dossier should not quietly promote
+     * the second into the first.
+     *
+     * @param array<int> $accountIds
+     */
+    private function altLinksFor(array $accountIds)
+    {
+        if (empty($accountIds) || !\Illuminate\Support\Facades\Schema::hasTable('hr_manager_suspected_alt_links')) {
+            return collect();
+        }
+
+        try {
+            $links = \HrManager\Models\SuspectedAltLink::where(function ($q) use ($accountIds) {
+                $q->whereIn('suspected_character_id', $accountIds)
+                  ->orWhereIn('main_character_id', $accountIds);
+            })->orderByDesc('asserted_at')->get();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('[HR Manager] intel alt-link lookup failed: ' . $e->getMessage());
+            return collect();
+        }
+
+        return $links->map(function ($l) use ($accountIds) {
+            $thisIsSuspected = in_array((int) $l->suspected_character_id, $accountIds, true);
+            $otherId = $thisIsSuspected ? (int) $l->main_character_id : (int) $l->suspected_character_id;
+
+            return [
+                'state'                => $l->state,
+                // Direction changes the meaning entirely: "this player may be
+                // an alt of X" is a different claim from "X may be an alt of
+                // this player".
+                'this_is_suspected'    => $thisIsSuspected,
+                'other_character_id'   => $otherId,
+                'other_character_name' => $thisIsSuspected
+                    ? ($l->main_character_name ?: ('#' . $l->main_character_id))
+                    : ($l->suspected_character_name ?: ('#' . $l->suspected_character_id)),
+                'resolution_note'      => $l->resolution_note,
+            ];
+        })->unique(fn ($r) => $r['other_character_id'] . ':' . $r['this_is_suspected'])->values();
     }
 
     /**
@@ -203,14 +289,52 @@ class IntelController extends Controller
             \Illuminate\Support\Facades\Log::warning('[HR] intel immediate scope check failed: ' . $e->getMessage());
         }
 
-        // Possible alts the director listed by hand: each gets the same note,
-        // plus a suspected-alt link naming the main so the claim can later be
-        // confirmed or refuted against real account data.
+        // Everyone else who should carry this note, gathered into ONE set before
+        // anything is written.
+        //
+        // Two independent things put a character here: the director typed them
+        // into the possible-alts box, and the include-alts toggle expanded the
+        // account. Those overlap constantly (a hand-listed alt that is ALSO
+        // registered on the same SeAT account is the normal case, not the edge
+        // case) and writing from two separate loops gave that character the
+        // note twice. Keying by character id makes the overlap harmless and
+        // keeps one place deciding who gets a note.
+        //
+        // Hand-listed entries are tracked separately because only they earn a
+        // suspected-alt claim: the director ASSERTED that link, whereas an
+        // account sibling is already proven and needs no claim.
+        $claimed = [];   // character_id => name, listed by hand
+        $targets = [];   // character_id => name, everyone bar the main
+
+        foreach ($extraTargets as $exId => $exName) {
+            $claimed[(int) $exId] = $exName;
+            $targets[(int) $exId] = $exName;
+        }
+
+        $alsoAdded = [];
+        if ($request->boolean('include_alts')) {
+            try {
+                foreach (app(\HrManager\Services\AccountCharacterResolver::class)->siblingsFor($cid) as $sib) {
+                    if (!empty($sib['is_seed'])) {
+                        continue;
+                    }
+                    $sibId = (int) $sib['character_id'];
+                    if ($sibId === $cid || isset($targets[$sibId])) {
+                        continue; // the main, or already listed by hand
+                    }
+                    $targets[$sibId] = $sib['name'];
+                    $alsoAdded[]     = $sib['name'];
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('[HR Manager] intel alt bulk-add failed: ' . $e->getMessage());
+            }
+        }
+
         $extraAdded = [];
         $linksMade  = 0;
         $altService = app(\HrManager\Services\SuspectedAltService::class);
 
-        foreach ($extraTargets as $exId => $exName) {
+        foreach ($targets as $exId => $exName) {
             try {
                 $altNote = IntelNote::create([
                     'character_id'         => (int) $exId,
@@ -223,51 +347,26 @@ class IntelController extends Controller
                     'expires_at'           => $request->filled('expires_at') ? \Carbon\Carbon::parse($request->expires_at) : null,
                 ]);
 
-                if ($altService->record(
-                    (int) $exId,
-                    $cid,
-                    $exName,
-                    $cname,
-                    \HrManager\Models\SuspectedAltLink::SOURCE_INTEL,
-                    (int) $altNote->id,
-                    (int) auth()->user()->id
-                )) {
-                    $linksMade++;
+                // Only a hand-listed alt is a CLAIM. An account sibling is
+                // already proven to be the same human, so recording a claim
+                // about it would assert something HR can already see.
+                if (isset($claimed[$exId])) {
+                    if ($altService->record(
+                        (int) $exId,
+                        $cid,
+                        $exName,
+                        $cname,
+                        \HrManager\Models\SuspectedAltLink::SOURCE_INTEL,
+                        (int) $altNote->id,
+                        (int) auth()->user()->id
+                    )) {
+                        $linksMade++;
+                    }
+                    $extraAdded[] = $exName;
                 }
-
-                $extraAdded[] = $exName;
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning('[HR Manager] intel multi-add failed for ' . $exId . ': ' . $e->getMessage());
                 $extraFailed[] = $exName;
-            }
-        }
-
-        // Optional: file the same note against every OTHER character proven to
-        // be the same human (shared SeAT account or HR identity), so intel on a
-        // person isn't invisible when a recruiter looks up one of their alts.
-        // Same human only — never a group.
-        $alsoAdded = [];
-        if ($request->boolean('include_alts')) {
-            try {
-                $siblings = app(\HrManager\Services\AccountCharacterResolver::class)->siblingsFor($cid);
-                foreach ($siblings as $sib) {
-                    if (!empty($sib['is_seed'])) {
-                        continue;
-                    }
-                    IntelNote::create([
-                        'character_id'         => (int) $sib['character_id'],
-                        'character_name'       => $sib['name'],
-                        'scope_corporation_id' => $scope,
-                        'body'                 => $request->input('body'),
-                        'tags'                 => $tagsArr,
-                        'recruiter_visible'    => (bool) $request->input('recruiter_visible', false),
-                        'author_id'            => (int) auth()->user()->id,
-                        'expires_at'           => $request->filled('expires_at') ? \Carbon\Carbon::parse($request->expires_at) : null,
-                    ]);
-                    $alsoAdded[] = $sib['name'];
-                }
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('[HR Manager] intel alt bulk-add failed: ' . $e->getMessage());
             }
         }
 

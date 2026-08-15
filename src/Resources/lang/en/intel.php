@@ -54,6 +54,22 @@ return [
     'back_to_index'          => 'Back to Intel index',
     'notes_for_character'    => 'Notes for this character',
     'no_notes_for_character' => 'No intel notes for this character yet.',
+
+    // The whole human, not just the character on screen
+    'same_human_heading'   => 'Same human',
+    'same_account_intro'   => 'Other characters on this SeAT account or HR player identity. Proven, not claimed.',
+    'claimed_alts_intro'   => 'Claimed alt links. A director asserted these; they are not proof, and each settles on its own once both characters appear in SeAT.',
+    'claim_is_alt_of'      => 'Claimed to be a possible alt of',
+    'claim_has_alt'        => 'Claimed as a possible alt of this character:',
+
+    'account_notes_heading' => "Notes on this person's other characters",
+    'account_notes_intro'   => 'Intel is filed per character, so these are about the same human but recorded elsewhere. Shown here so a dossier is one place rather than several.',
+    'account_note_count'    => '{1}:count note|[2,*]:count notes',
+
+    'app_view_all'       => 'Open the dossier to read all :count',
+    'read_full'          => 'read full',
+    'open_dossier'       => 'Open',
+    'open_dossier_title' => "Open this character's intel dossier",
     'added_by'               => 'Added by',
     'expires_at'             => 'expires',
     'confirm_delete'         => 'Delete this intel note?',
