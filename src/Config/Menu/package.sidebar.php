@@ -38,6 +38,13 @@ return [
                 'permission' => 'hr-manager.director',
             ],
             [
+                'name'       => 'Former Members',
+                'label'      => 'hr-manager::menu.former_members',
+                'icon'       => 'fas fa-user-clock',
+                'route'      => 'hr-manager.former-members.index',
+                'permission' => 'hr-manager.director',
+            ],
+            [
                 'name'       => 'Corp Health',
                 'label'      => 'hr-manager::menu.corp_health',
                 'icon'       => 'fas fa-heartbeat',

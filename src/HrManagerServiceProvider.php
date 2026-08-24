@@ -71,6 +71,7 @@ class HrManagerServiceProvider extends AbstractSeatPlugin
                 Console\Commands\SendOnboardingWelcomesCommand::class,
                 Console\Commands\ReconcileSuspectedAltsCommand::class,
                 Console\Commands\ScanDonationsCommand::class,
+                Console\Commands\BackfillMemberArchivesCommand::class,
                 Console\Commands\InitCommand::class,
             ]);
         }

@@ -411,6 +411,17 @@ class MembershipChangeService
 
         $this->logEvent($corporationId, $charId, MembershipEvent::CHANGE_LEFT, null, $mainId, $playerStillPresent);
 
+        // Freeze what we know about them before it stops being knowable. A
+        // leaver often revokes their key on the way out, after which syncing
+        // stops and their history can be pruned, so anything computed later
+        // would silently under-report. Failure here must not stop the leave
+        // being logged or notified.
+        try {
+            app(MemberArchiveService::class)->recordDeparture($charId, $corporationId, $mainId);
+        } catch (\Throwable $e) {
+            Log::warning('[HR Manager] member archive on leave failed: ' . $e->getMessage());
+        }
+
         try {
             $this->notifications->notifyMemberLeft($corporationId, $charId, $mainId, $playerStillPresent);
         } catch (\Throwable $e) {

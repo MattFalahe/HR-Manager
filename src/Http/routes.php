@@ -167,6 +167,16 @@ Route::group([
     // live here too — the Player Identity surface was folded in. Director-
     // gated (raised from recruiter 2026-06-18) for the same sensitivity
     // reason as the member profiles above.
+    // Former members. Director-gated like Players, but access to an individual
+    // record comes from the archived stint's own corporation_id rather than
+    // from where the person currently works -- which is the whole point, since
+    // that is the check that stops being answerable once they leave.
+    Route::group(['prefix' => 'former-members', 'middleware' => 'can:hr-manager.director'], function () {
+        Route::get('/',      ['as' => 'hr-manager.former-members.index', 'uses' => 'FormerMemberController@index']);
+        Route::get('/{key}', ['as' => 'hr-manager.former-members.show',  'uses' => 'FormerMemberController@show'])
+            ->where('key', '[a-z]+:[0-9]+');
+    });
+
     Route::group(['prefix' => 'players', 'middleware' => 'can:hr-manager.director'], function () {
         Route::get('/',                          ['as' => 'hr-manager.players.index', 'uses' => 'PlayerController@index']);
         Route::get('/{id}',                      ['as' => 'hr-manager.players.show',  'uses' => 'PlayerController@show']);

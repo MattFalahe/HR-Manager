@@ -5,6 +5,7 @@ return [
     'dashboard'    => 'Dashboard',
     'applications' => 'Applications',
     'members'      => 'Members',
+    'former_members'  => 'Former Members',
     'players'      => 'Players',
     'corp_health'  => 'Corp Health',
     'landings'     => 'Recruitment Pages',
