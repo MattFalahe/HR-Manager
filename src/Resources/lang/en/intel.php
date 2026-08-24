@@ -66,6 +66,15 @@ return [
     'account_notes_intro'   => 'Intel is filed per character, so these are about the same human but recorded elsewhere. Shown here so a dossier is one place rather than several.',
     'account_note_count'    => '{1}:count note|[2,*]:count notes',
 
+    'player_panel_heading' => '{1}:count intel note on this player|[2,*]:count intel notes on this player',
+    'player_panel_intro'   => "Filed against this person's characters. Shown here because a profile is a whole account, and a note written on one character is about the same human.",
+    // Writing a player note straight into the intel database instead
+    'as_intel_label'        => 'Record this in the intel database instead',
+    'as_intel_help'         => "Files it against this player's main character rather than as a player note. Intel outlives their membership, so it stays readable after they leave, and it shows on every one of their characters. It is stored in one place only, not copied, so there is no second version to keep in step. Scoped to this corp, and never shared with recruiters.",
+    'as_intel_saved'        => 'Recorded in the intel database against :name.',
+    'as_intel_no_character' => 'Nothing was saved: this player has no character HR can file intel against. Intel is filed per character, and this account has none HR can see.',
+    'as_intel_failed'       => 'Could not write to the intel database. Check the SeAT logs.',
+
     'app_view_all'       => 'Open the dossier to read all :count',
     'read_full'          => 'read full',
     'open_dossier'       => 'Open',

@@ -211,6 +211,52 @@
         </div>
     @endif
 
+    {{-- Intel on this human. Read straight from the intel tables, never
+         copied here, so the profile and the dossier can never disagree.
+         Notes are filed per character, so each is labelled with which one it
+         was written against. --}}
+    @if(($intelNotes ?? collect())->isNotEmpty())
+        <div class="alert mb-3" style="background: rgba(102,126,234,0.08); border: 1px solid rgba(102,126,234,0.35); color: var(--hr-text-light);">
+            <div style="font-weight: 600; color: var(--hr-text-white);">
+                <i class="fas fa-user-secret"></i>
+                {{ trans_choice('hr-manager::intel.player_panel_heading', $intelNotes->count(), ['count' => $intelNotes->count()]) }}
+            </div>
+            <small class="d-block mt-1 mb-2" style="color: var(--hr-text-muted);">{{ trans('hr-manager::intel.player_panel_intro') }}</small>
+
+            @foreach($intelNotes->take(5) as $inote)
+                <div style="padding: 7px 11px; background: rgba(0,0,0,0.18); border-radius: 4px; margin-bottom: 6px;">
+                    <div class="mb-1">
+                        <a href="{{ route('hr-manager.intel.show', $inote->character_id) }}" style="color: var(--hr-text-white);">
+                            <strong>{{ $intelNoteNames[$inote->character_id] ?? ('Character #' . $inote->character_id) }}</strong>
+                        </a>
+                        @if($inote->scope_corporation_id)
+                            <span class="badge ml-1" style="background: rgba(255,255,255,0.06); color: var(--hr-text-muted); font-size: 0.62rem;">{{ trans('hr-manager::intel.scope_corp') }}</span>
+                        @else
+                            <span class="badge ml-1" style="background: rgba(102,126,234,0.18); color: var(--hr-text-light); font-size: 0.62rem;"><i class="fas fa-globe"></i> {{ trans('hr-manager::intel.scope_global') }}</span>
+                        @endif
+                        @foreach(($inote->tags ?? []) as $itag)
+                            <span class="badge ml-1" style="background: rgba(255,255,255,0.05); color: var(--hr-text-light); border: 1px solid var(--hr-border); font-size: 0.62rem;">{{ $itag }}</span>
+                        @endforeach
+                    </div>
+                    <div style="color: var(--hr-text-light); white-space: pre-wrap; font-size: 0.9rem;">{{ Str::limit($inote->body, 300) }}</div>
+                    <small style="color: var(--hr-text-muted);">
+                        {{ trans('hr-manager::intel.added_by') }} <strong>{{ $inote->author->name ?? 'User #' . $inote->author_id }}</strong>
+                        @hrDate($inote->created_at)
+                    </small>
+                </div>
+            @endforeach
+
+            @if($intelNotes->count() > 5)
+                <small>
+                    <a href="{{ route('hr-manager.intel.show', $intelNotes->first()->character_id) }}" style="color: #9ec5fe;">
+                        <i class="fas fa-folder-open"></i>
+                        {{ trans('hr-manager::intel.app_view_all', ['count' => $intelNotes->count()]) }}
+                    </a>
+                </small>
+            @endif
+        </div>
+    @endif
+
     {{-- Purge role-strip warning. Renders only when this player is
          marked_for_purge. Severity tiers:
            - scheduled within 24h  -> CRITICAL blinking banner
@@ -1797,6 +1843,20 @@
                             {{ trans('hr-manager::notes.make_private') }}
                         </label>
                     </div>
+
+                    {{-- Destination, not a copy: the note is written to one
+                         table or the other, never both, so there is no second
+                         version to drift. --}}
+                    @can('hr-manager.director')
+                        <hr style="border-color: rgba(255,255,255,0.08); margin: 14px 0;">
+                        <div class="form-check">
+                            <input type="checkbox" name="as_intel" value="1" class="form-check-input" id="playerNoteAsIntel">
+                            <label class="form-check-label" for="playerNoteAsIntel">
+                                <i class="fas fa-user-secret"></i> {{ trans('hr-manager::intel.as_intel_label') }}
+                            </label>
+                        </div>
+                        <small class="form-text" style="color: var(--hr-text-muted);">{{ trans('hr-manager::intel.as_intel_help') }}</small>
+                    @endcan
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-hr-secondary" data-dismiss="modal">{{ trans('hr-manager::settings.cancel') }}</button>

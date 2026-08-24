@@ -367,9 +367,39 @@ class PlayerController extends Controller
         $donationFlags = app(\HrManager\Services\DonationScanService::class)
             ->flagsForCharacters($blCharIds, $allowedCorps);
 
+        // Intel on this human. Notes are filed per CHARACTER while a profile is
+        // a whole account, so a note written against an alt was invisible here
+        // even though it is about the same person. Read-only and loaded from
+        // the intel tables directly: no copy lives on the profile, so there is
+        // nothing that can drift out of step with the dossier.
+        $intelNotes      = collect();
+        $intelNoteNames  = [];
+        try {
+            $viewerTier = auth()->user()->can('hr-manager.admin') ? 'admin'
+                : (auth()->user()->can('hr-manager.director') ? 'director' : 'recruiter');
+
+            $intelNotes = app(\HrManager\Services\IntelService::class)->notesForCharacters(
+                $blCharIds,
+                (int) auth()->user()->id,
+                $allowedCorps,
+                $viewerTier
+            );
+
+            if ($intelNotes->isNotEmpty()) {
+                $intelNoteNames = app(\HrManager\Services\NameResolutionService::class)
+                    ->getCharacterNamesWithFallback(
+                        $intelNotes->pluck('character_id')->map(fn ($c) => (int) $c)->unique()->all()
+                    );
+            }
+        } catch (\Throwable $e) {
+            Log::warning('[HR Manager] player intel lookup failed: ' . $e->getMessage());
+        }
+
         return view('hr-manager::players.show', compact(
             'activeBlacklist',
             'donationFlags',
+            'intelNotes',
+            'intelNoteNames',
             'altFlags',
             'identityOrphanHint',
             'identityMergedByName',
@@ -889,11 +919,26 @@ class PlayerController extends Controller
             'corporation_id' => 'required|integer',
             'content'        => 'required|string|max:5000',
             'is_private'     => 'nullable|boolean',
+            'as_intel'       => 'nullable|boolean',
         ]);
 
         $corporationId = (int) $request->corporation_id;
         $this->assertCanAccessCorp($corporationId);
         $this->assertPlayerExistsInCorp($userId, $corporationId);
+
+        // Destination chosen when the note is written, rather than a copy made
+        // afterwards. A player note and an intel note answer different
+        // questions -- one is about managing this member, the other is about
+        // the character and outlives their membership -- and mirroring the text
+        // into both tables would leave two rows that drift apart the first time
+        // anyone edits one. So it goes to exactly one place.
+        if ($request->boolean('as_intel')) {
+            $result = $this->recordPlayerNoteAsIntel($userId, $corporationId, (string) $request->content, $request->boolean('is_private'));
+
+            return redirect()->route('hr-manager.players.show', [
+                'id' => $id, 'corporation_id' => $corporationId,
+            ])->with($result['ok'] ? 'success' : 'error', $result['message']);
+        }
 
         Note::create([
             'noteable_type' => 'player',
@@ -906,6 +951,87 @@ class PlayerController extends Controller
         return redirect()->route('hr-manager.players.show', [
             'id' => $id, 'corporation_id' => $corporationId,
         ])->with('success', trans('hr-manager::notes.note_created'));
+    }
+
+    /**
+     * Write a player note into the intel database instead of the notes table.
+     *
+     * Notes are keyed to a SeAT ACCOUNT and intel to a CHARACTER, so this has
+     * to pick one. It uses the account's main character: the alternative --
+     * filing against every character on the account -- is the duplication that
+     * turned six intended notes into eleven the last time intel spread itself
+     * across an account, and the dossier now shows the whole account anyway, so
+     * one row is read from every one of their characters regardless.
+     *
+     * Scoped to the corp whose page the director was on. A note written while
+     * looking at a specific corp is about that corp's business, and intel with
+     * no scope is visible to every corp on the install.
+     *
+     * @return array{ok:bool, message:string}
+     */
+    private function recordPlayerNoteAsIntel(int $userId, int $corporationId, string $body, bool $isPrivate): array
+    {
+        $mainId = $this->mainCharacterFor($userId);
+        if ($mainId === null) {
+            // Nothing to file against. Say so rather than silently dropping the
+            // note or quietly writing it somewhere the director did not choose.
+            return ['ok' => false, 'message' => trans('hr-manager::intel.as_intel_no_character')];
+        }
+
+        try {
+            $name = app(\HrManager\Services\NameResolutionService::class)->getCharacterName($mainId);
+
+            \HrManager\Models\IntelNote::create([
+                'character_id'         => $mainId,
+                'character_name'       => $name ?: ('Character #' . $mainId),
+                'scope_corporation_id' => $corporationId,
+                'body'                 => $body,
+                'tags'                 => [],
+                // A private note is the director thinking aloud, so it must not
+                // become recruiter-visible just by changing table.
+                'recruiter_visible'    => false,
+                'author_id'            => (int) auth()->user()->id,
+                'expires_at'           => null,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('[HR Manager] player note-to-intel failed: ' . $e->getMessage());
+            return ['ok' => false, 'message' => trans('hr-manager::intel.as_intel_failed')];
+        }
+
+        return [
+            'ok'      => true,
+            'message' => trans('hr-manager::intel.as_intel_saved', [
+                'name' => $name ?: ('#' . $mainId),
+            ]),
+        ];
+    }
+
+    /**
+     * The account's main character, falling back to any character it holds.
+     *
+     * users.main_character_id is what SeAT itself calls the main, so it is the
+     * right answer when set. A fallback matters because an account can hold
+     * characters without ever nominating one, and refusing to record intel over
+     * a missing preference would be a poor trade.
+     */
+    private function mainCharacterFor(int $userId): ?int
+    {
+        try {
+            $main = DB::table('users')->where('id', $userId)->value('main_character_id');
+            if ($main) {
+                return (int) $main;
+            }
+
+            $any = DB::table('refresh_tokens')
+                ->where('user_id', $userId)
+                ->orderBy('character_id')
+                ->value('character_id');
+
+            return $any ? (int) $any : null;
+        } catch (\Throwable $e) {
+            Log::warning('[HR Manager] main character lookup failed: ' . $e->getMessage());
+            return null;
+        }
     }
 
     // -----------------------------------------------------------------
