@@ -142,6 +142,43 @@ class ClassifierService
             }
         }
 
+        // Drop classifications for people who are no longer in this corp.
+        //
+        // The pass above only ever classifies CURRENT members, so it never
+        // adds a stale row -- but it never removed one either, and nothing
+        // else did. So somebody classified dead weight last month and gone
+        // since kept counting toward this corp's health forever: the figures
+        // described a roster that no longer existed, and the longer a corp ran
+        // the more wrong they got.
+        //
+        // Pruned here rather than in a migration because this pass has just
+        // built the definitive list of who IS in the corp, and it runs nightly,
+        // so the table heals itself without anything extra to schedule.
+        try {
+            $keep = $userIds->map(fn ($id) => (int) $id)->all();
+
+            // An empty member list means "we could not see the roster", not
+            // "the corp is empty". Treating it as authoritative would delete
+            // every classification the corp has on the strength of a failed
+            // affiliation sync, which is precisely how the inactive-director
+            // alert once flagged an entire corp at once.
+            if (empty($keep)) {
+                Log::info('[HR Manager] corp ' . $corporationId . ' resolved no members; skipping classification prune.');
+            } else {
+                $pruned = PlayerClassification::forCorporation($corporationId)
+                    ->whereNotIn('user_id', $keep)
+                    ->delete();
+
+                if ($pruned > 0) {
+                    Log::info('[HR Manager] pruned ' . $pruned . ' stale classification(s) for corp ' . $corporationId . '.');
+                }
+            }
+        } catch (\Throwable $e) {
+            // A failed prune leaves the old behaviour, which is wrong but not
+            // worse than it was; it must not cost the run its results.
+            Log::warning('[HR Manager] classification prune failed for corp ' . $corporationId . ': ' . $e->getMessage());
+        }
+
         // Bust the CorpStatusService cache so the Corp Health page reflects
         // the new category counts immediately (without waiting for the
         // 5-min TTL to expire).

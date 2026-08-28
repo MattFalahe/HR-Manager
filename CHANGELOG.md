@@ -33,6 +33,14 @@ All notable changes to HR Manager will be documented in this file.
 - A corp EveWho knows nothing about is now **reported as empty** rather than counting as a silent success.
 - **Scheduled behaviour is unchanged**: with no selector it still refreshes exactly the seeded corps.
 
+### 🐛 Departed members were still counted in corp stats
+
+- **Somebody you kicked kept skewing Corp Health.** The classifier only ever classifies current members, so it never added a stale row, but nothing removed one either: a player classified dead weight last month and gone since kept counting toward that corp's category totals, tier distribution and health score forever. The longer a corp ran, the more its figures described a roster that no longer existed.
+- **Contribution averages had the same fault.** Cached assessment rows are written while somebody is a member and never cleaned up, so reading them by corporation alone folded departed members into the corp's contribution and tax-compliance aggregates.
+- Fixed at both ends. Cached rows are cleared **when the departure is detected**, so a director looking at Corp Health an hour after a kick no longer sees the person they kicked; and the nightly classifier prunes anything left, so the table heals itself without a migration. The read paths also narrow to the current roster, which corrects existing installs on the next page load rather than waiting for a pass.
+- **An account that moves one alt out keeps its classification**, because the human is still a member; only the per-character assessment goes. And a roster that cannot be read is treated as unknown rather than empty, so a failed affiliation sync can never wipe a corp's classifications, which is how the inactive-director alert once managed to flag an entire corp at once.
+- Audited the rest of the plugin for the same shape. The Members and Players lists, the classifier's own subject list and the roster tables were already correct; the historical records (membership events, audit log, donation flags, member archives) keep departed members deliberately, because that is what they are for.
+
 ### 📁 Former Members
 
 - **People who leave are no longer erased.** A departure deleted HR's roster row, and the player profile decides access from *current* corp membership, so the moment somebody's affiliation changed their whole file became unreachable: you had to know which corp they used to be in and switch to it, assuming you could get there at all. There is now a **Former Members** page, alongside Members and Players.

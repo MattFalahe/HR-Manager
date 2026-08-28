@@ -84,6 +84,9 @@ class CorpStatusService
      *  Insights cards share one fetch (corp-wide CWM, else registered cache). */
     private array $memberRowsMemo = [];
 
+    /** Current-member character ids per corp, for the length of one request. */
+    private array $currentCharsMemo = [];
+
     // Section → tab assignment. The controller passes the active tab;
     // only its sections build. Keeping this as a map (not hardcoded per
     // builder) makes it trivial to move a section between tabs later.
@@ -487,7 +490,15 @@ class CorpStatusService
 
         // 2. Fallback: registered-only assessment cache.
         if (Schema::hasColumn('hr_manager_member_assessments', 'lifetime_contribution')) {
+            // Assessment rows are written while somebody is a member and never
+            // removed when they leave, so reading by corporation alone folds
+            // departed members into the corp's contribution figures. Narrowed
+            // to the current roster; a roster we cannot read leaves the old
+            // behaviour rather than emptying the page.
+            $currentChars = $this->currentMemberCharacterIds($corpId);
+
             $rows = MemberAssessment::where('corporation_id', $corpId)
+                ->when($currentChars !== null, fn ($q) => $q->whereIn('character_id', $currentChars))
                 ->get(['character_id', 'lifetime_contribution', 'net_position_6mo', 'tax_compliance_pct', 'total_ratting_income', 'total_mining_value', 'active_months'])
                 ->map(fn ($a) => (object) [
                     'character_id'  => (int) $a->character_id,
@@ -1292,6 +1303,71 @@ class CorpStatusService
      * (full ESI roster), then corporation_member_trackings, then
      * character_affiliations as the sparse last-resort fallback.
      */
+    /**
+     * Character ids currently in this corp.
+     *
+     * Cached tables keyed by (character, corporation) are written when somebody
+     * IS a member and never cleaned up when they stop being one, so reading
+     * them by corporation alone counts people who left. Every aggregate that
+     * describes the CURRENT roster has to intersect with this.
+     *
+     * Returns null when the roster cannot be established. That is deliberately
+     * distinct from an empty array: callers must fall back to their old
+     * behaviour rather than filter everything out, because a failed roster read
+     * would otherwise show a healthy corp as having no members at all.
+     *
+     * @return array<int>|null
+     */
+    private function currentMemberCharacterIds(int $corporationId): ?array
+    {
+        if (array_key_exists($corporationId, $this->currentCharsMemo)) {
+            return $this->currentCharsMemo[$corporationId];
+        }
+
+        foreach (['corporation_members', 'corporation_member_trackings'] as $table) {
+            if (!Schema::hasTable($table)) {
+                continue;
+            }
+            try {
+                $ids = DB::table($table)
+                    ->where('corporation_id', $corporationId)
+                    ->pluck('character_id')
+                    ->map(fn ($c) => (int) $c)
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all();
+                if (!empty($ids)) {
+                    return $this->currentCharsMemo[$corporationId] = $ids;
+                }
+            } catch (\Throwable $e) {
+                continue;
+            }
+        }
+
+        // Sparse fallback: only characters SeAT has resolved, but better than
+        // counting departed members.
+        if (Schema::hasTable('character_affiliations')) {
+            try {
+                $ids = DB::table('character_affiliations')
+                    ->where('corporation_id', $corporationId)
+                    ->pluck('character_id')
+                    ->map(fn ($c) => (int) $c)
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all();
+                if (!empty($ids)) {
+                    return $this->currentCharsMemo[$corporationId] = $ids;
+                }
+            } catch (\Throwable $e) {
+                // fall through
+            }
+        }
+
+        return $this->currentCharsMemo[$corporationId] = null;
+    }
+
     private function resolveRosterSource(int $corporationId): string
     {
         foreach (['corporation_members', 'corporation_member_trackings'] as $table) {
@@ -2326,7 +2402,12 @@ class CorpStatusService
             return ['available' => false, 'reason' => 'cwm_columns_missing'];
         }
 
+        // Same staleness: departed members keep an assessment row, and without
+        // this their contribution history skews the corp's averages forever.
+        $currentChars = $this->currentMemberCharacterIds($corpId);
+
         $rows = MemberAssessment::where('corporation_id', $corpId)
+            ->when($currentChars !== null, fn ($q) => $q->whereIn('character_id', $currentChars))
             ->whereNotNull('lifetime_contribution')
             ->get([
                 'lifetime_contribution',

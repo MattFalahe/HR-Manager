@@ -422,10 +422,60 @@ class MembershipChangeService
             Log::warning('[HR Manager] member archive on leave failed: ' . $e->getMessage());
         }
 
+        // Then drop the cached per-member rows for this corp, so the corp's
+        // health figures stop counting somebody who is no longer in it.
+        //
+        // Strictly after the archive above, which reads exactly these rows to
+        // freeze their tier and contribution: clearing first would archive a
+        // blank record. The nightly classifier prunes these too, but a
+        // director looking at Corp Health an hour after a kick should not still
+        // see the person they kicked.
+        $this->clearMembershipCaches($charId, $corporationId, $playerStillPresent);
+
         try {
             $this->notifications->notifyMemberLeft($corporationId, $charId, $mainId, $playerStillPresent);
         } catch (\Throwable $e) {
             Log::warning('[HR Manager] membership leave notify failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Remove the cached rows that describe this character as a member of this
+     * corp.
+     *
+     * member_assessments is per character, so it always goes. The player
+     * classification is per ACCOUNT, so it only goes when the account has no
+     * character left in the corp -- somebody who moved one alt out is still a
+     * member, and deleting their classification would drop a current member
+     * from the corp's health figures instead of a departed one.
+     */
+    private function clearMembershipCaches(int $charId, int $corporationId, bool $playerStillPresent): void
+    {
+        try {
+            if (Schema::hasTable('hr_manager_member_assessments')) {
+                DB::table('hr_manager_member_assessments')
+                    ->where('character_id', $charId)
+                    ->where('corporation_id', $corporationId)
+                    ->delete();
+            }
+        } catch (\Throwable $e) {
+            Log::warning('[HR Manager] assessment cleanup on leave failed: ' . $e->getMessage());
+        }
+
+        if ($playerStillPresent) {
+            return; // the human is still in this corp on another character
+        }
+
+        try {
+            $userId = $this->userIdForCharacter($charId);
+            if ($userId !== null && Schema::hasTable('hr_manager_player_classifications')) {
+                DB::table('hr_manager_player_classifications')
+                    ->where('user_id', $userId)
+                    ->where('corporation_id', $corporationId)
+                    ->delete();
+            }
+        } catch (\Throwable $e) {
+            Log::warning('[HR Manager] classification cleanup on leave failed: ' . $e->getMessage());
         }
     }
 
