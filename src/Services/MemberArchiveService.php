@@ -74,22 +74,53 @@ class MemberArchiveService
             $archive += $this->contributionForStint($characterId, $joinedAt, $leftAt);
             $archive += $this->recordCounts($characterId, $userId);
 
-            // Keyed on the stint: departure detection is overlap-guarded, but a
-            // re-run must not file the same leave twice.
-            MemberArchive::updateOrCreate(
-                [
-                    'character_id'   => $characterId,
-                    'corporation_id' => $corporationId,
-                    'left_at'        => $leftAt,
-                ],
-                $archive
-            );
+            $this->writeStint($characterId, $corporationId, $joinedAt, $archive);
 
             return true;
         } catch (\Throwable $e) {
             Log::warning('[HR Manager] member archive failed for ' . $characterId . ': ' . $e->getMessage());
             return false;
         }
+    }
+
+    /**
+     * Write the stint, updating the existing record when this is the same one.
+     *
+     * This used to be an updateOrCreate keyed on left_at, which is set to
+     * now() a few lines earlier -- so the match condition held a fresh
+     * timestamp on every call and could never find the previous row. It read
+     * like a guard against double-filing a departure while being, in fact,
+     * an unconditional insert.
+     *
+     * A stint is identified by when it STARTED, which does not move. When the
+     * start cannot be dated (no corp history for the character) there is
+     * nothing stable to match on, so a departure already recorded within the
+     * last day is treated as the same one: re-running detection must not
+     * produce a second record, and two genuine stints a day apart are not a
+     * real scenario.
+     */
+    private function writeStint(int $characterId, int $corporationId, ?Carbon $joinedAt, array $archive): void
+    {
+        $existing = MemberArchive::where('character_id', $characterId)
+            ->where('corporation_id', $corporationId)
+            ->orderByDesc('left_at')
+            ->first();
+
+        $sameStint = false;
+        if ($existing !== null) {
+            if ($joinedAt !== null && $existing->joined_at !== null) {
+                $sameStint = $existing->joined_at->equalTo($joinedAt);
+            } elseif ($joinedAt === null && $existing->left_at !== null) {
+                $sameStint = $existing->left_at->greaterThan(now()->subDay());
+            }
+        }
+
+        if ($sameStint) {
+            $existing->update($archive);
+            return;
+        }
+
+        MemberArchive::create($archive);
     }
 
     /**
@@ -197,12 +228,15 @@ class MemberArchiveService
         }
 
         // A nominated main is a better label than whichever alt left last.
+        // Resolved for every person in one query: asking per row cost a query
+        // each, and this page shows up to 500 of them.
+        $mainNames = $this->mainNamesForUsers(
+            array_values(array_filter(array_column($people, 'user_id')))
+        );
+
         foreach ($people as $key => $person) {
-            if ($person['user_id']) {
-                $mainName = $this->mainNameForUser((int) $person['user_id']);
-                if ($mainName !== null) {
-                    $people[$key]['display_name'] = $mainName;
-                }
+            if ($person['user_id'] && isset($mainNames[(int) $person['user_id']])) {
+                $people[$key]['display_name'] = $mainNames[(int) $person['user_id']];
             }
             $people[$key]['corporation_ids'] = array_values($person['corporation_ids']);
         }
@@ -420,6 +454,12 @@ class MemberArchiveService
      * Wallet and mining over this stint only, so the figure means "contributed
      * while a member" rather than "ever".
      *
+     * mining_contributed is ore UNITS (mining_ledger.quantity), not ISK. The
+     * ledger records what was pulled out of the rock, and converting to value
+     * would need prices from the day of each entry, which is exactly the sort
+     * of after-the-fact reconstruction this record exists to avoid. The UI
+     * labels it as units for the same reason.
+     *
      * @return array<string, mixed>
      */
     private function contributionForStint(int $characterId, ?Carbon $from, Carbon $to): array
@@ -540,17 +580,38 @@ class MemberArchiveService
         }
     }
 
-    private function mainNameForUser(int $userId): ?string
+    /**
+     * Nominated main character names for many accounts at once.
+     *
+     * @param array<int> $userIds
+     * @return array<int, string>
+     */
+    private function mainNamesForUsers(array $userIds): array
     {
-        try {
-            $name = DB::table('users')
-                ->join('character_infos as ci', 'ci.character_id', '=', 'users.main_character_id')
-                ->where('users.id', $userId)
-                ->value('ci.name');
-
-            return $name ? (string) $name : null;
-        } catch (\Throwable $e) {
-            return null;
+        $userIds = array_values(array_unique(array_filter(
+            array_map('intval', $userIds), fn ($v) => $v > 0
+        )));
+        if (empty($userIds)) {
+            return [];
         }
+
+        $out = [];
+        try {
+            foreach (array_chunk($userIds, 1000) as $chunk) {
+                $rows = DB::table('users')
+                    ->join('character_infos as ci', 'ci.character_id', '=', 'users.main_character_id')
+                    ->whereIn('users.id', $chunk)
+                    ->get(['users.id', 'ci.name']);
+                foreach ($rows as $r) {
+                    if ($r->name) {
+                        $out[(int) $r->id] = (string) $r->name;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::debug('[HR Manager] main-name batch lookup failed: ' . $e->getMessage());
+        }
+
+        return $out;
     }
 }

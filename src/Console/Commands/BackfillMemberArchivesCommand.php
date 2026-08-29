@@ -178,6 +178,13 @@ class BackfillMemberArchivesCommand extends Command
                 $byChar[(int) $r->character_id][] = $r;
             }
 
+            // Gather the stints first, resolve names and accounts for the whole
+            // chunk after. Looking each one up inline cost three queries per
+            // stint, and a backfill walks every stint the corp has ever had.
+            $found         = [];
+            $stintCharIds  = [];
+            $destCorps     = [];
+
             foreach ($byChar as $charId => $history) {
                 foreach ($history as $i => $row) {
                     if ((int) $row->corporation_id !== $corporationId) {
@@ -199,17 +206,17 @@ class BackfillMemberArchivesCommand extends Command
 
                     $joinedAt = $row->start_date ? Carbon::parse($row->start_date) : null;
 
-                    $out[] = [
+                    $stintCharIds[(int) $charId]            = (int) $charId;
+                    $destCorps[(int) $next->corporation_id] = (int) $next->corporation_id;
+
+                    $found[] = [
                         'character_id'   => (int) $charId,
                         'corporation_id' => $corporationId,
-                        'character_name' => $this->characterName((int) $charId),
-                        'user_id'        => $this->userIdFor((int) $charId),
                         'joined_at'      => $joinedAt,
                         'left_at'        => $leftAt,
                         'days_in_corp'   => $joinedAt ? max(0, $joinedAt->diffInDays($leftAt)) : null,
 
-                        'destination_corporation_id'   => (int) $next->corporation_id,
-                        'destination_corporation_name' => $this->corporationName((int) $next->corporation_id),
+                        'destination_corporation_id' => (int) $next->corporation_id,
 
                         // Unknowable in hindsight. Left honest rather than
                         // guessed: whether somebody was purged is a fact about
@@ -219,6 +226,21 @@ class BackfillMemberArchivesCommand extends Command
                         'token_valid_at_departure' => false,
                     ];
                 }
+            }
+
+            if (empty($found)) {
+                continue;
+            }
+
+            $names     = $this->characterNames(array_values($stintCharIds));
+            $userIds   = $this->userIdsFor(array_values($stintCharIds));
+            $corpNames = $this->corporationNames(array_values($destCorps));
+
+            foreach ($found as $stint) {
+                $stint['character_name'] = $names[$stint['character_id']] ?? null;
+                $stint['user_id']        = $userIds[$stint['character_id']] ?? null;
+                $stint['destination_corporation_name'] = $corpNames[$stint['destination_corporation_id']] ?? null;
+                $out[] = $stint;
             }
         }
 
@@ -251,36 +273,77 @@ class BackfillMemberArchivesCommand extends Command
         return [];
     }
 
-    private function characterName(int $characterId): ?string
+    /**
+     * @param array<int> $characterIds
+     * @return array<int, string>
+     */
+    private function characterNames(array $characterIds): array
     {
-        try {
-            $n = DB::table('character_infos')->where('character_id', $characterId)->value('name');
-            return $n ? (string) $n : null;
-        } catch (\Throwable $e) {
-            return null;
-        }
+        return $this->lookup('character_infos', 'character_id', 'name', $characterIds);
     }
 
-    private function corporationName(int $corporationId): ?string
+    /**
+     * @param array<int> $corporationIds
+     * @return array<int, string>
+     */
+    private function corporationNames(array $corporationIds): array
     {
         if (!Schema::hasTable('corporation_infos')) {
-            return null;
+            return [];
         }
-        try {
-            $n = DB::table('corporation_infos')->where('corporation_id', $corporationId)->value('name');
-            return $n ? (string) $n : null;
-        } catch (\Throwable $e) {
-            return null;
-        }
+
+        return $this->lookup('corporation_infos', 'corporation_id', 'name', $corporationIds);
     }
 
-    private function userIdFor(int $characterId): ?int
+    /**
+     * Owning account per character. Reads through soft-deleted tokens: somebody
+     * who dropped their key years ago is still the same human, and an archive
+     * with no account link cannot show their notes.
+     *
+     * @param array<int> $characterIds
+     * @return array<int, int>
+     */
+    private function userIdsFor(array $characterIds): array
     {
-        try {
-            $id = DB::table('refresh_tokens')->where('character_id', $characterId)->value('user_id');
-            return $id ? (int) $id : null;
-        } catch (\Throwable $e) {
-            return null;
+        $out = [];
+        foreach ($this->lookup('refresh_tokens', 'character_id', 'user_id', $characterIds) as $charId => $userId) {
+            if ($userId) {
+                $out[$charId] = (int) $userId;
+            }
         }
+
+        return $out;
+    }
+
+    /**
+     * One keyed read, chunked. Every batch lookup here is the same shape, and
+     * three near-identical copies would be three places to get the chunking
+     * wrong.
+     *
+     * @param array<int> $ids
+     * @return array<int, mixed>
+     */
+    private function lookup(string $table, string $keyColumn, string $valueColumn, array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), fn ($v) => $v > 0)));
+        if (empty($ids)) {
+            return [];
+        }
+
+        $out = [];
+        try {
+            foreach (array_chunk($ids, 1000) as $chunk) {
+                $rows = DB::table($table)->whereIn($keyColumn, $chunk)->get([$keyColumn, $valueColumn]);
+                foreach ($rows as $r) {
+                    if ($r->{$valueColumn} !== null && $r->{$valueColumn} !== '') {
+                        $out[(int) $r->{$keyColumn}] = $r->{$valueColumn};
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::debug('[HR Manager] archive backfill lookup on ' . $table . ' failed: ' . $e->getMessage());
+        }
+
+        return $out;
     }
 }

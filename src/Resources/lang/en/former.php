@@ -52,7 +52,7 @@ return [
     'tier_at_departure'  => 'Tier when they left',
     'class_at_departure' => 'Status when they left',
     'wallet_contributed' => 'Wallet contributed',
-    'mining_contributed' => 'Mining contributed',
+    'mining_contributed' => 'Ore mined (units)',
 
     'token_state'     => 'ESI token',
     'token_live'      => 'Still valid',
