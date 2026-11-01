@@ -1244,6 +1244,14 @@
                     'watchlist_added'                    => ['fa-user-lock',        'var(--hr-warning, #ffc107)'],
                     'watchlist_cleared'                  => ['fa-user-check',       'var(--hr-info, #17a2b8)'],
                     'hr.player.blacklist_override'       => ['fa-ban',              'var(--hr-danger, #dc3545)'],
+                    // Mining Manager bills and theft incidents
+                    'mining.tax_created'                 => ['fa-file-invoice-dollar', 'var(--hr-text-muted, #9ca3af)'],
+                    'mining.invoice_sent'                => ['fa-paper-plane',      'var(--hr-text-muted, #9ca3af)'],
+                    'mining.tax_paid'                    => ['fa-check-circle',     'var(--hr-success, #28a745)'],
+                    'mining.tax_overdue'                 => ['fa-exclamation-circle', 'var(--hr-danger, #dc3545)'],
+                    'mining.tax_written_off'             => ['fa-hand-holding-usd', 'var(--hr-info, #17a2b8)'],
+                    'mining.theft_detected'              => ['fa-user-secret',      'var(--hr-danger, #dc3545)'],
+                    'mining.theft_resolved'              => ['fa-user-check',       'var(--hr-success, #28a745)'],
                 ];
 
                 // event_type -> human-readable label. Unknown keys fall back to
@@ -1273,7 +1281,39 @@
                     'watchlist_application_hit'               => 'Flagged character on a new application',
                     'watchlist_added'                         => 'Added to watchlist',
                     'watchlist_cleared'                       => 'Cleared from watchlist',
+                    'mining.tax_created'                      => 'Mining tax bill raised',
+                    'mining.invoice_sent'                     => 'Mining tax invoice sent',
+                    'mining.tax_paid'                         => 'Mining tax bill paid',
+                    'mining.tax_overdue'                      => 'Mining tax bill overdue',
+                    'mining.tax_written_off'                  => 'Mining tax bill let off',
+                    'mining.theft_detected'                   => 'Mining theft incident opened',
+                    'mining.theft_resolved'                   => 'Mining theft incident closed',
                 ];
+
+                // Mining Manager sends machine values; the timeline says them in
+                // words beside the label, as it does a reason.
+                $miningDetails = [
+                    'overdue_tax'      => 'overdue tax',
+                    'guest_mining_off' => 'mined while guests may not',
+                    'resolved'         => 'resolved',
+                    'false_alarm'      => 'false alarm',
+                    'removed_paid'     => 'paid up',
+                    'waived'           => 'waived',
+                    'exempted'         => 'exempted',
+                ];
+                $eventDetail = function ($event) use ($miningDetails) {
+                    $payload = $event->payload ?? [];
+                    $detail = $payload['reason'] ?? null;
+                    if (in_array($event->event_type, ['mining.theft_resolved', 'mining.tax_written_off'], true)) {
+                        $detail = $payload['status'] ?? null;
+                    } elseif ($event->event_type === 'mining.tax_paid' && !empty($payload['late'])) {
+                        return 'late';
+                    }
+
+                    return $detail !== null && str_starts_with($event->event_type, 'mining.')
+                        ? ($miningDetails[$detail] ?? $detail)
+                        : $detail;
+                };
 
                 $humanizeEvent = function (string $type) {
                     $t = preg_replace('/^(hr|member|player)\./', '', $type);
@@ -1308,7 +1348,7 @@
                     @forelse($history as $event)
                         @php
                             [$icon, $color] = $eventIcons[$event->event_type] ?? ['fa-circle', 'var(--hr-text-muted, #9ca3af)'];
-                            $payloadReason = $event->payload['reason'] ?? null;
+                            $payloadReason = $eventDetail($event);
                             $eventLabel = $eventLabels[$event->event_type] ?? $humanizeEvent($event->event_type);
                             $actorId = $event->actor_user_id;
                             $actorName = $actorId ? ($historyActorNames[$actorId] ?? ('User #' . $actorId)) : null;
