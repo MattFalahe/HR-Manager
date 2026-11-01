@@ -64,6 +64,7 @@ All notable changes to HR Manager will be documented in this file.
 - **A mining event's start and completion were dropped.** History filed Mining Manager's events under the mining event's own id, which its announcement, start and completion share, so the last two looked like repeats of the first. Each is filed under the key Manager Core gives it now. Mining Manager sends these from 3.0.0, so nothing was lost before.
 - **Mining counts toward a member's last activity.** The last-activity date read a Mining Manager table that does not exist, so mining never moved it. It now takes the last day the character mined from the mining ledger.
 - **Mining was counted twice where both of Mining Manager's sources saw it.** When a character's own records and a structure's observer report the same mining, Mining Manager keeps one ledger row and sets the other aside. HR read the set-aside rows too: in a player's top ores and systems, mining engagement and moon ore value, the corp's miner count, and the archive kept when someone leaves. They are left out now.
+- **A bill let off still marked a member down.** Tax compliance counted Mining Manager bills a director had waived or exempted as owed and unpaid, so a member could drop in compliance, or show as an untaxed earner on Corp Health, for a bill nobody asked them to pay. Mining Manager counts those bills as never billed, and HR does now too.
 
 ### 🐛 Fixed
 
