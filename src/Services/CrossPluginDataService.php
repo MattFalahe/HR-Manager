@@ -421,8 +421,14 @@ class CrossPluginDataService
                 ->orderBy('created_at', 'desc')
                 ->get();
 
-            $totalOwed = $taxes->sum('amount_owed');
-            $totalPaid = $taxes->sum('amount_paid');
+            // A bill a director let off, waived or exempted, counts as never
+            // billed in Mining Manager. Read as owed and unpaid it marked the
+            // member down, and could list them as an untaxed earner on Corp
+            // Health, for a bill nobody was asked to pay.
+            $billed = $taxes->whereNotIn('status', ['waived', 'exempted']);
+
+            $totalOwed = $billed->sum('amount_owed');
+            $totalPaid = $billed->sum('amount_paid');
 
             return [
                 'available'      => true,
