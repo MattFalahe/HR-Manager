@@ -376,6 +376,7 @@ class CorpStatusService
         if (Schema::hasTable('mining_ledger')) {
             $minerIds = DB::table('mining_ledger')
                 ->whereIn('character_id', $rosterIds)
+                ->whereNull('deleted_at')
                 ->where('date', '>=', $since)
                 ->distinct()
                 ->pluck('character_id')->map(fn($id) => (int) $id)->all();

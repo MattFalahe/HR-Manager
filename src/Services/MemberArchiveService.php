@@ -486,6 +486,7 @@ class MemberArchiveService
             if (Schema::hasTable('mining_ledger')) {
                 $q = DB::table('mining_ledger')
                     ->where('character_id', $characterId)
+                    ->whereNull('deleted_at')
                     ->where('date', '<=', $to);
                 if ($from) {
                     $q->where('date', '>=', $from);

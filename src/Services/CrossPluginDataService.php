@@ -127,8 +127,11 @@ class CrossPluginDataService
             return ['available' => false];
         }
         try {
+            // Mining Manager soft-deletes a ledger row that two ESI sources both
+            // reported, and the query builder does not skip those as its model would.
             $rows = DB::table('mining_ledger')
                 ->where('character_id', $characterId)
+                ->whereNull('deleted_at')
                 ->where('date', '>=', now()->subMonths($months)->startOfMonth())
                 ->groupBy('type_id')
                 ->selectRaw('type_id, SUM(quantity) as qty')
@@ -173,6 +176,7 @@ class CrossPluginDataService
         try {
             $rows = DB::table('mining_ledger')
                 ->where('character_id', $characterId)
+                ->whereNull('deleted_at')
                 ->where('date', '>=', now()->subMonths($months)->startOfMonth())
                 ->groupBy('solar_system_id')
                 ->selectRaw('solar_system_id, SUM(quantity) as qty, COUNT(*) as entries')
@@ -333,6 +337,7 @@ class CrossPluginDataService
             } else {
                 $agg = DB::table('mining_ledger')
                     ->whereIn('character_id', $characterIds)
+                    ->whereNull('deleted_at')
                     ->where('date', '>=', $since)
                     ->selectRaw("SUM(total_value) AS val, COUNT(DISTINCT DATE_FORMAT(date, '%Y-%m')) AS months_active")
                     ->first();
@@ -379,6 +384,7 @@ class CrossPluginDataService
                     if (!empty($moonStructures)) {
                         $out['moon_ore_value'] = (float) DB::table('mining_ledger')
                             ->whereIn('character_id', $characterIds)
+                            ->whereNull('deleted_at')
                             ->whereIn('observer_id', $moonStructures)
                             ->where('is_moon_ore', 1)
                             ->where('date', '>=', $since)
