@@ -58,6 +58,13 @@ All notable changes to HR Manager will be documented in this file.
 - **The intel index has an Open button.** The character name was already a link but styled to look like plain text, so nothing on a row invited a click and a trimmed note was as far as you could get. Rows now carry an explicit action, the name reads as a link, and a note longer than the trim says so.
 - Scope visibility is unchanged throughout: widening the character set does not widen what a viewer is permitted to read, because the filtering happens inside the query.
 
+### ⛏️ Mining Manager on a player's page
+
+- **Bills and theft incidents read properly on History.** A Mining Manager bill raised, invoiced, paid, overdue or let off, and a theft incident opened or closed, each have their own label and icon, and the detail is said in words ("overdue tax", "paid up", "false alarm", "late") rather than as a key. Mining Manager sends the paid, overdue and let-off bills and the closed incidents from 3.0.0.
+- **A mining event's start and completion were dropped.** History filed Mining Manager's events under the mining event's own id, which its announcement, start and completion share, so the last two looked like repeats of the first. Each is filed under the key Manager Core gives it now. Mining Manager sends these from 3.0.0, so nothing was lost before.
+- **Mining counts toward a member's last activity.** The last-activity date read a Mining Manager table that does not exist, so mining never moved it. It now takes the last day the character mined from the mining ledger.
+- **Mining was counted twice where both of Mining Manager's sources saw it.** When a character's own records and a structure's observer report the same mining, Mining Manager keeps one ledger row and sets the other aside. HR read the set-aside rows too: in a player's top ores and systems, mining engagement and moon ore value, the corp's miner count, and the archive kept when someone leaves. They are left out now.
+
 ### 🐛 Fixed
 
 - **EveWho rosters were silently capped at 500 members, and cost 20 requests to get there.** EveWho's corplist endpoint ignores its own pagination parameter: every page number returns a byte-identical page 1, while the response still reports `pages: 2, has_next: true`. HR followed `has_next`, so it re-fetched page 1 until it hit the 20-page safety cap and finished with the 500 rows the first request already had. Verified against a 717-member corp on 2026-08-13; `?page`, `?p`, `?offset` and `?start` all behave the same way.
