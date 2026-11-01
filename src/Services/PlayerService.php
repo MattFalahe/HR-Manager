@@ -474,8 +474,9 @@ class PlayerService
 
     /**
      * Max activity timestamp across every signal we have access to:
+     *   - corporation_member_trackings logins (SeAT-native)
      *   - character_wallet_journals (SeAT-native, always available)
-     *   - mining_manager_* (when MM installed)
+     *   - mining_ledger (when MM installed)
      *   - corp_wallet_manager via bridge (when CWM installed)
      *
      * Skipped for v1.2.0: industry jobs, zKill kills. Add as new branches
@@ -517,16 +518,18 @@ class PlayerService
             }
         }
 
-        // Mining Manager — last mining summary record. Same defensive
+        // Mining Manager: the last day the character mined. Taken from the
+        // ledger, not the monthly summaries, whose month would put the last
+        // activity at the end of the month, ahead of today. Same defensive
         // class_exists pattern as CrossPluginDataService.
-        if (class_exists('MiningManager\Models\MiningLedgerMonthlySummary')) {
+        if (class_exists('MiningManager\Models\MiningLedger')) {
             try {
-                $month = DB::table('mining_manager_ledger_monthly_summaries')
+                $date = DB::table('mining_ledger')
                     ->where('character_id', $characterId)
-                    ->max('month');
-                if ($month) {
-                    // monthly aggregate; use end-of-month as the proxy timestamp
-                    $candidates[] = Carbon::parse($month)->endOfMonth();
+                    ->whereNull('deleted_at')
+                    ->max('date');
+                if ($date) {
+                    $candidates[] = Carbon::parse($date);
                 }
             } catch (\Throwable $e) {
                 // MM table may not be present even if class is autoloaded
