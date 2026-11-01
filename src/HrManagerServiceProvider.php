@@ -198,6 +198,14 @@ class HrManagerServiceProvider extends AbstractSeatPlugin
                 // handler does. Mining Manager's event_id is its mining event's
                 // own id, the same on that event's created, started and
                 // completed, so keyed on it the last two were taken for repeats.
+                // A raised bill is keyed on the bill: Manager Core 1.0.3 and
+                // earlier key it on the month and the character, which both
+                // bills of a twice-monthly month share, and this key is kept
+                // for good.
+                $idempotencyKey = $eventName === 'mining.tax_created' && isset($payload['tax_id'])
+                    ? 'tax_created:' . $payload['tax_id']
+                    : ($payload['idempotency_key'] ?? $payload['source_reference'] ?? $payload['event_id'] ?? null);
+
                 app(\HrManager\Services\HistoryEventService::class)->record(
                     $eventName,
                     $payload,
@@ -206,10 +214,7 @@ class HrManagerServiceProvider extends AbstractSeatPlugin
                         'corporation_id'  => $payload['corporation_id'] ?? null,
                         'occurred_at'     => $payload['occurred_at'] ?? now(),
                         'source_plugin'   => $publisher,
-                        'idempotency_key' => $payload['idempotency_key']
-                            ?? $payload['source_reference']
-                            ?? $payload['event_id']
-                            ?? null,
+                        'idempotency_key' => $idempotencyKey,
                     ]
                 );
 
