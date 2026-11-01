@@ -193,8 +193,11 @@ class HrManagerServiceProvider extends AbstractSeatPlugin
             $bridge->registerCapability('hr-manager', 'hr.onMiningEvent', function ($eventName, $publisher, array $payload) {
                 $characterId = $payload['character_id'] ?? null;
 
-                // Persist the event for the player timeline (idempotent via
-                // source_reference)
+                // Persist the event for the player timeline, idempotent on the
+                // key Manager Core gives every registered topic, as the blueprint
+                // handler does. Mining Manager's event_id is its mining event's
+                // own id, the same on that event's created, started and
+                // completed, so keyed on it the last two were taken for repeats.
                 app(\HrManager\Services\HistoryEventService::class)->record(
                     $eventName,
                     $payload,
@@ -203,7 +206,8 @@ class HrManagerServiceProvider extends AbstractSeatPlugin
                         'corporation_id'  => $payload['corporation_id'] ?? null,
                         'occurred_at'     => $payload['occurred_at'] ?? now(),
                         'source_plugin'   => $publisher,
-                        'idempotency_key' => $payload['source_reference']
+                        'idempotency_key' => $payload['idempotency_key']
+                            ?? $payload['source_reference']
                             ?? $payload['event_id']
                             ?? null,
                     ]
