@@ -74,6 +74,13 @@ All notable changes to HR Manager will be documented in this file.
 - **Last activity still reads every source it always did**, the corp-side bounty rows included. Those are not redundant with a character's own journal: a member whose wallet scope is missing or revoked has no personal entries at all, and the corp's record of paying them is then the only evidence they were out ratting. Checked character by character against the old result, that case among them.
 - One deliberate change: the ratting signal **no longer needs Manager Core**, since it comes straight from SeAT's own table. On an install without Manager Core a member's last activity can now read more recently than HR used to think, never less.
 
+### 🧪 Tests
+
+- Unit tests for the figures the classifier runs on, and checks on the source itself: Blade directives closed the way Blade reads them, language keys that exist, migrations named as Laravel needs them, index names inside what MySQL allows, nothing writing to SeAT's tables beyond the few interfaces SeAT expects a plugin to drive, every command registered, and the schedule matching the list the Diagnostic page checks it against. They need no SeAT and no database, and run on every push on PHP 8.1 to 8.4.
+- One check exists because of a fatal that took every container down on boot. Symfony's `Command` declares a set of methods public, and narrowing any of them is an error at class-load rather than at call, so `php -l` says nothing and the plugin fails to install instead of the command failing to run. Every command is now read for it.
+- The activity tests count reads as well as checking answers. A read per character and a read per batch both give the right figure, and the difference between them is the entire reason the batched read exists, so the cost is asserted rather than assumed.
+- Each check was confirmed to fail when the thing it describes is broken, rather than only to pass when it is not. That is what turned up a gap in one of them: the test for a bounty paid by a corp somebody has since left was passing on the query's corp filter and never reaching the guard it was written for.
+
 ### 🐛 Fixed
 
 - **EveWho rosters were silently capped at 500 members, and cost 20 requests to get there.** EveWho's corplist endpoint ignores its own pagination parameter: every page number returns a byte-identical page 1, while the response still reports `pages: 2, has_next: true`. HR followed `has_next`, so it re-fetched page 1 until it hit the 20-page safety cap and finished with the 500 rows the first request already had. Verified against a 717-member corp on 2026-08-13; `?page`, `?p`, `?offset` and `?start` all behave the same way.
@@ -81,6 +88,8 @@ All notable changes to HR Manager will be documented in this file.
 - **The EveWho roster is now merged with SeAT's own affiliation data instead of replacing it.** Switching a corp to the back-fill used to swap the roster source wholesale, dropping any character SeAT already placed in that corp. Those are disproportionately your *registered* members, which is precisely who a director needs on the page. The two are unioned now, so coverage can only go up. Rows carry which source they came from, and the EveWho badge still only appears on characters that genuinely came from EveWho alone.
 - **The shortfall is measured against ESI, not EveWho.** `/corporations/{id}/` is public and unauthenticated: the member *list* needs a director token but the *count* does not, so CCP's own figure is available as a yardstick. On one corp checked while writing this, ESI said 719, EveWho 717 and zKillboard 702; only the first is not an aggregator's estimate. EveWho's `total` is still used as a fallback when ESI is unreachable.
 - **A truncated roster now says so.** The command names the corp, both figures, and the split between sources, so when a pull comes back short rather than letting 500 read as the corp's real size. A public source can only infer membership from public activity, so it is always a little short; a director token with `read_corporation_membership` remains the only way to see a full roster.
+
+- **The Diagnostic page was not checking one of the scheduled commands.** `hr-manager:warm-player-profiles` has been on the schedule since it shipped but was missing from the list the health check compares against, so had it ever fallen off the schedule, nothing would have said so. That list and the schedule are now held to each other by a test, which is how this turned up.
 
 ### 🔔 Changed
 

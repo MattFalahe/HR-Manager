@@ -1,0 +1,13 @@
+{
+    "name": "mattfalahe/hr-manager-tests",
+    "description": "Runs HR Manager's tests on their own, with no SeAT and no database",
+    "license": "GPL-2.0-or-later",
+    "require-dev": {
+        "illuminate/collections": "^10.0",
+        "nesbot/carbon": "^2.72",
+        "phpunit/phpunit": "^10.5"
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

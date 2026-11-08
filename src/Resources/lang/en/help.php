@@ -723,6 +723,7 @@ return [
     'cmd_prune_audit_log'   => 'Delete Activity Log entries past the 180-day retention window (override with <code>--days=N</code>). Runs daily at 04:30, and runs even when the Activity Log feature is off so a disabled log still drains rather than lingering. Cheap when there is nothing to remove.',
     'cmd_diagnose'          => 'Print a self-test summary to stdout for support tickets. Run on demand.',
     'cmd_backfill_buyback'  => 'One-time seed of historical Buyback Manager offers and completed contracts into HR\'s buyback activity, so the contribution panels have history immediately. Run by hand after enabling the Buyback integration; live data flows via the EventBus thereafter.',
+    'cmd_backfill_member_archives' => 'Rebuilds Former Member records for people who left <strong>before</strong> that page existed, from SeAT\'s corporation histories. Departures from here on are captured on the day they happen and need nothing run by hand. Everything this writes is badged <em>reconstructed</em>, because it holds only what survived in SeAT: contribution figures and the reason somebody left are usually gone, so it is a pointer rather than a full account. It never overwrites a record that was captured properly, and re-running it is safe.',
 
     'commands_schedule_note' => 'Cron schedules are registered by HR Manager\'s ScheduleSeeder and visible in <strong>Settings → Schedules</strong>.',
 

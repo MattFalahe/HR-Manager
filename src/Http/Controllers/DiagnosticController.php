@@ -130,7 +130,8 @@ class DiagnosticController extends Controller
         'hr-manager:detect-token-loss', 'hr-manager:scan-watchlist',
         'hr-manager:sweep-access-grants', 'hr-manager:token-coverage-digest',
         'hr-manager:prune-audit-log', 'hr-manager:send-onboarding-welcomes',
-        'hr-manager:reconcile-suspected-alts',
+        'hr-manager:reconcile-suspected-alts', 'hr-manager:warm-player-profiles',
+        'hr-manager:sync-external-rosters', 'hr-manager:scan-donations',
     ];
 
     private const VALID_TABS = ['health', 'master', 'validation', 'ecosystem', 'settings', 'integrity', 'notifications', 'trace'];

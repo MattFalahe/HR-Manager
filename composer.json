@@ -52,7 +52,7 @@
     }
   },
   "scripts": {
-    "test": "vendor/bin/phpunit"
+    "test": "tests/vendor/bin/phpunit"
   },
   "minimum-stability": "stable",
   "prefer-stable": true

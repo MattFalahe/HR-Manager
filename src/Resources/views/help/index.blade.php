@@ -1686,6 +1686,10 @@ docker compose -f docker-compose.yml -f docker-compose.mariadb.yml -f docker-com
                     <p>{{ trans('hr-manager::help.cmd_backfill_buyback') }}</p>
                     <p class="text-muted cmd-meta"><small><strong>Options:</strong> <code>--dry-run</code> count what would be seeded without writing &nbsp;|&nbsp; <strong>Runs:</strong> on demand (one-time seed; live data flows via the EventBus after)</small></p>
 
+                    <h4><code>hr-manager:backfill-member-archives</code></h4>
+                    <p>{{ trans('hr-manager::help.cmd_backfill_member_archives') }}</p>
+                    <p class="text-muted cmd-meta"><small><strong>Options:</strong> <code>--corporation=ID</code> only this corp &nbsp;|&nbsp; <code>--since=YYYY-MM-DD</code> only stints that ended on or after this date &nbsp;|&nbsp; <code>--dry-run</code> report without writing &nbsp;|&nbsp; <code>--yes</code> skip the prompt &nbsp;|&nbsp; <strong>Runs:</strong> on demand (one-time; departures from here on are recorded as they happen)</small></p>
+
                     <div class="info-box">
                         <i class="fas fa-info-circle"></i>
                         {!! trans('hr-manager::help.commands_schedule_note') !!}

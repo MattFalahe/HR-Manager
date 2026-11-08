@@ -28,3 +28,8 @@ Homestead.json
 .env.production
 .phpactor.json
 auth.json
+
+# Tests bring their own PHPUnit, so they need no SeAT and no database.
+/tests/vendor/
+/tests/composer.lock
+/.phpunit.cache/
