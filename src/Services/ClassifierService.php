@@ -131,6 +131,12 @@ class ClassifierService
             'inactive_directors'                       => 0,
         ];
 
+        // Resolve the whole roster's activity before classifying any of it, so
+        // the pass below reads memo entries rather than issuing four queries
+        // per character. Characters stay resolved for the rest of the run, so
+        // an account that comes round again under another corp is free.
+        $this->primeActivitySignals($userIds->map(fn ($id) => (int) $id)->all());
+
         foreach ($userIds as $userId) {
             $classification = $this->classifyPlayer((int) $userId, $corporationId);
             if (!$classification) {
@@ -193,6 +199,36 @@ class ClassifierService
     }
 
     /**
+     * Pre-resolve the activity reads for every character these accounts own.
+     * Best-effort: if it fails the pass still works, it just pays per player
+     * again.
+     *
+     * @param  array<int>  $userIds
+     */
+    private function primeActivitySignals(array $userIds): void
+    {
+        if (empty($userIds)) {
+            return;
+        }
+
+        try {
+            // Soft-deleted tokens included, matching the set the activity
+            // rollup covers: a revoked token still belonged to the player.
+            $characterIds = DB::table('refresh_tokens')
+                ->whereIn('user_id', $userIds)
+                ->pluck('character_id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            if (!empty($characterIds)) {
+                $this->player->primeActivityCache($characterIds);
+            }
+        } catch (\Throwable $e) {
+            Log::info('[HR Manager] activity prefetch skipped for this corp: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Classify one (user, corp). Persists the classification row + detects
      * transition vs prior persisted state + publishes events on change.
      */
@@ -220,9 +256,13 @@ class ClassifierService
             ->first();
         $loaActive = $status && $status->isLoaActive();
 
-        // Activity signal: max last_activity across the player's alts
-        $summary = $this->player->getPlayerSummary($userId, $corporationId);
-        $lastActivity = $summary['last_activity_at'];
+        // Activity signal: max last_activity across the player's alts. The lean
+        // read, not getPlayerSummary: the classifier wants three fields and the
+        // profile builder computes dozens, including a per-alt CWM rollup and a
+        // corp-history walk that nothing here looks at.
+        $signals      = $this->player->getClassifierSignals($userId);
+        $lastActivity = $signals['last_activity_at'];
+        $characters   = $signals['characters'];
 
         $daysInactive = $lastActivity
             ? max(0, (int) $lastActivity->diffInDays(now()))
@@ -236,11 +276,11 @@ class ClassifierService
         // aren't expected to be contributing yet.
         $walletFlags = [];
         $category = $baseCategory;
-        if (!$loaActive && $thresholdDays && $summary['characters']->isNotEmpty()) {
+        if (!$loaActive && $thresholdDays && $characters->isNotEmpty()) {
             [$category, $walletFlags] = $this->applyWalletSignals(
                 $userId,
                 $corporationId,
-                $summary['characters'],
+                $characters,
                 $baseCategory,
                 $tierLevel
             );
@@ -255,10 +295,10 @@ class ClassifierService
         // doesn't undo a long absence). No-op when BP/MC absent.
         if (!$loaActive && $thresholdDays
             && $category === PlayerClassification::CATEGORY_AT_RISK
-            && $summary['characters']->isNotEmpty()) {
+            && $characters->isNotEmpty()) {
             [$category, $blueprintFlags] = $this->applyBlueprintSignal(
                 $corporationId,
-                $summary['characters'],
+                $characters,
                 $category,
                 $thresholdDays
             );
@@ -276,10 +316,10 @@ class ClassifierService
         // at_risk so it never undoes a long absence or redoes a blueprint hold.
         if (!$loaActive && $thresholdDays
             && $category === PlayerClassification::CATEGORY_AT_RISK
-            && $summary['characters']->isNotEmpty()) {
+            && $characters->isNotEmpty()) {
             [$category, $buybackFlags] = $this->applyBuybackSignal(
                 $corporationId,
-                $summary['characters'],
+                $characters,
                 $category,
                 $thresholdDays
             );
@@ -295,8 +335,7 @@ class ClassifierService
         // alive on its main but lugging unused alts.
         if ($category === PlayerClassification::CATEGORY_ACTIVE) {
             $dormant = 0;
-            foreach (($summary['alt_summaries'] ?? []) as $alt) {
-                $la = $alt['last_activity_at'] ?? null;
+            foreach ($signals['alt_activity'] as $la) {
                 if ($la === null || $la->diffInDays(now()) > self::DORMANT_ALT_DAYS) {
                     $dormant++;
                 }
@@ -311,8 +350,8 @@ class ClassifierService
         // wallet movement still surfaces. We compute the flag here so it
         // can ride alongside the inactive-director critical alert.
         $silentWalletDirector = false;
-        if ($tierLevel === TierLevel::DIRECTOR && $summary['characters']->isNotEmpty()) {
-            $silentWalletDirector = $this->detectSilentWalletDirector($corporationId, $summary['characters']);
+        if ($tierLevel === TierLevel::DIRECTOR && $characters->isNotEmpty()) {
+            $silentWalletDirector = $this->detectSilentWalletDirector($corporationId, $characters);
             if ($silentWalletDirector) {
                 $walletFlags['silent_wallet_director'] = true;
             }
