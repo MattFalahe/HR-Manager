@@ -47,6 +47,63 @@ class SourceTest extends TestCase
         return $known;
     }
 
+    /** The array literal whose opening bracket is at $open, brackets included. */
+    private static function literalAt(string $code, int $open): string
+    {
+        $depth = 0;
+        for ($i = $open, $n = strlen($code); $i < $n; $i++) {
+            if ($code[$i] === '[') {
+                $depth++;
+            } elseif ($code[$i] === ']' && --$depth === 0) {
+                break;
+            }
+        }
+
+        return substr($code, $open, $i - $open + 1);
+    }
+
+    /**
+     * Keys of an array literal and of the arrays nested one level in.
+     *
+     * @return array<string, string[]> top-level key => its own keys
+     */
+    private static function literalKeys(string $literal): array
+    {
+        $keys = [];
+        $parent = null;
+        preg_match_all("/'(\\w+)'\\s*=>/", $literal, $found, PREG_OFFSET_CAPTURE);
+        foreach ($found[1] as [$key, $at]) {
+            $before = substr($literal, 0, $at);
+            $depth = substr_count($before, '[') - substr_count($before, ']');
+            if ($depth === 1) {
+                $parent = $key;
+                $keys[$key] = [];
+            } elseif ($depth === 2 && $parent !== null) {
+                $keys[$parent][] = $key;
+            }
+        }
+
+        return $keys;
+    }
+
+    /** A method's code with its closures cut out, so their returns are not its own. */
+    private static function withoutClosures(string $code): string
+    {
+        while (($at = strpos($code, 'function (')) !== false) {
+            $depth = 0;
+            for ($i = strpos($code, '{', $at), $n = strlen($code); $i < $n; $i++) {
+                if ($code[$i] === '{') {
+                    $depth++;
+                } elseif ($code[$i] === '}' && --$depth === 0) {
+                    break;
+                }
+            }
+            $code = substr($code, 0, $at) . substr($code, $i + 1);
+        }
+
+        return $code;
+    }
+
     /**
      * Blade reads a directive with \B@\w+, so counting @if and @endif proves
      * nothing: {{ $h }}h@endif is not a directive, and leaves its @if open.
@@ -383,5 +440,52 @@ class SourceTest extends TestCase
             file_get_contents(self::SRC . 'Http/Controllers/CorpHealthController.php'),
             'the Corp Health page lists classifications; it has to read the current roster'
         );
+    }
+
+    /**
+     * The Access tab reads CorpAccessService's result without defaults, so a
+     * section one return leaves out is a 500 for every corp that takes that
+     * return. A corp with nobody registered did, from 1.0.0: its early return
+     * had no people list.
+     */
+    public function test_every_return_gives_the_access_tab_everything_it_reads(): void
+    {
+        preg_match_all(
+            "/\\$(ax|axS|axD)\\['(\\w+)'\\](?!\\s*\\?\\?)/",
+            file_get_contents(self::SRC . 'Resources/views/corp-health/index.blade.php'),
+            $reads,
+            PREG_SET_ORDER
+        );
+        $needs = ['ax' => [], 'axS' => [], 'axD' => []];
+        foreach ($reads as [, $variable, $key]) {
+            $needs[$variable][$key] = true;
+        }
+        $this->assertArrayHasKey('people', $needs['ax'], 'the pattern no longer finds the reads, so the check checks nothing');
+        $this->assertNotEmpty($needs['axS']);
+        $this->assertNotEmpty($needs['axD']);
+
+        $source = file_get_contents(self::SRC . 'Services/CorpAccessService.php');
+        $start = strpos($source, 'public function forCorporation(');
+        $this->assertNotFalse($start);
+        preg_match('/\R    \}\R/', $source, $end, PREG_OFFSET_CAPTURE, $start);
+        $body = self::withoutClosures(preg_replace('~//[^\n]*|/\*.*?\*/~s', '', substr($source, $start, $end[0][1] - $start)));
+
+        preg_match_all('/\breturn\b/', $body, $returns, PREG_OFFSET_CAPTURE);
+        $this->assertNotEmpty($returns[0]);
+        foreach ($returns[0] as [, $at]) {
+            $this->assertMatchesRegularExpression(
+                '/^return\s*\[/',
+                substr($body, $at, 12),
+                'forCorporation returns something other than an array literal, which this check cannot read'
+            );
+            $given = self::literalKeys(self::literalAt($body, strpos($body, '[', $at)));
+
+            foreach (['ax' => null, 'axS' => 'seat', 'axD' => 'discord'] as $variable => $section) {
+                $have = $section === null ? array_keys($given) : ($given[$section] ?? []);
+                foreach (array_keys($needs[$variable]) as $key) {
+                    $this->assertContains($key, $have, "a return from forCorporation gives the Access tab no {$variable}['{$key}']");
+                }
+            }
+        }
     }
 }

@@ -103,6 +103,8 @@ All notable changes to HR Manager will be documented in this file.
 
 - **The Diagnostic page was not checking one of the scheduled commands.** `hr-manager:warm-player-profiles` has been on the schedule since it shipped but was missing from the list the health check compares against, so had it ever fallen off the schedule, nothing would have said so. That list and the schedule are now held to each other by a test, which is how this turned up.
 
+- **Corp Health's Access tab failed with a 500 error for a corp with nobody registered.** When no account in the corp had a live token, the access summary returned early without its list of people, and the page could not render. It has been that way since 1.0.0. The early return is gone, so a corp like that now opens the tab and lists its tracked characters that have no SeAT account, with the counts to match. A test now holds every return to the keys the page reads.
+
 ### 🔔 Changed
 
 - The **conflict precedence** setting (corp-vs-alliance) moved to the Standings tab with the rest of it. Its meaning is unchanged, and it is now documented alongside the *source* precedence it was easy to confuse with: source precedence is HR over SeAT in hybrid mode; conflict precedence is about one entity whose corp and alliance are rated differently.

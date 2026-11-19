@@ -42,6 +42,7 @@ class CorpAccessService
      * @return array{
      *   seat: array,
      *   discord: array,
+     *   people: array<int, array>,
      *   mismatches: array<int, array{type: string, main_name: string, detail: string, severity: string}>,
      * }
      */
@@ -73,13 +74,9 @@ class CorpAccessService
             : count($corpUserIds);
         $unregisteredCount = max(0, $memberTotal - $registeredCharCount);
 
-        if (empty($corpUserIds)) {
-            return [
-                'seat'       => $this->emptySeat($memberTotal),
-                'discord'    => $this->emptyDiscord(),
-                'mismatches' => [],
-            ];
-        }
+        // No early return when nobody is registered: every read below copes
+        // with an empty account list, and a corp like that is the one whose
+        // unregistered characters most need listing.
 
         // Superusers (users.admin) + HR power grants among corp accounts.
         $superusers = DB::table('users')->whereIn('id', $corpUserIds)->where('admin', 1)
@@ -566,23 +563,5 @@ class CorpAccessService
             Log::warning('[HR Manager] CorpAccessService permission query failed: ' . $e->getMessage());
         }
         return array_values(array_unique($ids));
-    }
-
-    private function emptySeat(int $memberTotal): array
-    {
-        return [
-            'account_count' => 0, 'member_total' => $memberTotal, 'registered_char_count' => 0, 'unregistered_count' => $memberTotal,
-            'superuser_count' => 0, 'hr_admin_count' => 0, 'hr_director_count' => 0,
-            'ingame_director_count' => 0, 'seat_role_count' => 0, 'squad_role_count' => 0, 'direct_role_count' => 0,
-            'elevated_rows' => [], 'elevated_count' => 0,
-        ];
-    }
-
-    private function emptyDiscord(): array
-    {
-        return [
-            'available' => $this->connector->isAvailable(), 'configured' => !empty($this->connector->sensitiveRoleIds()),
-            'linked_count' => 0, 'unlinked_count' => 0, 'unlinked_rows' => [], 'role_rows' => [], 'sensitive_count' => 0,
-        ];
     }
 }
