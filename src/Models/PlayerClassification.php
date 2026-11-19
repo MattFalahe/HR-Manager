@@ -58,6 +58,20 @@ class PlayerClassification extends Model
         return $query->where('corporation_id', $corporationId);
     }
 
+    /**
+     * One corp's classifications, for the accounts in it now. Anything that
+     * counts or lists a corp's members reads through this rather than
+     * forCorporation(), which also returns people who have left.
+     *
+     * @param  array<int>|null  $userIds  CurrentMemberService::userIds(); null reads by corporation alone
+     */
+    public function scopeOnRoster($query, int $corporationId, ?array $userIds)
+    {
+        $query->where('corporation_id', $corporationId);
+
+        return $userIds === null ? $query : $query->whereIn('user_id', $userIds);
+    }
+
     public function scopeInCategory($query, string $category)
     {
         return $query->where('category', $category);

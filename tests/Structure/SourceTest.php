@@ -351,4 +351,37 @@ class SourceTest extends TestCase
         $this->assertStringNotContainsString('PluginBridge', $readSection);
         $this->assertStringNotContainsString("->call('corp-wallet-manager'", $readSection);
     }
+
+    /**
+     * A classification outlives the membership it describes until the nightly
+     * prune, and for good in a corp the prune skips. So a corp's
+     * classifications are never read by corporation alone: each read either
+     * goes through onRoster() or starts from a list of user ids. The prune is
+     * the one read that wants the others, and it names them with whereNotIn.
+     */
+    public function test_no_classification_read_counts_people_who_left(): void
+    {
+        $reads = 0;
+        foreach (self::files('.php') as $path) {
+            $source = file_get_contents($path);
+            $offset = 0;
+            while (($at = strpos($source, 'PlayerClassification::forCorporation(', $offset)) !== false) {
+                $chain = substr($source, $at, strpos($source, ';', $at) - $at);
+                $this->assertMatchesRegularExpression(
+                    "/->where(?:Not)?In\\(\\s*'user_id'/",
+                    $chain,
+                    basename($path) . " reads a corp's classifications without narrowing to its members"
+                );
+                $offset = $at + 1;
+                $reads++;
+            }
+        }
+
+        $this->assertGreaterThan(0, $reads, 'the pattern no longer matches anything, so the check checks nothing');
+        $this->assertStringContainsString(
+            'PlayerClassification::onRoster(',
+            file_get_contents(self::SRC . 'Http/Controllers/CorpHealthController.php'),
+            'the Corp Health page lists classifications; it has to read the current roster'
+        );
+    }
 }

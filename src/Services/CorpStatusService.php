@@ -1254,11 +1254,14 @@ class CorpStatusService
             ->whereNull('deleted_at')
             ->count();
 
-        // Active vs inactive counts from the classifier (Phase 3 cache)
-        $activeCount = PlayerClassification::forCorporation($corpId)
+        // Active vs inactive counts from the classifier, for the people in
+        // the corp now. Someone who left keeps their row until the nightly
+        // prune, and a corp the prune never reaches keeps it for good.
+        $members = app(CurrentMemberService::class)->userIds($corpId);
+        $activeCount = PlayerClassification::onRoster($corpId, $members)
             ->where('category', PlayerClassification::CATEGORY_ACTIVE)
             ->count();
-        $concernCount = PlayerClassification::forCorporation($corpId)
+        $concernCount = PlayerClassification::onRoster($corpId, $members)
             ->whereIn('category', [
                 PlayerClassification::CATEGORY_AT_RISK,
                 PlayerClassification::CATEGORY_INACTIVE,
@@ -1298,12 +1301,6 @@ class CorpStatusService
         ];
     }
 
-    /**
-     * Probe roster tables in priority order. Same chain as
-     * MemberController::resolveRosterSource — corporation_members first
-     * (full ESI roster), then corporation_member_trackings, then
-     * character_affiliations as the sparse last-resort fallback.
-     */
     /**
      * Character ids currently in this corp.
      *
@@ -1369,6 +1366,12 @@ class CorpStatusService
         return $this->currentCharsMemo[$corporationId] = null;
     }
 
+    /**
+     * Probe roster tables in priority order. Same chain as
+     * MemberController::resolveRosterSource — corporation_members first
+     * (full ESI roster), then corporation_member_trackings, then
+     * character_affiliations as the sparse last-resort fallback.
+     */
     private function resolveRosterSource(int $corporationId): string
     {
         foreach (['corporation_members', 'corporation_member_trackings'] as $table) {
@@ -1386,14 +1389,15 @@ class CorpStatusService
 
     private function tierDistribution(int $corpId): array
     {
-        $rows = PlayerClassification::forCorporation($corpId)
+        $members = app(CurrentMemberService::class)->userIds($corpId);
+        $rows = PlayerClassification::onRoster($corpId, $members)
             ->whereNotNull('tier_level')
             ->selectRaw('tier_level, COUNT(*) as c')
             ->groupBy('tier_level')
             ->pluck('c', 'tier_level')
             ->toArray();
 
-        $unmappedCount = PlayerClassification::forCorporation($corpId)
+        $unmappedCount = PlayerClassification::onRoster($corpId, $members)
             ->whereNull('tier_level')
             ->count();
 

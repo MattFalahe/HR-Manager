@@ -124,12 +124,9 @@ class ClassifierService
      */
     public function classifyCorporation(int $corporationId): array
     {
-        $userIds = DB::table('refresh_tokens')
-            ->join('character_affiliations', 'refresh_tokens.character_id', '=', 'character_affiliations.character_id')
-            ->where('character_affiliations.corporation_id', $corporationId)
-            ->whereNull('refresh_tokens.deleted_at')
-            ->distinct()
-            ->pluck('refresh_tokens.user_id');
+        // The same list Corp Health narrows its counts to, so every row this
+        // pass keeps is one the page shows, and nothing it prunes is counted.
+        $userIds = collect(app(CurrentMemberService::class)->userIds($corporationId) ?? []);
 
         $counts = [
             PlayerClassification::CATEGORY_ACTIVE      => 0,

@@ -21,7 +21,13 @@ class CorpHealthController extends Controller
         $corporationId = $this->resolveCorporationContext($request, $allowedCorps);
         $this->assertCanAccessCorp($corporationId);
 
-        $classifications = PlayerClassification::forCorporation($corporationId)->get();
+        // The people in the corp now. A row for somebody who left would
+        // otherwise sit in the counts and the at-risk table until the nightly
+        // prune, or for good in a corp it never reaches.
+        $classifications = PlayerClassification::onRoster(
+            $corporationId,
+            app(\HrManager\Services\CurrentMemberService::class)->userIds($corporationId)
+        )->get();
 
         $byCategory = [
             'active'      => $classifications->where('category', PlayerClassification::CATEGORY_ACTIVE)->count(),

@@ -522,7 +522,7 @@ class CorpAccessService
     private function categoryByUser(int $corporationId): array
     {
         try {
-            return PlayerClassification::forCorporation($corporationId)
+            return PlayerClassification::onRoster($corporationId, app(CurrentMemberService::class)->userIds($corporationId))
                 ->get(['user_id', 'category'])
                 ->pluck('category', 'user_id')
                 ->map(fn ($c) => (string) $c)
