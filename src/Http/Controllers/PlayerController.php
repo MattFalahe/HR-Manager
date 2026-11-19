@@ -211,6 +211,12 @@ class PlayerController extends Controller
         $miningEngagement = app(\HrManager\Services\CrossPluginDataService::class)
             ->getMiningEngagement($characterIds, $corporationId, (int) config('hr-manager.performance.activity_window_months', 6));
 
+        // Game and comms time: EVE sessions merged across alts, Discord voice
+        // for the account. Local reads only; nothing here calls Discord.
+        $commsActivity = ($userId !== null && $userId > 0)
+            ? app(\HrManager\Services\ActivityTrackingService::class)->playerSummary((int) $userId, $characterIds)
+            : null;
+
         // PvP activity — the account's most active PvP characters. Cache-peek
         // only (no cold zKill fetch on the page); characters warm as their own
         // view is opened. Top 3 with PvP data, ready to drill into.
@@ -410,7 +416,8 @@ class PlayerController extends Controller
             'blueprintActivity', 'accessDepth', 'discord', 'squads',
             'noteAuthorNames', 'noteAuthorAdmins', 'historyActorNames',
             'historySubjectNames', 'buyback', 'roleAlignment', 'playerActivity',
-            'miningEngagement', 'topPvp', 'discordAccess', 'connectorInstalled'
+            'miningEngagement', 'topPvp', 'discordAccess', 'connectorInstalled',
+            'commsActivity'
         ));
     }
 

@@ -875,12 +875,12 @@
                         $wfStyle = function ($flag) {
                             return match ($flag) {
                                 'silent_wallet_director', 'compliance_very_low' => 'background:#dc3545;color:#fff;',
-                                'loyalty_hold', 'blueprint_hold', 'buyback_hold' => 'background:#2fa84f;color:#fff;',
-                                'dormant_alts'                                   => 'background:#5a6472;color:#fff;',
+                                'loyalty_hold', 'blueprint_hold', 'buyback_hold', 'voice_hold' => 'background:#2fa84f;color:#fff;',
+                                'dormant_alts', 'on_comms'                       => 'background:#5a6472;color:#fff;',
                                 default                                          => 'background:#e6a700;color:#1a1d21;',
                             };
                         };
-                        $wfAll = ['stalled','negative_contribution','compliance_low','compliance_very_low','silent_wallet_director','loyalty_hold','blueprint_hold','buyback_hold','dormant_alts'];
+                        $wfAll = ['stalled','negative_contribution','compliance_low','compliance_very_low','silent_wallet_director','loyalty_hold','blueprint_hold','buyback_hold','voice_hold','dormant_alts','on_comms'];
                     @endphp
                     {{-- Legend for the Wallet flags column. --}}
                     <div class="px-3 py-2" style="border-bottom:1px solid var(--hr-border, rgba(255,255,255,0.08)); display:flex; flex-wrap:wrap; gap:6px 16px; align-items:center;">
@@ -1118,6 +1118,9 @@
                 </div>
             </div>
         @endif
+
+        {{-- Game and comms presence --}}
+        @include('hr-manager::corp-health.partials._comms_presence', ['presence' => $commsPresence ?? ['available' => false]])
 
         {{-- Character quality --}}
         <div class="card card-dark mb-3">

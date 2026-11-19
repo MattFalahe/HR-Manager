@@ -232,11 +232,37 @@ class ScheduleSeeder extends AbstractScheduleSeeder
             ],
 
             // Prune the activity/audit log past its 180-day retention - daily
-            // at 04:30. Runs whether or not the feature is enabled so a log
+            // at 04:45. Runs whether or not the feature is enabled so a log
             // left off still ages out. Cheap when there's nothing to remove.
             [
                 'command'           => 'hr-manager:prune-audit-log',
                 'expression'        => '45 4 * * *',
+                'allow_overlap'     => false,
+                'allow_maintenance' => false,
+                'ping_before'       => null,
+                'ping_after'        => null,
+            ],
+
+            // Copy EVE play sessions out of character_onlines - every 15
+            // minutes, off the quarter hours other jobs crowd. SeAT refreshes
+            // each character about hourly and the snapshot waits until the
+            // next refresh, so this cadence loses nothing; it only sets how
+            // soon a session shows. Reads one SeAT table, no ESI.
+            [
+                'command'           => 'hr-manager:record-eve-sessions',
+                'expression'        => '7,22,37,52 * * * *',
+                'allow_overlap'     => false,
+                'allow_maintenance' => false,
+                'ping_before'       => null,
+                'ping_after'        => null,
+            ],
+
+            // Discord voice poll - every minute. The command only queues one
+            // slice of linked members and returns, so the scheduler is never
+            // held; it exits at once when voice tracking is switched off.
+            [
+                'command'           => 'hr-manager:poll-voice',
+                'expression'        => '* * * * *',
                 'allow_overlap'     => false,
                 'allow_maintenance' => false,
                 'ping_before'       => null,

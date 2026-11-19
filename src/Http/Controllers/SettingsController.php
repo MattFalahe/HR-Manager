@@ -334,7 +334,30 @@ class SettingsController extends Controller
             $notifStates[$notifKey] = \HrManager\Services\NotificationCatalog::isEnabled($notifKey);
         }
 
+        // Activity Tracking tab. Reads only: the linked-member count is one
+        // query, and the sizing is arithmetic on it plus the last run's
+        // figures. The bot token never leaves the service.
+        $activityTracking = [];
+        try {
+            $trackingSvc = app(\HrManager\Services\ActivityTrackingService::class);
+            $activityTracking = [
+                'eve_enabled'        => app(\HrManager\Services\EveSessionService::class)->isEnabled(),
+                'eve_available'      => \Illuminate\Support\Facades\Schema::hasTable('character_onlines'),
+                'voice_enabled'      => $trackingSvc->voiceEnabled(),
+                'voice_classifier'   => $trackingSvc->voiceClassifierEnabled(),
+                'interval'           => $trackingSvc->interval(),
+                'retention'          => $trackingSvc->retentionDays(),
+                'connector'          => $trackingSvc->connectorInstalled(),
+                'driver_configured'  => $trackingSvc->discordConfig() !== null,
+                'sizing'             => $trackingSvc->currentSizing(),
+                'last_run'           => $trackingSvc->lastRun(),
+            ];
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('[HR Manager] activity tracking settings could not load: ' . $e->getMessage());
+        }
+
         return view('hr-manager::settings.index', compact(
+            'activityTracking',
             'settings', 'webhooks', 'corporations',
             'discordRoles', 'discordRolesProvider', 'discordRoleMap',
             'tierMappings', 'tierAuto', 'tierLevels', 'tierDefaults',
@@ -879,7 +902,27 @@ class SettingsController extends Controller
         // Keep the operator on the tab they saved from (the hash drives the
         // tab-restore JS). Every form maps to its pane, so saving never dumps
         // you back on General and makes you navigate to where you were.
+        // Activity Tracking tab (id=activity-tracking). Interval and retention
+        // only ever take a value from their fixed lists, so a tampered form
+        // cannot set a poll rate the sizing advice was never worked out for.
+        if ($request->has('activity_tracking_form')) {
+            Setting::setValue(\HrManager\Services\EveSessionService::SETTING_ENABLED, $request->boolean('activity_eve_sessions_enabled') ? '1' : '0', 'boolean');
+            Setting::setValue(\HrManager\Services\ActivityTrackingService::SETTING_VOICE_ENABLED, $request->boolean('activity_voice_enabled') ? '1' : '0', 'boolean');
+            Setting::setValue(\HrManager\Services\ActivityTrackingService::SETTING_VOICE_CLASSIFIER, $request->boolean('activity_voice_classifier') ? '1' : '0', 'boolean');
+
+            $interval = (int) $request->input('activity_voice_interval', \HrManager\Services\ActivityTrackingService::DEFAULT_INTERVAL);
+            if (in_array($interval, \HrManager\Services\ActivityTrackingService::INTERVALS, true)) {
+                Setting::setValue(\HrManager\Services\ActivityTrackingService::SETTING_VOICE_INTERVAL, (string) $interval, 'integer');
+            }
+
+            $retention = (int) $request->input('activity_retention_days', \HrManager\Services\ActivityTrackingService::DEFAULT_RETENTION);
+            if (in_array($retention, \HrManager\Services\ActivityTrackingService::RETENTION_OPTIONS, true)) {
+                Setting::setValue(\HrManager\Services\ActivityTrackingService::SETTING_RETENTION_DAYS, (string) $retention, 'integer');
+            }
+        }
+
         $tab = match (true) {
+            $request->has('activity_tracking_form')    => 'activity-tracking',
             $request->has('general_form')              => 'general',
             $request->has('features_form')             => 'features',
             $request->has('purge_squads_form')         => 'purge-squads',

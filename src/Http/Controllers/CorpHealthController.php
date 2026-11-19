@@ -187,7 +187,18 @@ class CorpHealthController extends Controller
             ? app(\HrManager\Services\CorpAccessService::class)->forCorporation($corporationId)
             : null;
 
+        // Game and comms presence over 30 days (lazy — Composition tab only).
+        $commsPresence = ['available' => false];
+        if ($activeTab === 'composition') {
+            try {
+                $commsPresence = app(\HrManager\Services\ActivityTrackingService::class)->corpPresenceForCorporation($corporationId);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('[HR Manager] corp comms presence failed: ' . $e->getMessage());
+            }
+        }
+
         return view('hr-manager::corp-health.index', compact(
+            'commsPresence',
             'byCategory',
             'directorHealth',
             'rosterActivity',

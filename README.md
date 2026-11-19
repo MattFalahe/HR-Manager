@@ -141,6 +141,7 @@ What leadership sees while doing the actual work of keeping the corp alive.
 - **Corp membership-change alerts**: a 30-minute roster diff notifies on **joins** (classified — an alt of a current member names the main; an applicant is tagged "applied") and **leaves** (noting whether the person still has another character in the corp), plus a **joined-without-a-valid-application** security flag for newcomers who bypassed recruitment. With **Manager Core** installed, joins and *voluntary* leaves are also picked up **~2 minutes** from the director ESI notification feed (`CorpAppAcceptMsg` / `CharLeftCorpMsg`) rather than waiting for the diff — a kick sends no EVE notification, so those stay caught by the roster diff, which dedups the fast path so nothing fires twice. It also flags a newcomer with **no SeAT account at all** (unregistered — no token, no visibility) as its own category, and that flag **auto-clears** the moment they register the character (as their own main, or an alt of any account). Forward-only: the first scan of each corp seeds the roster silently, so existing members are never announced, and separate webhook categories let you route the security flags to a leadership channel. Settings → Webhooks badges these four membership categories with a **⚡ fast-poll indicator** showing whether the fast path is live (and it works either way — without fast-poll they arrive from the 30-minute scan). Every change is also logged in-app on the director-only **Corp Health → Membership** tab — a recent joins/leaves history, a **review queue** where a director acknowledges each no-application flag (with a red unreviewed count), and a **Pending registration** list of current members not yet in SeAT
 - **New-member onboarding welcome** (opt-in, Settings → Onboarding): when a genuinely new person joins a tracked corp, HR posts a **member-facing** greeting to a Discord channel that **@-mentions the newcomer** and links your first-steps guide, held for a configurable delay (default 30 min) and then until they are actually reachable — confirmed in the corp, a webhook subscribing, and (with SeAT Connector) a linked Discord identity — so the ping lands when they can see the channel rather than at a fixed guess. **Off by default per corporation** — the master switch only arms the feature, and each corp is turned on individually, so it never starts greeting members of a corp you did not intend. **Per-corp Markdown template** with a friendly built-in default and `{member}` / `{corp}` / `{care}` variables, plus a **new-member care team** role picker the `{care}` mention expands to, so your onboarding people are pinged alongside the newcomer. New people only (an existing member's alt is ignored) and once per account — the joining character can be any of theirs, main or alt. Drops the queued welcome if they leave during the wait, and gives up after 7 days if it never becomes deliverable. Without SeAT Connector it still posts, naming the member in plain text instead of pinging. Delivered on a 5-minute cron (`hr-manager:send-onboarding-welcomes`) and routed with the **New-member onboarding welcome** webhook category
 - **Activity Log** (director-only, opt-in): a dedicated sidebar page recording who did — and viewed — what inside HR Manager. One middleware over the whole plugin captures **both** every internal page view (which application / player / member / dossier / intel record was opened, plus the Corp Health corp + tab) **and every successful action** — add / edit / delete across applications, players, members, notes, watchlist, intel, templates, recruitment pages, webhooks, tiers and settings — so nothing is missed. The security-critical ones carry richer detail: **blacklist / whitelist add + clear** and **intel add + delete** (naming the character + reason, snapshotting deletes before they vanish), **privilege** grants/revokes (subject, permissions, expiry, and *why* on revoke), application **decisions** and player-lifecycle actions, and the **action-driven notifications** that go out. Filter by category / action / actor / date / text, export to CSV, jump back to any referenced record. Off until you enable it in Settings → Features; entries are append-only and pruned after 180 days. Nothing is recorded before you turn it on
+- **Game and comms tracking**: a history of when each member plays EVE and when they sit in Discord voice. The player profile shows last in EVE, last in voice and hours in each over 7 and 30 days; Corp Health → Composition splits the roster into *playing and on comms*, *playing, not on comms*, *on comms, not playing* and *neither*, listing the middle two by name. EVE sessions are copied from the online status SeAT already keeps (`esi-location.read_online.v1`, no ESI calls of HR's own, on by default). Voice is opt-in under Settings → Activity Tracking and needs **SeAT Connector**: HR asks Discord, with Connector's own bot, whether each linked member is in voice, once per poll interval (5 minutes by default). An hour of voice in the recent half of a tier's threshold holds an at-risk member at active (`VC`); on an inactive member it only adds a `COM` note. Members are not told individually, so say in your corp rules that voice presence is recorded
 
 ---
 
@@ -275,7 +276,7 @@ HR Manager runs **standalone**. Every integration is gated by `class_exists` / `
 | [Structure Manager](https://github.com/MattFalahe/Structure-Manager) | Per-structure doctrine compliance shown on Corp Health (via Manager Core PluginBridge) |
 | [Buyback Manager](https://github.com/MattFalahe/Buyback-Manager) | Buyback contribution (offers + completions) valued by a per-corp policy, on member profiles and Corp Health (EventBus) |
 | [SeAT Broadcast](https://github.com/MattFalahe/seat-discord-pings) | Subscribes to HR's published events (`hr.application.*`, `hr.player.*`, `hr.purge.*`) for in-Discord coordination |
-| [warlof/seat-connector](https://github.com/warlof/seat-connector) | **Deep Discord integration** — see below |
+| [warlof/seat-connector](https://github.com/warlof/seat-connector) | **Deep Discord integration**, including voice tracking — see below |
 | [zKillboard](https://zkillboard.com/) | Recent PvP card on member profiles (cached, no key required) |
 
 ### SeAT Connector (Discord) — deep integration
@@ -289,6 +290,20 @@ HR reads the **warlof/seat-connector** framework directly and understands its re
 - **Activity tiers** — maps **Discord roles → activity tiers** for the classifier (highest tier, strictest threshold when several apply).
 - **Recruitment** — an optional per-applicant Connector-view grant powers the in-application *"Link Discord"* button, and the post-submission **Connector handoff** auto-roles accepted members.
 - **Purge cleanup** — clearing a purged member's removable squads cascades their **Connector-bound Discord roles** off, exactly as a manual kick would.
+- **Voice tracking** — the Discord link and the bot Connector already runs are what HR polls Discord's voice states with. No second bot and no gateway connection. See [Voice tracking and Discord's limits](#voice-tracking-and-discords-limits).
+
+### Voice tracking and Discord's limits
+
+The bot token is shared with SeAT Connector, so HR holds itself to 10 requests a second (Discord allows a bot 50) and spreads the members over the poll interval, one slice a minute, each slice finishing inside 50 seconds. Discord does not publish the limit for the voice-state endpoint; after the first poll HR reads the figure Discord reports and sizes against it if it is lower. The settings page shows the advice for your own member count. With 40% held in reserve:
+
+| Poll interval | Linked Discord accounts it handles |
+|---|---|
+| 5 minutes (default) | up to 1,500 |
+| 10 minutes | up to 3,000 |
+| 15 minutes | up to 4,500 |
+| 20 / 30 / 60 minutes | up to 6,000 / 9,000 / 18,000 |
+
+Give the bot's role **View Channel** and **Connect** on your voice channels. In a channel it cannot see, Discord still reports the member as in voice but refuses to name the channel, and those refusals count toward Discord's limit of 10,000 refused requests per ten minutes, past which it temporarily bans the server's IP (Connector included). HR counts them and pauses at half that limit.
 
 ---
 
@@ -335,12 +350,14 @@ HR also **subscribes** to:
 | `hr-manager:scan-watchlist` | every 15 minutes | Scheduled blacklist match check + intel scope-corp pass |
 | `hr-manager:detect-token-loss` | every 10 minutes | Token-loss Watchdog: detect revoked tokens (alert + history), apply the auto-purge policy, auto-cancel on restore, run the opt-in squad-drop |
 | `hr-manager:send-onboarding-welcomes` | every 5 minutes | **Opt-in**: post queued new-member onboarding welcomes whose delay has elapsed, re-checking the member is still in the corp first. No-ops when off or nothing is due |
+| `hr-manager:record-eve-sessions` | every 15 minutes | Copy EVE logins and logouts from SeAT's per-character online status into HR's session history. No ESI calls. No-ops when EVE session tracking is off |
+| `hr-manager:poll-voice` | every minute | **Opt-in**: ask Discord, through SeAT Connector's bot, which linked members are in voice. Each run polls one slice so everyone is asked once per interval; the polling runs on the queue. `--sync` polls this minute's slice in the console and prints the result. No-ops when off |
 | `hr-manager:scan-donations` | nightly 05:40 | **Opt-in**: flag direct ISK transfers (`player_donation` only) between members and entities your standings rate badly. Incremental, so a nightly pass reads only what is new; the first pass after enabling reads each member's history once and `--limit` spreads that over several nights. No-ops when off or when no standings are configured |
 | `hr-manager:reconcile-suspected-alts` | nightly 05:00 | Confirm or refute "possible alt of X" claims once both characters appear in SeAT (same account = confirmed, different accounts = refuted) |
 | `hr-manager:sweep-access-grants` | nightly 04:00 | Revoke expired recruiter + applicant access grants |
-| `hr-manager:cleanup` | nightly 03:00 | Permanently delete soft-deleted applications older than N days |
+| `hr-manager:cleanup` | nightly 03:00 | Permanently delete soft-deleted applications older than N days, and game and comms sessions past their retention |
 | `hr-manager:token-coverage-digest` | weekly (Mon 09:00) | Opt-in token + scope coverage summary per corp to subscribing webhooks |
-| `hr-manager:prune-audit-log` | nightly 04:30 | Prune Activity Log entries past the 180-day retention window (runs even when the feature is off) |
+| `hr-manager:prune-audit-log` | nightly 04:45 | Prune Activity Log entries past the 180-day retention window (runs even when the feature is off) |
 | `hr-manager:warm-player-profiles` | every 30 minutes | **Opt-in**: pre-compute player-profile panels for instant loads; rebuilds only changed accounts; lock + time budget + cursor keep it safe at any roster size. No-ops when off. Run by hand with `--corporation=<name\|ticker\|id>` (preview + confirm) or `--all` |
 | `hr-manager:sync-external-rosters` | nightly 04:30 | **Opt-in**: full multi-page refresh of the EveWho member rosters. Scheduled runs refresh corps already seeded (a director opened their Members page). To reach corps nobody has opened, pick a set: `--corporation=<name\|ticker\|id>` (repeatable / comma-separated), `--registered` (corps your registered characters are in), `--landings` (corps with a recruitment landing), `--alliance=<id\|name>`, or `--all` for the union. Previews the list and confirms first; corps SeAT already has a roster for are skipped unless `--include-tracked`. Merges EveWho's list with SeAT's own affiliation data rather than replacing it, and reports any shortfall against ESI's public member_count. No-ops when off |
 | `hr-manager:diagnose` | on-demand | Tables / bridge / event traffic / quick stats summary |
@@ -373,6 +390,7 @@ All tables prefixed with `hr_manager_`. Major tables:
 | `donation_flags`, `donation_scan_state` | flagged member ISK transfers with badly-rated entities + the incremental scan watermark |
 | `member_history_events` | append-only history timeline |
 | `audit_log` | opt-in director Activity Log (views + privilege / decision / security / notification actions), 180-day retention |
+| `eve_sessions`, `voice_sessions` | game and comms tracking: EVE play sessions per character, Discord voice sessions per account |
 | `recruitment_landings`, `recruitment_views` | public funnel + analytics |
 
 ---

@@ -19,6 +19,11 @@ class CleanupExpiredApplicationsCommand extends Command
         $days = (int) $this->option('days');
         $dryRun = $this->option('dry-run');
 
+        // Its own step, ahead of the application cleanup, which returns early
+        // when there is nothing to delete. --days does not apply here: the
+        // window is the Activity Tracking retention setting.
+        $this->pruneActivitySessions((bool) $dryRun);
+
         $this->info("HR Manager: Cleaning up applications soft-deleted more than {$days} days ago...");
 
         $ids = Application::onlyTrashed()
@@ -59,5 +64,25 @@ class CleanupExpiredApplicationsCommand extends Command
         $this->info("Permanently deleted {$count} application(s) and {$orphanedNotes} associated note(s).");
 
         return 0;
+    }
+
+    private function pruneActivitySessions(bool $dryRun): void
+    {
+        try {
+            $tracking = app(\HrManager\Services\ActivityTrackingService::class);
+            $removed = $tracking->prune($dryRun);
+            $days = $tracking->retentionDays();
+
+            $this->info(sprintf(
+                '%sEVE and voice sessions older than %d days: %d EVE, %d voice %s.',
+                $dryRun ? '[Dry run] ' : '',
+                $days,
+                $removed['eve'],
+                $removed['voice'],
+                $dryRun ? 'would be deleted' : 'deleted'
+            ));
+        } catch (\Throwable $e) {
+            $this->warn('Activity session prune failed: ' . $e->getMessage());
+        }
     }
 }

@@ -293,4 +293,37 @@ class LastActivityTest extends TestCase
             $this->assertSame('2026-11-04 10:00:00', $this->activity($characterId), $refType);
         }
     }
+
+    /**
+     * Corp member tracking needs a director token for the corp. Without one,
+     * the online status read with the member's own token is the only record
+     * that they log in at all, and a member who logs in daily and does nothing
+     * else visible would otherwise drift toward dead weight.
+     */
+    public function test_a_login_read_with_the_members_own_token_counts(): void
+    {
+        $this->seed([
+            'character_affiliations' => [['character_id' => 1201, 'corporation_id' => 2000]],
+        ]);
+        Rows::table('character_onlines', [
+            ['character_id' => 1201, 'last_login' => '2026-11-06 19:00:00', 'last_logout' => '2026-11-06 22:30:00'],
+            ['character_id' => 1202, 'last_login' => '2026-11-07 08:00:00', 'last_logout' => '2026-11-01 23:00:00'],
+        ]);
+
+        $this->assertSame('2026-11-06 22:30:00', $this->activity(1201), 'the logout is the later of the two');
+        $this->assertSame('2026-11-07 08:00:00', $this->service()->lastActivityForMany([1202])[1202]?->toDateTimeString(), 'a login with no logout after it still counts');
+    }
+
+    public function test_corp_member_tracking_still_wins_when_it_is_newer(): void
+    {
+        $this->seed([
+            'character_affiliations'       => [['character_id' => 1203, 'corporation_id' => 2000]],
+            'corporation_member_trackings' => [['character_id' => 1203, 'logon_date' => '2026-11-08 09:00:00']],
+        ]);
+        Rows::table('character_onlines', [
+            ['character_id' => 1203, 'last_login' => '2026-11-02 19:00:00', 'last_logout' => '2026-11-02 20:00:00'],
+        ]);
+
+        $this->assertSame('2026-11-08 09:00:00', $this->activity(1203));
+    }
 }

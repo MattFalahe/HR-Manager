@@ -660,6 +660,12 @@ class PlayerService
             // (not dead weight).
             $this->maxByCharacter('corporation_member_trackings', 'character_id', 'logon_date', $ids),
 
+            // SeAT's own online status, read with the member's token. Covers a
+            // character whose corp has no director token, which the roster
+            // above never sees.
+            $this->maxByCharacter('character_onlines', 'character_id', 'last_login', $ids),
+            $this->maxByCharacter('character_onlines', 'character_id', 'last_logout', $ids),
+
             // SeAT wallet journal — any movement is "this person logged in".
             $this->maxByCharacter('character_wallet_journals', 'character_id', 'date', $ids),
 

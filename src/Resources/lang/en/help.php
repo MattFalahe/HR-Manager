@@ -676,8 +676,8 @@ return [
     'int_sm_fallback'        => 'Tab shows a "Structure Manager required" notice; the Manage doctrines button links into Structure Manager.',
     'int_broadcast_provides' => 'FC activity + form-up planning: broadcasts led, cadence, and the Corp Health fleet-commander roster.',
     'int_broadcast_fallback' => 'FC panels hide and the FC role badge never lights up; the rest of the profile renders normally.',
-    'int_connector_provides' => 'Discord username + role list per linked character.',
-    'int_connector_fallback' => 'Quick Info card hides Discord row.',
+    'int_connector_provides' => 'Discord username + role list per linked character, and the Discord link and bot that voice tracking polls with.',
+    'int_connector_fallback' => 'Quick Info card hides Discord row; voice tracking stays idle and the game and comms views show EVE only.',
     'int_zkill_provides'     => 'Recent PvP summary on each member profile.',
     'int_zkill_fallback'     => 'Card shows "zKillboard unreachable"; rest of profile renders normally.',
 
@@ -707,7 +707,7 @@ return [
 
     'cmd_init'              => 'Guided first-run setup: a readiness check (prerequisites + the setup steps to complete) then a sequenced load that populates every dashboard at once instead of waiting for the nightly crons. It deliberately skips the notification passes so a first run is quiet. Run by hand; <code>--check</code> runs the readiness pass only, <code>--force</code> skips the prompt.',
     'cmd_cache_assessments' => 'Refresh the cached MemberAssessment rows for every tracked character. Runs every 2 hours.',
-    'cmd_cleanup'           => 'Permanently delete long-soft-deleted applications and orphaned notes. Runs nightly.',
+    'cmd_cleanup'           => 'Permanently delete long-soft-deleted applications and orphaned notes, and drop game and comms sessions older than the retention set under Settings, Activity Tracking. Runs nightly.',
     'cmd_classify'          => 'Run the Corp Health classifier across every active player. Runs nightly.',
     'cmd_purge'             => 'Dispatch due purge reminders (T-7 / T-3 / T-48 / T-0) and run the opt-in auto squad cleanup. Runs every 12 hours.',
     'cmd_detect_corp_joins' => 'Detect accepted applicants who actually joined the corp by watching SeAT corp histories, and flag accepted-but-never-joined. Runs every 30 minutes.',
@@ -720,10 +720,12 @@ return [
     'cmd_detect_token_loss' =>'The Token-loss Watchdog pass: detects members whose ESI refresh token has gone, fires the security alert + history event, applies the configured auto-purge policy, cancels any of its own purges whose token has been restored, and runs the opt-in squad-drop when due. Runs every 10 minutes.',
     'cmd_sweep_access_grants' => 'Revoke expired recruiter and applicant access grants (a defensive backstop for the lifecycle hooks). Runs nightly.',
     'cmd_token_coverage'     => 'Opt-in weekly summary of each corp token + scope coverage to any webhook with the Token Coverage Digest category on. Runs Mondays at 09:00. No-op when no webhook subscribes.',
-    'cmd_prune_audit_log'   => 'Delete Activity Log entries past the 180-day retention window (override with <code>--days=N</code>). Runs daily at 04:30, and runs even when the Activity Log feature is off so a disabled log still drains rather than lingering. Cheap when there is nothing to remove.',
+    'cmd_prune_audit_log'   => 'Delete Activity Log entries past the 180-day retention window (override with <code>--days=N</code>). Runs daily at 04:45, and runs even when the Activity Log feature is off so a disabled log still drains rather than lingering. Cheap when there is nothing to remove.',
     'cmd_diagnose'          => 'Print a self-test summary to stdout for support tickets. Run on demand.',
     'cmd_backfill_buyback'  => 'One-time seed of historical Buyback Manager offers and completed contracts into HR\'s buyback activity, so the contribution panels have history immediately. Run by hand after enabling the Buyback integration; live data flows via the EventBus thereafter.',
     'cmd_backfill_member_archives' => 'Rebuilds Former Member records for people who left <strong>before</strong> that page existed, from SeAT\'s corporation histories. Departures from here on are captured on the day they happen and need nothing run by hand. Everything this writes is badged <em>reconstructed</em>, because it holds only what survived in SeAT: contribution figures and the reason somebody left are usually gone, so it is a pointer rather than a full account. It never overwrites a record that was captured properly, and re-running it is safe.',
+    'cmd_record_eve_sessions' => 'Copies EVE logins and logouts out of the online status SeAT keeps for each character into HR\'s own session history, which the profile and Corp Health game and comms views read. Makes no ESI calls; SeAT refreshes that status about once an hour, so running this more often than every 15 minutes gains nothing.',
+    'cmd_poll_voice'        => 'Asks Discord, through SeAT Connector\'s bot, which linked members are in a voice channel. Each run covers one slice of the members, so everybody is asked once per poll interval, and the actual polling happens on the queue so a slow Discord never holds up SeAT\'s scheduler. Stops early and says why if Discord asks it to slow down.',
 
     'commands_schedule_note' => 'Cron schedules are registered by HR Manager\'s ScheduleSeeder and visible in <strong>Settings → Schedules</strong>.',
 

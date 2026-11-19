@@ -46,6 +46,11 @@ use Illuminate\Support\Str;
  *      contribution (one the per-corp policy credits — personal / uncounted
  *      buyback never rescues) holds a borderline at_risk player at active.
  *      at_risk only; recorded as a 'buyback_hold' flag (no event).
+ *   5d. Voice layer (optional — no-op unless Discord voice tracking and its
+ *      classifier switch are on). An hour or more in voice inside the active
+ *      window holds an at_risk player at active ('voice_hold'); on an
+ *      inactive / dead_weight player it is only an 'on_comms' annotation and
+ *      never moves the category.
  *   6. Director special case: any L3 player in 'inactive' or 'dead_weight'
  *      raises is_inactive_director=true (corp survival depends on them).
  *      Wallet-director check: an L3 with zero director attribution rows
@@ -71,6 +76,9 @@ class ClassifierService
      * constants so the detection and the alert that reports it can't drift
      * apart (the message quotes the window back to the operator).
      */
+    /** Voice time inside the active window that holds an at-risk member at active. */
+    private const VOICE_HOLD_MIN_SECONDS = 3600;
+
     private const WALLET_ATTRIBUTION_MONTHS  = 3;
     private const WALLET_ATTRIBUTION_MIN_ISK = 50_000_000;
 
@@ -324,6 +332,20 @@ class ClassifierService
                 $thresholdDays
             );
             $walletFlags = array_merge($walletFlags, $buybackFlags);
+        }
+
+        // Voice pass — Discord voice time (HR's own voice tracking). A member
+        // regularly on comms holds a borderline at_risk at active, like the
+        // modifiers above. On someone already inactive or dead weight it only
+        // annotates the row: a voice regular who has stopped playing is worth
+        // a conversation before a purge, not a free pass.
+        if (!$loaActive && $thresholdDays && in_array($category, [
+            PlayerClassification::CATEGORY_AT_RISK,
+            PlayerClassification::CATEGORY_INACTIVE,
+            PlayerClassification::CATEGORY_DEAD_WEIGHT,
+        ], true)) {
+            [$category, $voiceFlags] = $this->applyVoiceSignal($userId, $category, $thresholdDays);
+            $walletFlags = array_merge($walletFlags, $voiceFlags);
         }
 
         // "Active but carrying dormant alts" annotation. Chosen representation:
@@ -918,6 +940,49 @@ class ClassifierService
 
         $flags['buyback_hold'] = true;
         $category = PlayerClassification::CATEGORY_ACTIVE;
+
+        return [$category, $flags];
+    }
+
+    /**
+     * Voice signal. "Regularly on comms" = at least VOICE_HOLD_MIN_SECONDS in
+     * voice inside the window that would count as active for game activity
+     * (half the tier threshold). One hour, so a single poll catching someone
+     * passing through a channel never moves anybody.
+     *
+     * No-op when voice tracking or its classifier switch is off. Tracking has
+     * no history before it was switched on, so in the first weeks this can
+     * only find less voice than there really was, never more.
+     *
+     * @return array{0:string, 1:array<string,bool>}
+     */
+    private function applyVoiceSignal(int $userId, string $category, int $thresholdDays): array
+    {
+        $flags = [];
+
+        try {
+            $tracking = app(ActivityTrackingService::class);
+            if (!$tracking->voiceEnabled() || !$tracking->voiceClassifierEnabled()) {
+                return [$category, $flags];
+            }
+
+            $windowDays = max(1, (int) ceil($thresholdDays / 2));
+            $seconds = app(VoiceSessionService::class)->secondsSince($userId, now()->subDays($windowDays));
+        } catch (\Throwable $e) {
+            Log::info('[HR Manager] classifier voice signal failed: ' . $e->getMessage());
+            return [$category, $flags];
+        }
+
+        if ($seconds < self::VOICE_HOLD_MIN_SECONDS) {
+            return [$category, $flags];
+        }
+
+        if ($category === PlayerClassification::CATEGORY_AT_RISK) {
+            $flags['voice_hold'] = true;
+            $category = PlayerClassification::CATEGORY_ACTIVE;
+        } else {
+            $flags['on_comms'] = true;
+        }
 
         return [$category, $flags];
     }

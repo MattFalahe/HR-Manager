@@ -349,6 +349,8 @@ return [
     'wf_blueprint_hold'       => 'Blueprint engagement (recent corp BP sourcing, held at active)',
     'wf_buyback_hold'         => 'Buyback engagement (recent counted buyback contribution, held at active)',
     'wf_dormant_alts'         => 'Active on the main but carrying multiple dormant alts (informational)',
+    'wf_voice_hold'           => 'Regularly on Discord voice (an hour or more inside the active window, held at active)',
+    'wf_on_comms'             => 'Still on Discord voice although not playing (informational)',
     // Short labels for in-row badges
     'wf_short_dormant_alts'            => 'ALT',
     'wf_short_stalled'                 => 'STL',
@@ -359,6 +361,8 @@ return [
     'wf_short_loyalty_hold'            => 'LYL',
     'wf_short_blueprint_hold'          => 'BP',
     'wf_short_buyback_hold'            => 'BB',
+    'wf_short_voice_hold'              => 'VC',
+    'wf_short_on_comms'                => 'COM',
 
     // Compact legend labels for the Wallet flags column
     'wf_legend_label'                     => 'Wallet flags:',
@@ -371,6 +375,8 @@ return [
     'wf_legend_blueprint_hold'            => 'Blueprint (held active)',
     'wf_legend_buyback_hold'              => 'Buyback (held active)',
     'wf_legend_dormant_alts'              => 'Dormant alts',
+    'wf_legend_voice_hold'                => 'Voice (held active)',
+    'wf_legend_on_comms'                  => 'On comms, not playing',
 
     // Quick corp status — headline KPIs
     'kpi_chars'             => 'Characters in corp',
@@ -581,4 +587,21 @@ return [
     'wc_net_6mo'                    => 'Net position (6mo)',
     'wc_avg_compliance'             => 'Avg tax compliance',
     'wc_low_compliance'             => 'Below 50% compliance',
+
+    // Game and comms presence card (Composition tab)
+    'cp_heading'          => 'Game and comms',
+    'cp_window'           => 'Last :n days, :players registered players',
+    'cp_seg_both'         => 'Playing and on comms',
+    'cp_seg_game_only'    => 'Playing, not on comms',
+    'cp_seg_voice_only'   => 'On comms, not playing',
+    'cp_seg_neither'      => 'Neither',
+    'cp_seg_game_any'     => 'Played',
+    'cp_list_voice_only'  => 'On comms but not playing (:n)',
+    'cp_list_game_only'   => 'Playing but not on comms (:n)',
+    'cp_list_capped'      => 'Showing the first :n.',
+    'cp_col_last_game'    => 'Last in EVE',
+    'cp_col_last_voice'   => 'Last in voice',
+    'cp_not_linked'       => 'No Discord linked',
+    'cp_footnote_voice'   => ':linked of :players players have a Discord account linked through SeAT Connector. Someone without one always reads as not on comms.',
+    'cp_footnote_no_voice' => 'From the online status SeAT keeps per character, all of a player\'s characters together. Switch on Discord voice tracking under Settings, Activity Tracking to split this by who is on comms.',
 ];

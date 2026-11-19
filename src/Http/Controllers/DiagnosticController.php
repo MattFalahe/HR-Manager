@@ -46,6 +46,7 @@ class DiagnosticController extends Controller
         'hr_manager_audit_log', 'hr_manager_onboarding_welcomes',
         'hr_manager_onboarding_templates',
         'hr_manager_suspected_alt_links',
+        'hr_manager_eve_sessions', 'hr_manager_voice_sessions',
     ];
 
     /** Manager Core capabilities HR consumes (plugin:capability). */
@@ -132,6 +133,7 @@ class DiagnosticController extends Controller
         'hr-manager:prune-audit-log', 'hr-manager:send-onboarding-welcomes',
         'hr-manager:reconcile-suspected-alts', 'hr-manager:warm-player-profiles',
         'hr-manager:sync-external-rosters', 'hr-manager:scan-donations',
+        'hr-manager:record-eve-sessions', 'hr-manager:poll-voice',
     ];
 
     private const VALID_TABS = ['health', 'master', 'validation', 'ecosystem', 'settings', 'integrity', 'notifications', 'trace'];
@@ -490,6 +492,14 @@ class DiagnosticController extends Controller
                         : 'No enabled webhook has the SeAT Token Revoked category, so token-loss security alerts will not be delivered'
                 );
             }
+        }
+
+        try {
+            foreach (app(\HrManager\Services\ActivityTrackingService::class)->diagnosticChecks() as $check) {
+                $out[] = $this->result($check['label'], $check['status'], $check['message']);
+            }
+        } catch (\Throwable $e) {
+            $out[] = $this->result('Activity tracking', 'warn', 'Could not read the tracker state: ' . $e->getMessage());
         }
 
         return $out;

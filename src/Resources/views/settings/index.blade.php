@@ -171,6 +171,11 @@
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link" data-toggle="tab" href="#activity-tracking">
+                                <i class="fas fa-headset"></i> {{ trans('hr-manager::settings.at_tab') }}
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link" data-toggle="tab" href="#purge-squads">
                                 <i class="fas fa-user-minus"></i> {{ trans('hr-manager::settings.purge_squads_tab') }}
                             </a>
@@ -1524,6 +1529,161 @@
                     })();
                     </script>
                 </div>
+                {{-- Activity Tracking: EVE sessions + Discord voice. --}}
+                <div class="tab-pane" id="activity-tracking">
+                    @php
+                        $at = $activityTracking ?? [];
+                        $atSizing = $at['sizing'] ?? null;
+                        $atRun = $at['last_run'] ?? null;
+                        $atVoiceOn = !empty($at['voice_enabled']);
+                        $atVerdictColor = match ($atSizing['verdict'] ?? 'ok') {
+                            'over'  => '#dc3545',
+                            'tight' => '#e0a800',
+                            default => '#3fb950',
+                        };
+                        $atRunLine = null;
+                        $atStopLine = null;
+                        if (is_array($atRun) && isset($atRun['at'])) {
+                            $atRunLine = trans('hr-manager::settings.at_last_run_detail', [
+                                'ago'      => \Carbon\Carbon::parse($atRun['at'])->diffForHumans(),
+                                'requests' => (int) ($atRun['requests'] ?? 0),
+                                'in_voice' => (int) ($atRun['in_voice'] ?? 0),
+                                'hidden'   => (int) ($atRun['hidden'] ?? 0),
+                                'errors'   => (int) ($atRun['errors'] ?? 0),
+                            ]);
+                            if (!empty($atRun['stopped'])) {
+                                $atReasonKey = 'hr-manager::settings.at_stop_' . $atRun['stopped'];
+                                $atReason = trans($atReasonKey);
+                                $atStopLine = trans('hr-manager::settings.at_last_run_stopped', ['reason' => $atReason === $atReasonKey ? $atRun['stopped'] : $atReason]);
+                            }
+                        }
+                    @endphp
+                    <div class="alert" style="background: rgba(102,126,234,0.12); border-left: 4px solid #667eea; color: var(--hr-text-light);">
+                        <strong><i class="fas fa-headset"></i> {{ trans('hr-manager::settings.at_heading') }}</strong>
+                        <p class="mb-0 mt-1" style="font-size: 0.9rem;">{{ trans('hr-manager::settings.at_intro') }}</p>
+                    </div>
+
+                    <form method="POST" action="{{ route('hr-manager.settings.update') }}">
+                        @csrf
+                        <input type="hidden" name="activity_tracking_form" value="1">
+
+                        <h5 style="color: var(--hr-text-white);"><i class="fas fa-rocket"></i> {{ trans('hr-manager::settings.at_eve_heading') }}</h5>
+                        <div class="form-group">
+                            <div class="custom-control custom-switch">
+                                <input type="checkbox" class="custom-control-input" id="activity_eve_sessions_enabled" name="activity_eve_sessions_enabled" value="1" {{ !empty($at['eve_enabled']) ? 'checked' : '' }}>
+                                <label class="custom-control-label" for="activity_eve_sessions_enabled">{{ trans('hr-manager::settings.at_eve_enabled') }}</label>
+                            </div>
+                            <small class="form-text" style="color: var(--hr-text-muted);">{{ trans('hr-manager::settings.at_eve_help') }}</small>
+                            @if(empty($at['eve_available']))
+                                <small class="form-text" style="color: var(--hr-warning, #ffc107);"><i class="fas fa-exclamation-triangle"></i> {{ trans('hr-manager::settings.at_eve_missing') }}</small>
+                            @endif
+                        </div>
+
+                        <hr style="border-color: rgba(255,255,255,0.08); margin: 20px 0;">
+
+                        <h5 style="color: var(--hr-text-white);"><i class="fab fa-discord"></i> {{ trans('hr-manager::settings.at_voice_heading') }}</h5>
+                        <div class="form-group">
+                            <div class="custom-control custom-switch">
+                                <input type="checkbox" class="custom-control-input" id="activity_voice_enabled" name="activity_voice_enabled" value="1" {{ $atVoiceOn ? 'checked' : '' }}>
+                                <label class="custom-control-label" for="activity_voice_enabled">{{ trans('hr-manager::settings.at_voice_enabled') }}</label>
+                            </div>
+                            <small class="form-text" style="color: var(--hr-text-muted);">{{ trans('hr-manager::settings.at_voice_help') }}</small>
+                        </div>
+
+                        {{-- The switch above stays usable; only what it governs dims while off. --}}
+                        <div style="{{ $atVoiceOn ? '' : 'opacity: 0.55;' }}">
+                            @if(empty($at['connector']))
+                                <p style="color: var(--hr-warning, #ffc107); font-size: 0.9rem;"><i class="fas fa-exclamation-triangle"></i> {{ trans('hr-manager::settings.at_connector_missing') }}</p>
+                            @elseif(empty($at['driver_configured']))
+                                <p style="color: var(--hr-warning, #ffc107); font-size: 0.9rem;"><i class="fas fa-exclamation-triangle"></i> {{ trans('hr-manager::settings.at_driver_missing') }}</p>
+                            @else
+                                <p style="color: var(--hr-success, #3fb950); font-size: 0.9rem;">
+                                    <i class="fas fa-check-circle"></i> {{ trans('hr-manager::settings.at_connector_ok') }}
+                                    {{ trans('hr-manager::settings.at_linked', ['n' => (int) ($atSizing['linked'] ?? 0)]) }}
+                                </p>
+                            @endif
+                            <p style="color: var(--hr-text-muted); font-size: 0.85rem;"><i class="fas fa-info-circle"></i> {{ trans('hr-manager::settings.at_bot_permissions') }}</p>
+
+                            <div class="form-group">
+                                <label for="activity_voice_interval">{{ trans('hr-manager::settings.at_interval') }}</label>
+                                <select name="activity_voice_interval" id="activity_voice_interval" class="form-control" style="max-width: 360px;">
+                                    @foreach(\HrManager\Services\ActivityTrackingService::INTERVALS as $atOpt)
+                                        <option value="{{ $atOpt }}" {{ (int) ($at['interval'] ?? 5) === $atOpt ? 'selected' : '' }}>{{ trans('hr-manager::settings.at_interval_option', ['n' => $atOpt]) }}</option>
+                                    @endforeach
+                                </select>
+                                <small class="form-text" style="color: var(--hr-text-muted);">{{ trans('hr-manager::settings.at_interval_help') }}</small>
+                            </div>
+
+                            @if($atSizing)
+                                <div class="mb-3" style="border: 1px solid rgba(255,255,255,0.08); border-left: 4px solid {{ $atVerdictColor }}; border-radius: 6px; padding: 12px 14px;">
+                                    <strong style="color: var(--hr-text-white);">{{ trans('hr-manager::settings.at_sizing_heading') }}</strong>
+                                    <p class="mb-2 mt-1" style="color: var(--hr-text-muted); font-size: 0.85rem;">{{ trans('hr-manager::settings.at_sizing_intro', ['rate' => \HrManager\Services\VoicePoller::MAX_REQUESTS_PER_SECOND, 'budget' => \HrManager\Services\VoicePoller::RUN_BUDGET_SECONDS]) }}</p>
+                                    <p class="mb-1" style="color: var(--hr-text-light);">
+                                        {{ trans('hr-manager::settings.at_sizing_now', ['linked' => $atSizing['linked'], 'interval' => $atSizing['interval'], 'per_minute' => $atSizing['per_minute'], 'per_hour' => number_format($atSizing['per_hour'])]) }}
+                                        <strong style="color: {{ $atVerdictColor }};">{{ trans('hr-manager::settings.at_sizing_' . $atSizing['verdict'], ['rec' => $atSizing['recommended']]) }}</strong>
+                                    </p>
+                                    <p class="mb-2" style="color: var(--hr-text-muted); font-size: 0.8rem;">
+                                        {{ $atSizing['rate_source'] === 'discord'
+                                            ? trans('hr-manager::settings.at_sizing_rate_discord', ['rate' => $atSizing['rate']])
+                                            : trans('hr-manager::settings.at_sizing_rate_hr', ['rate' => $atSizing['rate']]) }}
+                                    </p>
+                                    <table class="table table-sm mb-0" style="max-width: 420px; color: var(--hr-text-light);">
+                                        <thead>
+                                            <tr>
+                                                <th>{{ trans('hr-manager::settings.at_sizing_table_interval') }}</th>
+                                                <th>{{ trans('hr-manager::settings.at_sizing_table_max') }}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($atSizing['max_members'] as $atInt => $atMax)
+                                                <tr style="{{ $atInt === $atSizing['recommended'] ? 'font-weight: 600; color: var(--hr-text-white);' : '' }}">
+                                                    <td>{{ trans('hr-manager::settings.at_interval_option', ['n' => $atInt]) }}</td>
+                                                    <td>{{ number_format($atMax) }}</td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                    @if(!$atSizing['hidden_ok'])
+                                        <p class="mb-0 mt-2" style="color: var(--hr-warning, #ffc107); font-size: 0.85rem;"><i class="fas fa-exclamation-triangle"></i> {{ trans('hr-manager::settings.at_sizing_hidden_warn', ['n' => number_format($atSizing['hidden_worst_10min'])]) }}</p>
+                                    @endif
+                                </div>
+                            @endif
+
+                            <div class="form-group">
+                                <div class="custom-control custom-switch">
+                                    <input type="checkbox" class="custom-control-input" id="activity_voice_classifier" name="activity_voice_classifier" value="1" {{ !empty($at['voice_classifier']) ? 'checked' : '' }}>
+                                    <label class="custom-control-label" for="activity_voice_classifier">{{ trans('hr-manager::settings.at_voice_classifier') }}</label>
+                                </div>
+                                <small class="form-text" style="color: var(--hr-text-muted);">{{ trans('hr-manager::settings.at_voice_classifier_help') }}</small>
+                            </div>
+
+                            <p class="mb-3" style="color: var(--hr-text-muted); font-size: 0.85rem;">
+                                <strong>{{ trans('hr-manager::settings.at_last_run') }}:</strong>
+                                {{ $atRunLine ?? trans('hr-manager::settings.at_last_run_none') }}
+                                @if($atStopLine)
+                                    <span style="color: var(--hr-warning, #ffc107);">{{ $atStopLine }}</span>
+                                @endif
+                            </p>
+                        </div>
+
+                        <hr style="border-color: rgba(255,255,255,0.08); margin: 20px 0;">
+
+                        <div class="form-group">
+                            <label for="activity_retention_days">{{ trans('hr-manager::settings.at_retention') }}</label>
+                            <select name="activity_retention_days" id="activity_retention_days" class="form-control" style="max-width: 360px;">
+                                @foreach(\HrManager\Services\ActivityTrackingService::RETENTION_OPTIONS as $atDays)
+                                    <option value="{{ $atDays }}" {{ (int) ($at['retention'] ?? 180) === $atDays ? 'selected' : '' }}>{{ trans('hr-manager::settings.at_retention_option', ['n' => $atDays]) }}</option>
+                                @endforeach
+                            </select>
+                            <small class="form-text" style="color: var(--hr-text-muted);">{{ trans('hr-manager::settings.at_retention_help') }}</small>
+                        </div>
+
+                        <button type="submit" class="btn btn-hr-primary btn-icon mt-2">
+                            <i class="fas fa-save"></i> {{ trans('hr-manager::settings.save_settings') }}
+                        </button>
+                    </form>
+                </div>
+
                 <div class="tab-pane" id="purge-squads">
                     @php $excludableSquads = array_values(array_filter($purgeSquads['all_squads'], fn ($s) => in_array($s['type'], ['manual', 'hidden'], true))); @endphp
                     <div class="alert" style="background: rgba(102,126,234,0.12); border-left: 4px solid #667eea; color: var(--hr-text-light);">

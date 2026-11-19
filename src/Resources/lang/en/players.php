@@ -306,6 +306,25 @@ return [
     'until_optional'    => 'Until (optional, blank = open-ended)',
     'scheduled_for'     => 'Scheduled for (optional, blank = no date yet)',
 
+    // Game and comms time panel
+    'ca_heading'           => 'Game and comms time',
+    'ca_window'            => 'Hours: last 7 / 30 days',
+    'ca_now'               => 'Now',
+    'ca_last_game'         => 'Last in EVE',
+    'ca_game_hours'        => 'Hours in EVE',
+    'ca_last_voice'        => 'Last in voice',
+    'ca_voice_hours'       => 'Hours in voice',
+    'ca_hidden_channel'    => 'a channel the bot cannot see',
+    'ca_split'             => 'Last 30 days: :game% in EVE, :voice% in Discord voice',
+    'ca_split_game'        => 'In EVE',
+    'ca_split_voice'       => 'In Discord voice',
+    'ca_top_channels'      => 'Most used channels',
+    'ca_voice_off'         => 'Discord voice tracking is off. Switch it on under Settings, Activity Tracking.',
+    'ca_voice_unavailable' => 'Discord voice tracking needs SeAT Connector with its Discord driver configured.',
+    'ca_not_linked'        => 'No Discord account linked through SeAT Connector, so there is no voice time to show.',
+    'ca_voice_accuracy'    => 'Voice is sampled every :n minutes, so times are accurate to about that, and a very short visit can be missed.',
+    'ca_since'             => 'Tracking started :when; hours before that are not counted.',
+
     // Tier auto-resolution unavailable
     'tier_auto_unavailable' => 'Tier auto-resolution requires the SeAT Connector framework with Discord driver. Install warlof/seat-connector + warlof/seat-discord-connector to auto-tier players from their Discord role assignments.',
 ];

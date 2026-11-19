@@ -73,6 +73,8 @@ class HrManagerServiceProvider extends AbstractSeatPlugin
                 Console\Commands\ScanDonationsCommand::class,
                 Console\Commands\BackfillMemberArchivesCommand::class,
                 Console\Commands\InitCommand::class,
+                Console\Commands\RecordEveSessionsCommand::class,
+                Console\Commands\PollVoiceCommand::class,
             ]);
         }
 

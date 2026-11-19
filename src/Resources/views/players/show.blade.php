@@ -559,6 +559,9 @@
          attendance, summed across alts. --}}
     @include('hr-manager::players.partials._mining_engagement', ['engagement' => $miningEngagement])
 
+    {{-- Game and comms time — last in EVE, last in Discord voice, hours in each. --}}
+    @include('hr-manager::players.partials._comms_activity', ['comms' => $commsActivity ?? null])
+
     {{-- PvP activity — the account's most active PvP characters (cache-peek,
          warms as each is opened). Quick stats + a jump into each. --}}
     @if(!empty($topPvp))

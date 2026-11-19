@@ -18,6 +18,7 @@
         'ok'   => ['#28a745', 'fa-check-circle', 'OK'],
         'warn' => ['#ffc107', 'fa-exclamation-triangle', 'WARN'],
         'fail' => ['#dc3545', 'fa-times-circle', 'FAIL'],
+        'info' => ['#17a2b8', 'fa-info-circle', 'INFO'],
     ];
 @endphp
 

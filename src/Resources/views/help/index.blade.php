@@ -1285,6 +1285,44 @@ docker compose -f docker-compose.yml -f docker-compose.mariadb.yml -f docker-com
                     <p>With Buyback Manager installed, the <strong>Economy</strong> tab carries a buyback card (ISK credited to the corp + top contributors) and the player profile a buyback panel. Each corp's buyback is valued by a <strong>per-corp policy</strong> (Settings → Buyback Contribution): <strong>Direct corp / Community / Personal</strong> with a weight, and an alt or holding corp's buyback can be credited to your main corp as support. A recent counted contribution also acts as a positive classifier signal — a <code>buyback_hold</code> badge that holds a borderline at-risk member at active, like the blueprint modifier.</p>
                 </div>
 
+                {{-- Game and comms tracking (EVE sessions always; voice needs SeAT Connector) --}}
+                <div class="help-card">
+                    <h3><i class="fas fa-headset"></i> Game and comms tracking <span style="font-size:0.7rem; opacity:0.7;">(voice needs SeAT Connector)</span></h3>
+                    <p>HR keeps a history of when members play EVE and when they sit in Discord voice. The player profile gets a <strong>Game and comms time</strong> panel (last in EVE, last in voice, hours in each over 7 and 30 days), and the Corp Health <strong>Composition</strong> tab splits the roster into <strong>playing and on comms</strong>, <strong>playing, not on comms</strong>, <strong>on comms, not playing</strong>, and <strong>neither</strong>, with the two middle groups listed by name. Everything is per human: all of a player's characters count together, so time on an alt is time played.</p>
+
+                    <h4>Where the data comes from</h4>
+                    <ul>
+                        <li><strong>EVE</strong> is copied out of the online status SeAT already keeps for each character, so it costs no ESI calls of its own. A character needs the <code>esi-location.read_online.v1</code> scope. SeAT refreshes that status about once an hour, so a short session between two refreshes can be missed, and a session's end is the last time the character was seen online, not the exact logout. On by default.</li>
+                        <li><strong>Discord voice</strong> is read by asking Discord, once per interval for every member linked through SeAT Connector, whether they are in a voice channel. It borrows the bot SeAT Connector already runs, so there is no second bot to set up. Off by default: switch it on under <strong>Settings &rarr; Activity Tracking</strong>. Members are not told individually, so say in your corp rules that voice presence is recorded.</li>
+                    </ul>
+
+                    <h4>Choosing a poll interval</h4>
+                    <p>The bot token is shared with SeAT Connector, so HR holds itself to <strong>10 requests a second</strong>, a fifth of Discord's 50-a-second limit for a bot, and each minute's slice of members has to finish inside 50 seconds. The table keeps 40% of that in reserve. Discord does not publish the limit for this endpoint; after the first poll HR reads the figure Discord reports and uses it if it is lower, and the Settings page shows the advice for your own member count.</p>
+                    <table class="table table-dark">
+                        <thead>
+                            <tr><th>Interval</th><th>Linked Discord accounts it handles</th><th>Typical fit</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>5 minutes</td><td>up to 1,500</td><td>A corp, or a small alliance. The default.</td></tr>
+                            <tr><td>10 minutes</td><td>up to 3,000</td><td>A mid-sized alliance</td></tr>
+                            <tr><td>15 minutes</td><td>up to 4,500</td><td>A large alliance</td></tr>
+                            <tr><td>20 / 30 / 60 minutes</td><td>up to 6,000 / 9,000 / 18,000</td><td>Coalition-sized SeAT installs</td></tr>
+                        </tbody>
+                    </table>
+                    <p>A longer interval makes voice hours coarser (each sample stands for one interval), not wrong. A member in voice for less than one interval can be missed entirely.</p>
+
+                    <div class="warning-box">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Give the bot View Channel and Connect on your voice channels.</strong>
+                        In a channel the bot cannot see, Discord still says the member is in voice but refuses to say which channel, and every refusal counts toward Discord's limit of 10,000 refused requests per ten minutes, past which it temporarily bans the server's IP. That ban would stop SeAT Connector as well. HR counts refusals and pauses polling at half that limit, and inside the intervals above it cannot reach it even if every member were hidden, but granting the permissions keeps channel names visible and the count at zero.
+                    </div>
+
+                    <h4>Classification</h4>
+                    <p>Logins read with each member's own token count as activity too, so a corp without a director token no longer looks idle to the classifier. With <strong>Let voice time count</strong> on (the default once voice is enabled), an hour or more in voice in the recent half of a tier's threshold holds an at-risk member at active, shown as a <strong>VC</strong> badge, the same way the blueprint and buyback signals do. On an inactive or dead-weight member, recent voice time only adds a <strong>COM</strong> note so you can see they are still around on comms; it never changes their category.</p>
+
+                    <p class="text-muted"><small>Sessions are kept for 180 days by default (90 days to two years, in Settings) and pruned by the daily <code>hr-manager:cleanup</code> run. The Diagnostic page's Settings Health tab shows the last poll, the measured Discord limit and anything that stopped a run.</small></p>
+                </div>
+
                 {{-- Wallet Insights cluster --}}
                 <div class="help-card">
                     <h3><i class="fas fa-coins"></i> {{ trans('hr-manager::help.wi_title') }}</h3>
@@ -1624,7 +1662,7 @@ docker compose -f docker-compose.yml -f docker-compose.mariadb.yml -f docker-com
 
                     <h4><code>hr-manager:cleanup</code></h4>
                     <p>{{ trans('hr-manager::help.cmd_cleanup') }}</p>
-                    <p class="text-muted cmd-meta"><small><strong>Options:</strong> <code>--days=90</code> delete soft-deleted applications older than N days &middot; <code>--dry-run</code> show what would be deleted &nbsp;|&nbsp; <strong>Runs:</strong> daily 03:00</small></p>
+                    <p class="text-muted cmd-meta"><small><strong>Options:</strong> <code>--days=90</code> delete soft-deleted applications older than N days &middot; <code>--dry-run</code> show what would be deleted (also counts the game and comms sessions past their retention) &nbsp;|&nbsp; <strong>Runs:</strong> daily 03:00</small></p>
 
                     <h4><code>hr-manager:classify-players</code></h4>
                     <p>{{ trans('hr-manager::help.cmd_classify') }}</p>
@@ -1676,7 +1714,7 @@ docker compose -f docker-compose.yml -f docker-compose.mariadb.yml -f docker-com
 
                     <h4><code>hr-manager:prune-audit-log</code></h4>
                     <p>{{ trans('hr-manager::help.cmd_prune_audit_log') }}</p>
-                    <p class="text-muted cmd-meta"><small><strong>Options:</strong> <code>--days=N</code> override the retention window &nbsp;|&nbsp; <strong>Runs:</strong> daily 04:30 (runs even when the Activity Log is off, so it still drains)</small></p>
+                    <p class="text-muted cmd-meta"><small><strong>Options:</strong> <code>--days=N</code> override the retention window &nbsp;|&nbsp; <strong>Runs:</strong> daily 04:45 (runs even when the Activity Log is off, so it still drains)</small></p>
 
                     <h4><code>hr-manager:diagnose</code></h4>
                     <p>{{ trans('hr-manager::help.cmd_diagnose') }}</p>
@@ -1689,6 +1727,14 @@ docker compose -f docker-compose.yml -f docker-compose.mariadb.yml -f docker-com
                     <h4><code>hr-manager:backfill-member-archives</code></h4>
                     <p>{{ trans('hr-manager::help.cmd_backfill_member_archives') }}</p>
                     <p class="text-muted cmd-meta"><small><strong>Options:</strong> <code>--corporation=ID</code> only this corp &nbsp;|&nbsp; <code>--since=YYYY-MM-DD</code> only stints that ended on or after this date &nbsp;|&nbsp; <code>--dry-run</code> report without writing &nbsp;|&nbsp; <code>--yes</code> skip the prompt &nbsp;|&nbsp; <strong>Runs:</strong> on demand (one-time; departures from here on are recorded as they happen)</small></p>
+
+                    <h4><code>hr-manager:record-eve-sessions</code></h4>
+                    <p>{{ trans('hr-manager::help.cmd_record_eve_sessions') }}</p>
+                    <p class="text-muted cmd-meta"><small><strong>Options:</strong> none &nbsp;|&nbsp; <strong>Runs:</strong> every 15 minutes (no-op when EVE session tracking is off)</small></p>
+
+                    <h4><code>hr-manager:poll-voice</code></h4>
+                    <p>{{ trans('hr-manager::help.cmd_poll_voice') }}</p>
+                    <p class="text-muted cmd-meta"><small><strong>Options:</strong> <code>--sync</code> poll this minute's slice in the console instead of the queue, and print what Discord answered &nbsp;|&nbsp; <strong>Runs:</strong> every minute (no-op until voice tracking is on and SeAT Connector's Discord driver is configured)</small></p>
 
                     <div class="info-box">
                         <i class="fas fa-info-circle"></i>
