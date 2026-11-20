@@ -1,0 +1,52 @@
+{
+    "plugin": "hr-manager",
+    "manager_core": { "relation": "optional", "minimum": "1.1.0" },
+    "migration_identifier": "hr_manager",
+    "publishes": [
+        "hr.application.submitted", "hr.application.accepted", "hr.application.rejected", "hr.application.withdrawn",
+        "hr.application.status_changed", "hr.application.joined_corp",
+        "hr.player.milestone_reached", "hr.player.classification_changed", "hr.player.flagged_at_risk",
+        "hr.player.flagged_inactive", "hr.player.flagged_dead_weight", "hr.player.recovered",
+        "hr.player.flagged_wallet_stalled", "hr.player.flagged_wallet_compliance_low",
+        "hr.player.flagged_negative_contribution", "hr.player.inactive_director", "hr.player.silent_wallet_director",
+        "hr.purge.reminder", "hr.purge.executed"
+    ],
+    "subscribes": [
+        { "topic": "blueprint.request.*", "handler": "hr.onBlueprintRequest" },
+        { "topic": "buyback.contract.completed", "handler": "hr.onBuybackCompleted" },
+        { "topic": "buyback.offer.published", "handler": "hr.onBuybackOffer" },
+        { "topic": "member.contribution.drop_detected", "handler": "hr.onContributionDropDetected" },
+        { "topic": "member.contribution.milestone", "handler": "hr.onWalletMilestone" },
+        { "topic": "member.contribution.stalled", "handler": "hr.onWalletStalled" },
+        { "topic": "member.tax.compliance_dropped", "handler": "hr.onWalletComplianceDropped" },
+        { "topic": "mining.*", "handler": "hr.onMiningEvent" },
+        { "topic": "pings.broadcast.sent", "handler": "hr.onBroadcastSent" },
+        { "topic": "pings.formup.scheduled", "handler": "hr.onFormupScheduled" },
+        { "topic": "structure.alert.*", "handler": "hr.onStructureAlert" },
+        { "topic": "wallet.unusual_recipient_detected", "handler": "hr.onUnusualRecipient" }
+    ],
+    "capabilities": {
+        "provides": [
+            "hr.getApplicationStatus", "hr.getAssessment", "hr.onBlueprintRequest", "hr.onBroadcastSent",
+            "hr.onBuybackCompleted", "hr.onBuybackOffer", "hr.onContributionDropDetected", "hr.onFormupScheduled",
+            "hr.onMiningEvent", "hr.onStructureAlert", "hr.onUnusualRecipient", "hr.onWalletComplianceDropped",
+            "hr.onWalletMilestone", "hr.onWalletStalled"
+        ],
+        "calls": [
+            "corp-wallet-manager:contribution.getActivityGaps", "corp-wallet-manager:contribution.getCharacterByCategory",
+            "corp-wallet-manager:contribution.getCharacterEntries", "corp-wallet-manager:contribution.getCharacterPercentile",
+            "corp-wallet-manager:contribution.getCharacterTaxCompliance", "corp-wallet-manager:contribution.getCharacterTrend",
+            "corp-wallet-manager:contribution.getCorpMemberSummary", "corp-wallet-manager:contribution.getLifetimeSummary",
+            "corp-wallet-manager:contribution.getNetPosition", "corp-wallet-manager:ratting.getCharacterBreakdown",
+            "corp-wallet-manager:ratting.getCharacterIncome", "corp-wallet-manager:ratting.getCharacterMonthly",
+            "corp-wallet-manager:wallet.getCorpOutflows", "corp-wallet-manager:wallet.getCorpSummary",
+            "corp-wallet-manager:wallet.getDirectorAttribution",
+            "blueprint-manager:blueprint.getCharacterStats", "blueprint-manager:blueprint.getCorpSummary",
+            "structure-manager:compliance.getForCorporation"
+        ]
+    },
+    "routes": {
+        "serves": [],
+        "uses": ["buyback.appraisal.create", "structure-manager.doctrines.index"]
+    }
+}
